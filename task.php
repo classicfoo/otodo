@@ -20,9 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
-    $priority = (int)($_POST['priority'] ?? 2);
-    if ($priority < 1 || $priority > 3) {
-        $priority = 2;
+    $priority = (int)($_POST['priority'] ?? 0);
+    if ($priority < 0 || $priority > 3) {
+        $priority = 0;
     }
     $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority WHERE id = :id AND user_id = :uid');
     $stmt->execute([
@@ -36,6 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: index.php');
     exit();
 }
+
+$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
+$p = (int)($task['priority'] ?? 0);
+if ($p < 0 || $p > 3) { $p = 0; }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,6 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container">
         <a href="index.php" class="navbar-brand">Todo App</a>
+        <div class="d-flex align-items-center gap-2">
+            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
+        </div>
     </div>
 </nav>
 <div class="container">
@@ -62,8 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
         </div>
         <div class="mb-3">
-            <label class="form-label">Priority</label>
+            <label class="form-label d-flex align-items-center justify-content-between">
+                <span>Priority</span>
+                <span id="priorityBadge" class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
+            </label>
             <select name="priority" class="form-select">
+                <option value="0" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
                 <option value="3" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
                 <option value="2" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
                 <option value="1" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
@@ -79,4 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 </div>
 </body>
+<script>
+(function(){
+  const select = document.querySelector('select[name="priority"]');
+  const badge = document.getElementById('priorityBadge');
+  if (!select || !badge) return;
+  const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
+  const classes = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-warning', 3: 'bg-danger'};
+  function updateBadge() {
+    const val = parseInt(select.value, 10);
+    badge.textContent = labels[val] || 'None';
+    badge.className = 'badge ' + (classes[val] || classes[0]);
+  }
+  select.addEventListener('change', updateBadge);
+})();
+</script>
 </html>
