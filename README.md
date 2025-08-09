@@ -8,6 +8,7 @@ A simple PHP online todo list application with user authentication and SQLite st
 - Add, complete, and delete tasks
 - Tasks stored per user in an SQLite database
 - Responsive design for desktop and mobile browsers
+- Optional due dates and descriptions for tasks
 
 ## Getting Started
 

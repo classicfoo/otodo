@@ -17,9 +17,20 @@ function get_db() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             description TEXT NOT NULL,
+            due_date TEXT,
+            details TEXT,
             done INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )");
+
+        // Ensure new columns exist for older databases
+        $columns = $db->query('PRAGMA table_info(tasks)')->fetchAll(PDO::FETCH_COLUMN, 1);
+        if (!in_array('due_date', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN due_date TEXT');
+        }
+        if (!in_array('details', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN details TEXT');
+        }
     }
     return $db;
 }
