@@ -24,7 +24,7 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="container">
         <span class="navbar-brand mb-0 h1">Todo App</span>
         <div class="d-flex align-items-center">
-            <span class="me-3">Hello, <?=htmlspecialchars($_SESSION['username'])?></span>
+            <span class="me-3">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></span>
             <a href="logout.php" class="btn btn-outline-secondary btn-sm">Logout</a>
         </div>
     </div>
@@ -37,8 +37,8 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between">
-                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'])?></span>
-                <span class="text-muted"><?=htmlspecialchars($task['due_date'])?></span>
+                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="text-muted"><?=htmlspecialchars($task['due_date'] ?? '')?></span>
             </a>
         <?php endforeach; ?>
     </div>
