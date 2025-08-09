@@ -19,6 +19,7 @@ function get_db() {
             description TEXT NOT NULL,
             due_date TEXT,
             details TEXT,
+            priority INTEGER NOT NULL DEFAULT 2,
             done INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )");
@@ -30,6 +31,9 @@ function get_db() {
         }
         if (!in_array('details', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN details TEXT');
+        }
+        if (!in_array('priority', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
         }
     }
     return $db;

@@ -7,9 +7,12 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, done FROM tasks WHERE user_id = :uid ORDER BY id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$priority_labels = [1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -31,8 +34,24 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </nav>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <input type="text" name="description" class="form-control" placeholder="New task" required>
-        <button type="submit" class="d-none"></button>
+        <div class="mb-2">
+            <input type="text" name="description" class="form-control" placeholder="New task" required>
+        </div>
+        <div class="mb-2">
+            <input type="date" name="due_date" class="form-control" placeholder="Due date">
+        </div>
+        <div class="mb-2">
+            <select name="priority" class="form-select">
+                <option value="3">High</option>
+                <option value="2" selected>Medium</option>
+                <option value="1">Low</option>
+            </select>
+        </div>
+        <div class="mb-2">
+            <textarea name="details" class="form-control" placeholder="Description"></textarea>
+        </div>
+        <button class="btn btn-primary" type="submit">Add</button>
+
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
@@ -40,6 +59,7 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
                 <span class="text-muted"><?=htmlspecialchars($task['due_date'] ?? '')?></span>
             </a>
+
         <?php endforeach; ?>
     </div>
 </div>
