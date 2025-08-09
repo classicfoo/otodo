@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done FROM tasks WHERE user_id = :uid ORDER BY id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, done FROM tasks WHERE user_id = :uid ORDER BY id DESC');
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -31,40 +31,17 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </nav>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <div class="mb-2">
-            <input type="text" name="description" class="form-control" placeholder="New task" required>
-        </div>
-        <div class="mb-2">
-            <input type="date" name="due_date" class="form-control" placeholder="Due date">
-        </div>
-        <div class="mb-2">
-            <textarea name="details" class="form-control" placeholder="Description"></textarea>
-        </div>
-        <button class="btn btn-primary" type="submit">Add</button>
+        <input type="text" name="description" class="form-control" placeholder="New task" required>
+        <button type="submit" class="d-none"></button>
     </form>
-    <ul class="list-group">
+    <div class="list-group">
         <?php foreach ($tasks as $task): ?>
-            <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'])?></span>
-                        <?php if (!empty($task['due_date'])): ?>
-                            <div class="small text-muted">Due: <?=htmlspecialchars($task['due_date'])?></div>
-                        <?php endif; ?>
-                        <?php if (!empty($task['details'])): ?>
-                            <div class="small"><?=nl2br(htmlspecialchars($task['details']))?></div>
-                        <?php endif; ?>
-                    </div>
-                    <span>
-                        <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-sm btn-success me-1">
-                            <?=$task['done'] ? 'Undo' : 'Done'?>
-                        </a>
-                        <a href="delete_task.php?id=<?=$task['id']?>" class="btn btn-sm btn-danger">Delete</a>
-                    </span>
-                </div>
-            </li>
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between">
+                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'])?></span>
+                <span class="text-muted"><?=htmlspecialchars($task['due_date'])?></span>
+            </a>
         <?php endforeach; ?>
-    </ul>
+    </div>
 </div>
 </body>
 </html>
