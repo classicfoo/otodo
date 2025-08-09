@@ -7,9 +7,11 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done FROM tasks WHERE user_id = :uid ORDER BY id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$priority_labels = [1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -38,6 +40,13 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <input type="date" name="due_date" class="form-control" placeholder="Due date">
         </div>
         <div class="mb-2">
+            <select name="priority" class="form-select">
+                <option value="3">High</option>
+                <option value="2" selected>Medium</option>
+                <option value="1">Low</option>
+            </select>
+        </div>
+        <div class="mb-2">
             <textarea name="details" class="form-control" placeholder="Description"></textarea>
         </div>
         <button class="btn btn-primary" type="submit">Add</button>
@@ -47,6 +56,9 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <li class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
+                        <span class="badge <?= $priority_classes[$task['priority']] ?? 'bg-secondary' ?> me-1">
+                            <?= $priority_labels[$task['priority']] ?? '' ?>
+                        </span>
                         <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'])?></span>
                         <?php if (!empty($task['due_date'])): ?>
                             <div class="small text-muted">Due: <?=htmlspecialchars($task['due_date'])?></div>
