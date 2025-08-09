@@ -34,24 +34,8 @@ $priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
 </nav>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <div class="mb-2">
-            <input type="text" name="description" class="form-control" placeholder="New task" required>
-        </div>
-        <div class="mb-2">
-            <input type="date" name="due_date" class="form-control" placeholder="Due date">
-        </div>
-        <div class="mb-2">
-            <select name="priority" class="form-select">
-                <option value="3">High</option>
-                <option value="2" selected>Medium</option>
-                <option value="1">Low</option>
-            </select>
-        </div>
-        <div class="mb-2">
-            <textarea name="details" class="form-control" placeholder="Description"></textarea>
-        </div>
-        <button class="btn btn-primary" type="submit">Add</button>
-
+        <input type="text" name="description" class="form-control" placeholder="New task" required>
+        <input type="submit" hidden>
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
