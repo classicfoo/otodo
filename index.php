@@ -27,7 +27,7 @@ $priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
     <div class="container">
         <span class="navbar-brand mb-0 h1">Todo App</span>
         <div class="d-flex align-items-center">
-            <span class="me-3">Hello, <?=htmlspecialchars($_SESSION['username'])?></span>
+            <span class="me-3">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></span>
             <a href="logout.php" class="btn btn-outline-secondary btn-sm">Logout</a>
         </div>
     </div>
@@ -55,28 +55,10 @@ $priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
-            <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="badge <?= $priority_classes[$task['priority']] ?? 'bg-secondary' ?> me-1">
-                            <?= $priority_labels[$task['priority']] ?? '' ?>
-                        </span>
-                        <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'])?></span>
-                        <?php if (!empty($task['due_date'])): ?>
-                            <div class="small text-muted">Due: <?=htmlspecialchars($task['due_date'])?></div>
-                        <?php endif; ?>
-                        <?php if (!empty($task['details'])): ?>
-                            <div class="small"><?=nl2br(htmlspecialchars($task['details']))?></div>
-                        <?php endif; ?>
-                    </div>
-                    <span>
-                        <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-sm btn-success me-1">
-                            <?=$task['done'] ? 'Undo' : 'Done'?>
-                        </a>
-                        <a href="delete_task.php?id=<?=$task['id']?>" class="btn btn-sm btn-danger">Delete</a>
-                    </span>
-                </div>
-            </li>
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between">
+                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="text-muted"><?=htmlspecialchars($task['due_date'] ?? '')?></span>
+            </a>
 
         <?php endforeach; ?>
     </div>

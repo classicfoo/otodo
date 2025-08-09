@@ -50,15 +50,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <form method="post">
         <div class="mb-3">
             <label class="form-label">Title</label>
-            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'])?>" required>
+            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Due Date</label>
-            <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'])?>">
+            <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <textarea name="details" class="form-control" rows="4"><?=htmlspecialchars($task['details'])?></textarea>
+            <textarea name="details" class="form-control" rows="4"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success ms-2"><?=$task['done'] ? 'Undo' : 'Done'?></a>
