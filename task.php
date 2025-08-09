@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$stmt = $db->prepare('SELECT id, description, due_date, details, done FROM tasks WHERE id = :id AND user_id = :uid');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE id = :id AND user_id = :uid');
 $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
@@ -20,11 +20,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details WHERE id = :id AND user_id = :uid');
+    $priority = (int)($_POST['priority'] ?? 2);
+    if ($priority < 1 || $priority > 3) {
+        $priority = 2;
+    }
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
+        ':priority' => $priority,
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
@@ -55,6 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mb-3">
             <label class="form-label">Due Date</label>
             <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Priority</label>
+            <select name="priority" class="form-select">
+                <option value="3" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
+                <option value="2" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
+                <option value="1" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
+            </select>
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
