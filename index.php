@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [1 => 'Low', 2 => 'Medium', 3 => 'High'];
@@ -50,8 +51,9 @@ $priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
             <textarea name="details" class="form-control" placeholder="Description"></textarea>
         </div>
         <button class="btn btn-primary" type="submit">Add</button>
+
     </form>
-    <ul class="list-group">
+    <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <li class="list-group-item">
                 <div class="d-flex justify-content-between align-items-start">
@@ -75,8 +77,9 @@ $priority_classes = [1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
                     </span>
                 </div>
             </li>
+
         <?php endforeach; ?>
-    </ul>
+    </div>
 </div>
 </body>
 </html>
