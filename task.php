@@ -56,11 +56,30 @@ if ($p < 0 || $p > 3) { $p = 0; }
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        #prioritySelect option:hover,
-        #prioritySelect option:focus,
-        #prioritySelect option:active {
-            background-color: inherit !important;
-            color: inherit !important;
+        #prioritySelect option.bg-secondary-subtle:hover,
+        #prioritySelect option.bg-secondary-subtle:focus,
+        #prioritySelect option.bg-secondary-subtle:active {
+            background-color: var(--bs-secondary-bg-subtle) !important;
+            color: var(--bs-secondary-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-success-subtle:hover,
+        #prioritySelect option.bg-success-subtle:focus,
+        #prioritySelect option.bg-success-subtle:active {
+            background-color: var(--bs-success-bg-subtle) !important;
+            color: var(--bs-success-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-warning-subtle:hover,
+        #prioritySelect option.bg-warning-subtle:focus,
+        #prioritySelect option.bg-warning-subtle:active {
+            background-color: var(--bs-warning-bg-subtle) !important;
+            color: var(--bs-warning-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-danger-subtle:hover,
+        #prioritySelect option.bg-danger-subtle:focus,
+        #prioritySelect option.bg-danger-subtle:active {
+            background-color: var(--bs-danger-bg-subtle) !important;
+            color: var(--bs-danger-text-emphasis) !important;
+
         }
         #prioritySelect:hover,
         #prioritySelect:focus {
