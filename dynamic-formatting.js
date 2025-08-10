@@ -21,11 +21,13 @@
         }
         if (node.nodeType === Node.TEXT_NODE) {
           caret += node.textContent.length;
-        } else if (node.nodeName === 'BR') {
-          caret += 1;
-        }
-        for (const child of node.childNodes) {
-          if (traverse(child)) return true;
+        } else {
+          for (const child of node.childNodes) {
+            if (traverse(child)) return true;
+          }
+          if (node.nodeName === 'BR' || (node.nodeName === 'DIV' && node !== root)) {
+            caret += 1;
+          }
         }
         return false;
       }
