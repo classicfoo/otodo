@@ -33,7 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
-    header('Location: index.php');
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'ok']);
     exit();
 }
 
@@ -109,8 +110,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
             <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success ms-2"><?=$task['done'] ? 'Undo' : 'Done'?></a>
+        <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success"><?=$task['done'] ? 'Undo' : 'Done'?></a>
     </form>
 </div>
 </body>
@@ -118,27 +118,50 @@ if ($p < 0 || $p > 3) { $p = 0; }
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
-  if (!select) return;
-  const classes = {
-    0: 'bg-secondary text-white',
-    1: 'bg-success text-white',
-    2: 'bg-warning text-dark',
-    3: 'bg-danger text-white'
-  };
-  function updateSelect() {
-    const val = parseInt(select.value, 10);
-    select.className = 'form-select ' + (classes[val] || classes[0]);
+  const badge = document.getElementById('priorityBadge');
+  if (select && badge) {
+    const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
+    const classes = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-warning', 3: 'bg-danger'};
+    function updateBadge() {
+      const val = parseInt(select.value, 10);
+      badge.textContent = labels[val] || 'None';
+      badge.className = 'badge ' + (classes[val] || classes[0]);
+    }
+    select.addEventListener('change', updateBadge);
   }
-  select.addEventListener('change', updateSelect);
-})();
 
-document.querySelector('form')?.addEventListener('submit', function () {
-  const editable = document.getElementById('detailsEditable');
-  const input = document.getElementById('detailsInput');
-  if (editable && input) {
-    input.value = editable.innerText.trim();
+  const form = document.querySelector('form');
+  if (!form) return;
+  let timer;
+
+  function scheduleSave() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(sendSave, 500);
   }
-});
+
+  function sendSave(immediate = false) {
+    const editable = document.getElementById('detailsEditable');
+    const input = document.getElementById('detailsInput');
+    if (editable && input) {
+      input.value = editable.innerText.trim();
+    }
+    const data = new FormData(form);
+    if (immediate && navigator.sendBeacon) {
+      navigator.sendBeacon(window.location.href, data);
+    } else {
+      fetch(window.location.href, {method: 'POST', body: data});
+    }
+  }
+
+  form.addEventListener('input', scheduleSave);
+  form.addEventListener('change', scheduleSave);
+  form.addEventListener('submit', function(e){ e.preventDefault(); });
+  window.addEventListener('beforeunload', function(){
+    if (timer) {
+      sendSave(true);
+    }
+  });
+})();
 </script>
 </body>
 </html>
