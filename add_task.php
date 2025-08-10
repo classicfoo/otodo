@@ -6,14 +6,31 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+$db = get_db();
 $description = trim($_POST['description'] ?? '');
 if ($description !== '') {
+    // Determine today's date based on user location
+    $tz = $_SESSION['location'] ?? null;
+    if ($tz === null) {
+        $stmt = $db->prepare('SELECT location FROM users WHERE id = :id');
+        $stmt->execute([':id' => $_SESSION['user_id']]);
+        $tz = $stmt->fetchColumn() ?: 'UTC';
+        $_SESSION['location'] = $tz;
+    }
+    try {
+        $now = new DateTime('now', new DateTimeZone($tz));
+    } catch (Exception $e) {
+        $now = new DateTime('now');
+    }
+    $due_date = $now->format('Y-m-d');
+
     // Default new tasks to no priority (0)
-    $stmt = get_db()->prepare('INSERT INTO tasks (user_id, description, priority) VALUES (:uid, :description, :priority)');
+    $stmt = $db->prepare('INSERT INTO tasks (user_id, description, priority, due_date) VALUES (:uid, :description, :priority, :due_date)');
     $stmt->execute([
         ':uid' => $_SESSION['user_id'],
         ':description' => $description,
         ':priority' => 0,
+        ':due_date' => $due_date,
     ]);
 }
 
