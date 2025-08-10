@@ -41,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $priority_classes = [
-    0 => 'bg-secondary text-white',
-    1 => 'bg-success text-white',
-    2 => 'bg-warning text-dark',
-    3 => 'bg-danger text-white'
+    0 => 'bg-secondary-subtle text-secondary',
+    1 => 'bg-success-subtle text-success',
+    2 => 'bg-warning-subtle text-warning',
+    3 => 'bg-danger-subtle text-danger'
 ];
 $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
@@ -55,6 +55,38 @@ if ($p < 0 || $p > 3) { $p = 0; }
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #prioritySelect option.bg-secondary-subtle:hover,
+        #prioritySelect option.bg-secondary-subtle:focus,
+        #prioritySelect option.bg-secondary-subtle:active {
+            background-color: var(--bs-secondary-bg-subtle) !important;
+            color: var(--bs-secondary-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-success-subtle:hover,
+        #prioritySelect option.bg-success-subtle:focus,
+        #prioritySelect option.bg-success-subtle:active {
+            background-color: var(--bs-success-bg-subtle) !important;
+            color: var(--bs-success-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-warning-subtle:hover,
+        #prioritySelect option.bg-warning-subtle:focus,
+        #prioritySelect option.bg-warning-subtle:active {
+            background-color: var(--bs-warning-bg-subtle) !important;
+            color: var(--bs-warning-text-emphasis) !important;
+        }
+        #prioritySelect option.bg-danger-subtle:hover,
+        #prioritySelect option.bg-danger-subtle:focus,
+        #prioritySelect option.bg-danger-subtle:active {
+            background-color: var(--bs-danger-bg-subtle) !important;
+            color: var(--bs-danger-text-emphasis) !important;
+
+        }
+        #prioritySelect:hover,
+        #prioritySelect:focus {
+            background-color: inherit !important;
+            color: inherit !important;
+        }
+    </style>
     <title>Task Details</title>
 </head>
 <body class="bg-light">
@@ -106,11 +138,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Priority</label>
-            <select name="priority" class="form-select <?=$priority_classes[$p]?>">
-                <option value="0" class="bg-secondary text-white" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
-                <option value="3" class="bg-danger text-white" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
-                <option value="2" class="bg-warning text-dark" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
-                <option value="1" class="bg-success text-white" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
+            <select name="priority" id="prioritySelect" class="form-select <?=$priority_classes[$p]?>">
+                <option value="0" class="bg-secondary-subtle text-secondary" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
+                <option value="3" class="bg-danger-subtle text-danger" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
+                <option value="2" class="bg-warning-subtle text-warning" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
+                <option value="1" class="bg-success-subtle text-success" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
             </select>
         </div>
         <div class="mb-3">
@@ -118,6 +150,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
             <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
+        <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -127,7 +160,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const badge = document.getElementById('priorityBadge');
   if (select && badge) {
     const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
-    const classes = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-warning', 3: 'bg-danger'};
+    const classes = {0: 'bg-secondary-subtle text-secondary', 1: 'bg-success-subtle text-success', 2: 'bg-warning-subtle text-warning', 3: 'bg-danger-subtle text-danger'};
     function updateBadge() {
       const val = parseInt(select.value, 10);
       badge.textContent = labels[val] || 'None';
