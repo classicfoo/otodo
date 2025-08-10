@@ -13,13 +13,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields';
     } else {
-        $stmt = get_db()->prepare('SELECT id, password, location FROM users WHERE username = :username');
+        $stmt = get_db()->prepare('SELECT id, password, location, dynamic_formatting FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
             $_SESSION['location'] = $user['location'] ?? 'UTC';
+            $_SESSION['dynamic_formatting'] = (int)($user['dynamic_formatting'] ?? 1);
             header('Location: index.php');
             exit();
         } else {
