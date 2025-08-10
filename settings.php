@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 $db = get_db();
 $message = '';
 $location = $_SESSION['location'] ?? '';
+$timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $location = trim($_POST['location'] ?? '');
@@ -60,13 +61,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
     <form method="post" class="mb-3" autocomplete="off">
         <div class="mb-3">
-            <label class="form-label">Location (timezone)</label>
-            <input type="text" name="location" class="form-control" value="<?=htmlspecialchars($location)?>" placeholder="e.g., America/New_York">
+            <label class="form-label" for="location">Location (timezone)</label>
+            <input type="text" name="location" id="location" class="form-control" list="tz-list" value="<?=htmlspecialchars($location)?>" placeholder="Start typing your timezone">
+            <datalist id="tz-list">
+                <?php foreach ($timezones as $tz): ?>
+                    <option value="<?=htmlspecialchars($tz)?>"></option>
+                <?php endforeach; ?>
+            </datalist>
+            <button type="button" class="btn btn-outline-secondary mt-2" id="detect-tz">Use My Timezone</button>
         </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const input = document.getElementById('location');
+const detectBtn = document.getElementById('detect-tz');
+function setBrowserTz() {
+    try {
+        input.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (e) {}
+}
+detectBtn.addEventListener('click', setBrowserTz);
+if (!input.value) {
+    setBrowserTz();
+}
+</script>
 </body>
 </html>
