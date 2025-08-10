@@ -51,9 +51,9 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <span class="text-decoration-line-through"><?=htmlspecialchars($task['description'] ?? '')?></span>
-                <span class="d-flex align-items-center gap-2">
+            <div class="list-group-item d-flex align-items-start">
+                <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
                     <?php if (!empty($task['due_date'])): ?>
                         <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>
                     <?php endif; ?>

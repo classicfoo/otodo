@@ -63,7 +63,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     <form method="post">
         <div class="mb-3">
             <label class="form-label">Title</label>
-            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required>
+            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required autocapitalize="none">
         </div>
         <div class="mb-3">
             <label class="form-label">Due Date</label>
