@@ -51,7 +51,6 @@
             return true;
           }
           current += 1;
-
         } else {
           for (const child of node.childNodes) {
             if (traverse(child)) return true;
@@ -67,7 +66,8 @@
 
     function update() {
       const caret = getCaret(el);
-      const lines = el.textContent.split(/\n/);
+      const text = el.textContent;
+      const lines = text.split(/\n/);
 
       const formatted = lines.map(line => {
         if (line.startsWith('T ')) {
@@ -76,13 +76,14 @@
         }
         return line ? capitalizeFirst(line) : '';
       });
-      const html = formatted.join('<br>');
+      let html = formatted.join('<br>');
+      if (text.endsWith('\n')) html += '<br>';
+
       if (el.innerHTML !== html) {
         el.innerHTML = html;
         setCaret(el, caret);
       }
       if (hidden) hidden.value = el.textContent;
-
     }
 
     el.addEventListener('input', update);
