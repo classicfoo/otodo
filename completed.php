@@ -45,6 +45,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
         <div class="list-group">
             <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
             <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
     </div>

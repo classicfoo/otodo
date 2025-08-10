@@ -116,6 +116,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         <div class="list-group">
             <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
             <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
     </div>
