@@ -24,12 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($priority < 0 || $priority > 3) {
         $priority = 0;
     }
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority WHERE id = :id AND user_id = :uid');
+    $done = isset($_POST['done']) ? 1 : 0;
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
         ':priority' => $priority,
+        ':done' => $done,
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
@@ -92,9 +94,15 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <label class="form-label">Title</label>
             <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required autocapitalize="none">
         </div>
-        <div class="mb-3">
-            <label class="form-label">Due Date</label>
-            <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
+        <div class="mb-3 d-flex align-items-end gap-3">
+            <div>
+                <label class="form-label">Due Date</label>
+                <input type="date" name="due_date" class="form-control w-auto" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="done" id="doneCheckbox" <?php if ($task['done']) echo 'checked'; ?>>
+                <label class="form-check-label" for="doneCheckbox">Completed</label>
+            </div>
         </div>
         <div class="mb-3">
             <label class="form-label">Priority</label>
@@ -110,7 +118,6 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
             <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
-        <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success"><?=$task['done'] ? 'Undo' : 'Done'?></a>
     </form>
 </div>
 </body>
