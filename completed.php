@@ -28,7 +28,7 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
-        <a href="index.php" class="navbar-brand">Todo App</a>
+        <a href="index.php" class="navbar-brand">Otodo</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
             <span class="navbar-toggler-icon"></span>
         </button>
