@@ -66,27 +66,39 @@
       selection.addRange(range);
     }
 
-    function update() {
-      const caret = getCaret(el);
-      const text = el.innerText;
-      const lines = text.split(/\n/);
+      let updating = false;
 
-      const formatted = lines.map(line => {
-        if (line.startsWith('T ')) {
-          const rest = capitalizeFirst(line.slice(2));
-          return `<span style="color:blue;">T ${rest}</span>`;
+      function update() {
+        if (updating) return;
+        updating = true;
+        const caret = getCaret(el);
+        let text = el.innerText;
+        const trailing = text.endsWith('\n\n');
+        text = text.replace(/\n$/, '');
+        const lines = text.split(/\n/);
+
+        const formatted = lines.map(line => {
+          if (line.startsWith('T ')) {
+            const rest = capitalizeFirst(line.slice(2));
+            return `<span style="color:blue;">T ${rest}</span>`;
+          }
+          return line ? capitalizeFirst(line) : '';
+        });
+        let html = formatted.join('<br>');
+        if (trailing) html += '<br>';
+
+        if (el.innerHTML !== html) {
+          el.innerHTML = html;
+          setTimeout(() => {
+            setCaret(el, caret);
+            updating = false;
+          }, 0);
+        } else {
+          updating = false;
         }
-        return line ? capitalizeFirst(line) : '';
-      });
-      let html = formatted.join('<br>');
-      if (text.endsWith('\n')) html += '<br>';
-
-      if (el.innerHTML !== html) {
-        el.innerHTML = html;
-        setCaret(el, caret);
+        if (hidden) hidden.value = text;
       }
-      if (hidden) hidden.value = text;
-    }
+
 
     el.addEventListener('input', update);
     update();
