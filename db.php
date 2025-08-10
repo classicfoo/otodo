@@ -11,7 +11,8 @@ function get_db() {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            location TEXT
+            location TEXT,
+            dynamic_formatting INTEGER NOT NULL DEFAULT 1
         )");
 
         $db->exec("CREATE TABLE IF NOT EXISTS tasks (
@@ -37,10 +38,13 @@ function get_db() {
             $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
         }
 
-        // Ensure location column exists for users
+        // Ensure user columns exist for older databases
         $userColumns = $db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_COLUMN, 1);
         if (!in_array('location', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN location TEXT');
+        }
+        if (!in_array('dynamic_formatting', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN dynamic_formatting INTEGER NOT NULL DEFAULT 1');
         }
     }
     return $db;
