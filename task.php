@@ -53,7 +53,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
-        <a href="index.php" class="navbar-brand">Todo App</a>
+        <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
             <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
             <div class="dropdown">
