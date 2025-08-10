@@ -37,8 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
-$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
+$priority_classes = [
+    0 => 'bg-secondary text-white',
+    1 => 'bg-success text-white',
+    2 => 'bg-warning text-dark',
+    3 => 'bg-danger text-white'
+];
 $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
 ?>
@@ -52,10 +56,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
+
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
-            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
             <div class="dropdown">
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
@@ -92,15 +96,12 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <input type="date" name="due_date" class="form-control" value="<?=htmlspecialchars($task['due_date'] ?? '')?>">
         </div>
         <div class="mb-3">
-            <label class="form-label d-flex align-items-center justify-content-between">
-                <span>Priority</span>
-                <span id="priorityBadge" class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-            </label>
-            <select name="priority" class="form-select">
-                <option value="0" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
-                <option value="3" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
-                <option value="2" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
-                <option value="1" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
+            <label class="form-label">Priority</label>
+            <select name="priority" class="form-select <?=$priority_classes[$p]?>">
+                <option value="0" class="bg-secondary text-white" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
+                <option value="3" class="bg-danger text-white" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
+                <option value="2" class="bg-warning text-dark" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
+                <option value="1" class="bg-success text-white" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
             </select>
         </div>
         <div class="mb-3">
@@ -117,16 +118,18 @@ if ($p < 0 || $p > 3) { $p = 0; }
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
-  const badge = document.getElementById('priorityBadge');
-  if (!select || !badge) return;
-  const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
-  const classes = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-warning', 3: 'bg-danger'};
-  function updateBadge() {
+  if (!select) return;
+  const classes = {
+    0: 'bg-secondary text-white',
+    1: 'bg-success text-white',
+    2: 'bg-warning text-dark',
+    3: 'bg-danger text-white'
+  };
+  function updateSelect() {
     const val = parseInt(select.value, 10);
-    badge.textContent = labels[val] || 'None';
-    badge.className = 'badge ' + (classes[val] || classes[0]);
+    select.className = 'form-select ' + (classes[val] || classes[0]);
   }
-  select.addEventListener('change', updateBadge);
+  select.addEventListener('change', updateSelect);
 })();
 
 document.querySelector('form')?.addEventListener('submit', function () {
