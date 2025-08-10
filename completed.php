@@ -64,7 +64,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
-            <div class="list-group-item d-flex align-items-start">
+            <div class="list-group-item d-flex align-items-start list-group-item-action" onclick="location.href='task.php?id=<?=$task['id']?>'" style="cursor: pointer;">
                 <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars($task['description'] ?? '')?></span>
                 <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
                     <?php if (!empty($task['due_date'])): ?>
@@ -73,7 +73,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
                     <?php if ($p > 0): ?>
                         <span class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
                     <?php endif; ?>
-                    <a href="delete_task.php?id=<?=$task['id']?>&redirect=completed" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this task?');">Delete</a>
+                    <a href="delete_task.php?id=<?=$task['id']?>&redirect=completed" class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); return confirm('Delete this task?');">Delete</a>
                 </span>
             </div>
         <?php endforeach; ?>
