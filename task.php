@@ -83,7 +83,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <textarea name="details" class="form-control" rows="4"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+            <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
+            <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success ms-2"><?=$task['done'] ? 'Undo' : 'Done'?></a>
@@ -105,5 +106,13 @@ if ($p < 0 || $p > 3) { $p = 0; }
   }
   select.addEventListener('change', updateBadge);
 })();
+
+document.querySelector('form')?.addEventListener('submit', function () {
+  const editable = document.getElementById('detailsEditable');
+  const input = document.getElementById('detailsInput');
+  if (editable && input) {
+    input.value = editable.innerText.trim();
+  }
+});
 </script>
 </html>
