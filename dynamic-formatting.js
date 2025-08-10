@@ -21,11 +21,13 @@
         }
         if (node.nodeType === Node.TEXT_NODE) {
           caret += node.textContent.length;
-        } else if (node.nodeName === 'BR') {
-          caret += 1;
-        }
-        for (const child of node.childNodes) {
-          if (traverse(child)) return true;
+        } else {
+          for (const child of node.childNodes) {
+            if (traverse(child)) return true;
+          }
+          if (node.nodeName === 'BR' || (node.nodeName === 'DIV' && node !== root)) {
+            caret += 1;
+          }
         }
         return false;
       }
@@ -64,27 +66,38 @@
       selection.addRange(range);
     }
 
-    function update() {
-      const caret = getCaret(el);
-      const text = el.textContent;
-      const lines = text.split(/\n/);
+      let updating = false;
 
-      const formatted = lines.map(line => {
-        if (line.startsWith('T ')) {
-          const rest = capitalizeFirst(line.slice(2));
-          return `<span style="color:blue;">T ${rest}</span>`;
+      function update() {
+        if (updating) return;
+        updating = true;
+        const caret = getCaret(el);
+        let text = el.innerText;
+        const trailing = text.endsWith('\n\n');
+        text = text.replace(/\n$/, '');
+        const lines = text.split(/\n/);
+
+        const formatted = lines.map(line => {
+          if (line.startsWith('T ')) {
+            const rest = capitalizeFirst(line.slice(2));
+            return `<span style="color:blue;">T ${rest}</span>`;
+          }
+          return line ? capitalizeFirst(line) : '';
+        });
+        let html = formatted.join('<br>');
+        if (trailing) html += '<br>';
+
+        if (el.innerHTML !== html) {
+          el.innerHTML = html;
+          setTimeout(() => {
+            setCaret(el, caret);
+            updating = false;
+          }, 0);
+        } else {
+          updating = false;
         }
-        return line ? capitalizeFirst(line) : '';
-      });
-      let html = formatted.join('<br>');
-      if (text.endsWith('\n')) html += '<br>';
-
-      if (el.innerHTML !== html) {
-        el.innerHTML = html;
-        setCaret(el, caret);
+        if (hidden) hidden.value = text;
       }
-      if (hidden) hidden.value = el.textContent;
-    }
 
     el.addEventListener('input', update);
     update();
