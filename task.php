@@ -52,13 +52,28 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
-    <div class="container">
+    <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Todo App</a>
-        <div class="d-flex align-items-center gap-2">
-            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
-        </div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
     </div>
 </nav>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
+        <div class="list-group">
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
+        </div>
+    </div>
+</div>
 <div class="container">
     <form method="post">
         <div class="mb-3">
@@ -91,7 +106,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         <a href="delete_task.php?id=<?=$task['id']?>" class="btn btn-danger ms-2">Delete</a>
     </form>
 </div>
-</body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
@@ -115,4 +130,5 @@ document.querySelector('form')?.addEventListener('submit', function () {
   }
 });
 </script>
+</body>
 </html>
