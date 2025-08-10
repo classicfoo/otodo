@@ -68,6 +68,7 @@
       const caret = getCaret(el);
       const text = el.textContent;
       const lines = text.split(/\n/);
+
       const formatted = lines.map(line => {
         if (line.startsWith('T ')) {
           const rest = capitalizeFirst(line.slice(2));
@@ -77,6 +78,7 @@
       });
       let html = formatted.join('<br>');
       if (text.endsWith('\n')) html += '<br>';
+
       if (el.innerHTML !== html) {
         el.innerHTML = html;
         setCaret(el, caret);
