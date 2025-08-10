@@ -99,6 +99,7 @@
         if (hidden) hidden.value = text;
       }
 
+
     el.addEventListener('input', update);
     update();
   }
