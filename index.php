@@ -20,22 +20,39 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .due-date { display: inline-block; width: 100px; text-align: right; }
+        .priority-badge { display: inline-block; width: 70px; text-align: center; }
+    </style>
     <title>Todo List</title>
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
-    <div class="container">
+    <div class="container d-flex justify-content-between align-items-center">
         <span class="navbar-brand mb-0 h1">Todo App</span>
-        <div class="d-flex align-items-center gap-2">
-            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
-            <span class="me-3">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></span>
-            <a href="logout.php" class="btn btn-outline-secondary btn-sm">Logout</a>
-        </div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
     </div>
 </nav>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
+        <div class="list-group">
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
+        </div>
+    </div>
+</div>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <input type="text" name="description" class="form-control" placeholder="New task" required>
+        <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
         <input type="submit" hidden>
     </form>
     <div class="list-group">
@@ -44,16 +61,14 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                 <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
                 <span class="d-flex align-items-center gap-2">
-                    <?php if (!empty($task['due_date'])): ?>
-                        <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>
-                    <?php endif; ?>
-                    <?php if ($p > 0): ?>
-                        <span class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-                    <?php endif; ?>
+                    <span class="text-muted small due-date text-end"><?=htmlspecialchars($task['due_date'] ?? '')?></span>
+                    <span class="badge <?=$priority_classes[$p]?> priority-badge"><?=$priority_labels[$p]?></span>
+
                 </span>
             </a>
         <?php endforeach; ?>
     </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
