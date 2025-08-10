@@ -7,7 +7,9 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$description = mb_convert_case(trim($_POST['description'] ?? ''), MB_CASE_TITLE, 'UTF-8');
+
+$description = ucwords(strtolower(trim($_POST['description'] ?? '')));
+
 if ($description !== '') {
     // Determine today's date based on user location
     $tz = $_SESSION['location'] ?? null;
