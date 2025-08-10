@@ -66,7 +66,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
         <?php foreach ($tasks as $task): ?>
             <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
             <div class="list-group-item d-flex align-items-start list-group-item-action" onclick="location.href='task.php?id=<?=$task['id']?>'" style="cursor: pointer;">
-                <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars(mb_convert_case($task['description'] ?? '', MB_CASE_TITLE, 'UTF-8'))?></span>
                 <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
                     <?php if (!empty($task['due_date'])): ?>
                         <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>

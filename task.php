@@ -17,7 +17,7 @@ if (!$task) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $description = trim($_POST['description'] ?? '');
+    $description = mb_convert_case(trim($_POST['description'] ?? ''), MB_CASE_TITLE, 'UTF-8');
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
     $priority = (int)($_POST['priority'] ?? 0);
@@ -125,7 +125,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     <form method="post">
         <div class="mb-3">
             <label class="form-label">Title</label>
-            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required autocapitalize="none">
+            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars(mb_convert_case($task['description'] ?? '', MB_CASE_TITLE, 'UTF-8'))?>" required autocapitalize="none">
         </div>
         <div class="mb-3 d-flex align-items-end gap-3">
             <div>
