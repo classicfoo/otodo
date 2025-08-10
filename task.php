@@ -52,18 +52,33 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
-    <div class="container">
+    <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Todo App</a>
-        <div class="d-flex align-items-center gap-2">
-            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
-        </div>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
     </div>
 </nav>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
+        <div class="list-group">
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
+        </div>
+    </div>
+</div>
 <div class="container">
     <form method="post">
         <div class="mb-3">
             <label class="form-label">Title</label>
-            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required>
+            <input type="text" name="description" class="form-control" value="<?=htmlspecialchars($task['description'] ?? '')?>" required autocapitalize="none">
         </div>
         <div class="mb-3">
             <label class="form-label">Due Date</label>
@@ -83,14 +98,15 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <textarea name="details" class="form-control" rows="4"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+            <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
+            <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="toggle_task.php?id=<?=$task['id']?>" class="btn btn-success ms-2"><?=$task['done'] ? 'Undo' : 'Done'?></a>
         <a href="delete_task.php?id=<?=$task['id']?>" class="btn btn-danger ms-2">Delete</a>
     </form>
 </div>
-</body>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
@@ -105,5 +121,14 @@ if ($p < 0 || $p > 3) { $p = 0; }
   }
   select.addEventListener('change', updateBadge);
 })();
+
+document.querySelector('form')?.addEventListener('submit', function () {
+  const editable = document.getElementById('detailsEditable');
+  const input = document.getElementById('detailsInput');
+  if (editable && input) {
+    input.value = editable.innerText.trim();
+  }
+});
 </script>
+</body>
 </html>
