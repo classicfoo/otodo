@@ -35,15 +35,15 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
 </nav>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <input type="text" name="description" class="form-control" placeholder="New task" required>
+        <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
         <input type="submit" hidden>
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
-                <span class="d-flex align-items-center gap-2">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex align-items-start">
+                <span class="flex-grow-1 text-break <?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
                     <?php if (!empty($task['due_date'])): ?>
                         <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>
                     <?php endif; ?>
