@@ -54,14 +54,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Todo App</a>
-        <div class="d-flex align-items-center gap-2">
-            <a href="completed.php" class="btn btn-outline-secondary btn-sm">Completed</a>
-            <div class="dropdown">
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
-                    <li><a class="dropdown-item text-danger" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
-                </ul>
-            </div>
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
+                <li><a class="dropdown-item text-danger" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
+            </ul>
         </div>
 
     </div>
