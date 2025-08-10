@@ -66,7 +66,7 @@
 
     function update() {
       const caret = getCaret(el);
-      const text = el.textContent;
+      const text = el.innerText;
       const lines = text.split(/\n/);
 
       const formatted = lines.map(line => {
@@ -83,7 +83,7 @@
         el.innerHTML = html;
         setCaret(el, caret);
       }
-      if (hidden) hidden.value = el.textContent;
+      if (hidden) hidden.value = text;
     }
 
     el.addEventListener('input', update);
