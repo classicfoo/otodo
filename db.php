@@ -10,7 +10,8 @@ function get_db() {
         $db->exec("CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            location TEXT
         )");
 
         $db->exec("CREATE TABLE IF NOT EXISTS tasks (
@@ -34,6 +35,12 @@ function get_db() {
         }
         if (!in_array('priority', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
+        }
+
+        // Ensure location column exists for users
+        $userColumns = $db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_COLUMN, 1);
+        if (!in_array('location', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN location TEXT');
         }
     }
     return $db;

@@ -10,6 +10,8 @@ A simple PHP online todo list application with user authentication and SQLite st
 - Responsive design for desktop and mobile browsers
 - Optional due dates and descriptions for tasks
 - Task priorities with color-coded badges
+- Tasks default to today's date
+- User-configurable location (timezone) for date calculations with browser auto-detection and a searchable list
 
 ## Getting Started
 
