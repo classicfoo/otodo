@@ -12,10 +12,25 @@
     function getCaret(root) {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return 0;
-      const range = sel.getRangeAt(0).cloneRange();
-      range.selectNodeContents(root);
-      range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset);
-      return range.toString().length;
+      const range = sel.getRangeAt(0);
+      let caret = 0;
+      function traverse(node) {
+        if (node === range.endContainer) {
+          caret += range.endOffset;
+          return true;
+        }
+        if (node.nodeType === Node.TEXT_NODE) {
+          caret += node.textContent.length;
+        } else if (node.nodeName === 'BR') {
+          caret += 1;
+        }
+        for (const child of node.childNodes) {
+          if (traverse(child)) return true;
+        }
+        return false;
+      }
+      traverse(root);
+      return caret;
     }
 
     function setCaret(root, pos) {
@@ -30,6 +45,13 @@
             return true;
           }
           current = next;
+        } else if (node.nodeName === 'BR') {
+          if (pos <= current + 1) {
+            range.setStartAfter(node);
+            return true;
+          }
+          current += 1;
+
         } else {
           for (const child of node.childNodes) {
             if (traverse(child)) return true;
@@ -45,7 +67,8 @@
 
     function update() {
       const caret = getCaret(el);
-      const lines = el.innerText.split(/\n/);
+      const lines = el.textContent.split(/\n/);
+
       const formatted = lines.map(line => {
         if (line.startsWith('T ')) {
           const rest = capitalizeFirst(line.slice(2));
@@ -58,7 +81,8 @@
         el.innerHTML = html;
         setCaret(el, caret);
       }
-      if (hidden) hidden.value = el.innerText;
+      if (hidden) hidden.value = el.textContent;
+
     }
 
     el.addEventListener('input', update);
