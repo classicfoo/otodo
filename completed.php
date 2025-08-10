@@ -12,7 +12,7 @@ $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 3 => 'bg-danger'];
+$priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success-subtle text-success', 2 => 'bg-warning-subtle text-warning', 3 => 'bg-danger-subtle text-danger'];
 ?>
 <!DOCTYPE html>
 <html lang="en">

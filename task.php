@@ -39,10 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $priority_classes = [
-    0 => 'bg-secondary text-white',
-    1 => 'bg-success text-white',
-    2 => 'bg-warning text-dark',
-    3 => 'bg-danger text-white'
+    0 => 'bg-secondary-subtle text-secondary',
+    1 => 'bg-success-subtle text-success',
+    2 => 'bg-warning-subtle text-warning',
+    3 => 'bg-danger-subtle text-danger'
 ];
 $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
@@ -53,6 +53,19 @@ if ($p < 0 || $p > 3) { $p = 0; }
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #prioritySelect option:hover,
+        #prioritySelect option:focus,
+        #prioritySelect option:active {
+            background-color: inherit !important;
+            color: inherit !important;
+        }
+        #prioritySelect:hover,
+        #prioritySelect:focus {
+            background-color: inherit !important;
+            color: inherit !important;
+        }
+    </style>
     <title>Task Details</title>
 </head>
 <body class="bg-light">
@@ -98,11 +111,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Priority</label>
-            <select name="priority" class="form-select <?=$priority_classes[$p]?>">
-                <option value="0" class="bg-secondary text-white" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
-                <option value="3" class="bg-danger text-white" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
-                <option value="2" class="bg-warning text-dark" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
-                <option value="1" class="bg-success text-white" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
+            <select name="priority" id="prioritySelect" class="form-select <?=$priority_classes[$p]?>">
+                <option value="0" class="bg-secondary-subtle text-secondary" <?php if (($task['priority'] ?? 0) == 0) echo 'selected'; ?>>None</option>
+                <option value="3" class="bg-danger-subtle text-danger" <?php if (($task['priority'] ?? 2) == 3) echo 'selected'; ?>>High</option>
+                <option value="2" class="bg-warning-subtle text-warning" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
+                <option value="1" class="bg-success-subtle text-success" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
             </select>
         </div>
         <div class="mb-3">
@@ -121,7 +134,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const badge = document.getElementById('priorityBadge');
   if (select && badge) {
     const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
-    const classes = {0: 'bg-secondary', 1: 'bg-success', 2: 'bg-warning', 3: 'bg-danger'};
+    const classes = {0: 'bg-secondary-subtle text-secondary', 1: 'bg-success-subtle text-success', 2: 'bg-warning-subtle text-warning', 3: 'bg-danger-subtle text-danger'};
     function updateBadge() {
       const val = parseInt(select.value, 10);
       badge.textContent = labels[val] || 'None';
