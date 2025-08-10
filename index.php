@@ -20,6 +20,10 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .due-date { display: inline-block; width: 100px; text-align: right; }
+        .priority-badge { display: inline-block; width: 70px; text-align: center; }
+    </style>
     <title>Todo List</title>
 </head>
 <body class="bg-light">
@@ -54,15 +58,12 @@ $priority_classes = [0 => 'bg-secondary', 1 => 'bg-success', 2 => 'bg-warning', 
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
             <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex align-items-start">
-                <span class="flex-grow-1 text-break <?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
-                <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
-                    <?php if (!empty($task['due_date'])): ?>
-                        <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>
-                    <?php endif; ?>
-                    <?php if ($p > 0): ?>
-                        <span class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-                    <?php endif; ?>
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars($task['description'] ?? '')?></span>
+                <span class="d-flex align-items-center gap-2">
+                    <span class="text-muted small due-date text-end"><?=htmlspecialchars($task['due_date'] ?? '')?></span>
+                    <span class="badge <?=$priority_classes[$p]?> priority-badge"><?=$priority_labels[$p]?></span>
+
                 </span>
             </a>
         <?php endforeach; ?>
