@@ -51,6 +51,7 @@
             return true;
           }
           current += 1;
+
         } else {
           for (const child of node.childNodes) {
             if (traverse(child)) return true;
@@ -67,6 +68,7 @@
     function update() {
       const caret = getCaret(el);
       const lines = el.textContent.split(/\n/);
+
       const formatted = lines.map(line => {
         if (line.startsWith('T ')) {
           const rest = capitalizeFirst(line.slice(2));
@@ -80,6 +82,7 @@
         setCaret(el, caret);
       }
       if (hidden) hidden.value = el.textContent;
+
     }
 
     el.addEventListener('input', update);
