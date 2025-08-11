@@ -73,7 +73,7 @@
         updating = true;
         const caret = getCaret(el);
         let text = el.innerText;
-        const trailing = text.endsWith('\n\n');
+        const trailing = text.endsWith('\n');
         text = text.replace(/\n$/, '');
         const lines = text.split(/\n/);
 
@@ -99,8 +99,16 @@
         if (hidden) hidden.value = text;
       }
 
-
-    el.addEventListener('input', update);
+    el.addEventListener('input', (e) => {
+      if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
+        if (hidden) {
+          const t = el.innerText.replace(/\n$/, '');
+          hidden.value = t;
+        }
+        return;
+      }
+      update();
+    });
     update();
   }
 
