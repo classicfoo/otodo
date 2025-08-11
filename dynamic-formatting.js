@@ -73,7 +73,7 @@
         updating = true;
         const caret = getCaret(el);
         let text = el.innerText;
-        const trailing = text.endsWith('\n\n');
+        const trailing = text.endsWith('\n');
         text = text.replace(/\n$/, '');
         const lines = text.split(/\n/);
 
