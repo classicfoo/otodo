@@ -53,8 +53,10 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
 </div>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
-        <input type="submit" hidden>
+        <div class="input-group">
+            <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
+            <button class="btn btn-primary" type="submit">Add</button>
+        </div>
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
@@ -82,6 +84,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
                             } else {
                                 $due = 'Later';
                                 $dueClass = 'text-primary';
+
                             }
                         }
                     } catch (Exception $e) {
@@ -103,6 +106,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
 <script>
 window.dynamicFormattingEnabled = <?=(int)($_SESSION['dynamic_formatting'] ?? 1)?>;
 </script>
+<script src="sw-register.js"></script>
 <script src="dynamic-formatting.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>

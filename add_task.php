@@ -26,12 +26,13 @@ if ($description !== '') {
     }
     $due_date = $now->format('Y-m-d');
 
-    // Default new tasks to no priority (0)
+    // Insert new task using user's default priority
+    $priority = (int)($_SESSION['default_priority'] ?? 0);
     $stmt = $db->prepare('INSERT INTO tasks (user_id, description, priority, due_date) VALUES (:uid, :description, :priority, :due_date)');
     $stmt->execute([
         ':uid' => $_SESSION['user_id'],
         ':description' => $description,
-        ':priority' => 0,
+        ':priority' => $priority,
         ':due_date' => $due_date,
     ]);
 }
