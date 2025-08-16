@@ -4,6 +4,9 @@
     const el = document.getElementById('detailsEditable');
     if (!el) return;
     const hidden = document.getElementById('detailsInput');
+    if (window.dynamicFormattingDebug) {
+      console.log('Dynamic formatting initialized');
+    }
 
     function capitalizeFirst(str) {
       return str.charAt(0).toUpperCase() + str.slice(1);
@@ -86,6 +89,10 @@
         });
         let html = formatted.join('<br>');
         if (trailing) html += '<br>';
+
+        if (window.dynamicFormattingDebug) {
+          console.log('update', { text, html, caret });
+        }
 
         if (el.innerHTML !== html) {
           el.innerHTML = html;
