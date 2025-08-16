@@ -81,6 +81,7 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
     </div>
     <?php endif; ?>
 </div>
+<script src="sw-register.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

@@ -56,5 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
     <p>Don't have an account? <a href="register.php">Register</a></p>
 </div>
+<script src="sw-register.js"></script>
 </body>
 </html>
