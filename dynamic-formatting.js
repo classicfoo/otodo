@@ -4,6 +4,9 @@
     const el = document.getElementById('detailsEditable');
     if (!el) return;
     const hidden = document.getElementById('detailsInput');
+    if (window.dynamicFormattingDebug) {
+      console.log('Dynamic formatting initialized');
+    }
 
     function capitalizeFirst(str) {
       return str.charAt(0).toUpperCase() + str.slice(1);
@@ -71,10 +74,14 @@
       function update() {
         if (updating) return;
         updating = true;
-        const caret = getCaret(el);
+        let caret = getCaret(el);
         let text = el.innerText;
+        if (text.endsWith('\n')) {
+          text = text.slice(0, -1);
+          if (caret > text.length) caret--;
+        }
         const trailing = text.endsWith('\n');
-        text = text.replace(/\n$/, '');
+        if (trailing) text = text.slice(0, -1);
         const lines = text.split(/\n/);
 
         const formatted = lines.map(line => {
@@ -87,6 +94,10 @@
         let html = formatted.join('<br>');
         if (trailing) html += '<br>';
 
+        if (window.dynamicFormattingDebug) {
+          console.log('update', { text, html, caret });
+        }
+
         if (el.innerHTML !== html) {
           el.innerHTML = html;
           setTimeout(() => {
@@ -96,7 +107,7 @@
         } else {
           updating = false;
         }
-        if (hidden) hidden.value = text;
+        if (hidden) hidden.value = text + (trailing ? '\n' : '');
       }
 
     el.addEventListener('input', (e) => {
