@@ -207,5 +207,6 @@ window.dynamicFormattingEnabled = <?=(int)($_SESSION['dynamic_formatting'] ?? 1)
   });
 })();
 </script>
+<script src="sw-register.js"></script>
 </body>
 </html>
