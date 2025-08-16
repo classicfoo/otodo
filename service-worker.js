@@ -1,12 +1,9 @@
-const CACHE_NAME = 'otodo-cache-v1';
+const CACHE_NAME = 'otodo-cache-v2';
 const URLS_TO_CACHE = [
   '/',
-  '/index.php',
   '/login.php',
   '/register.php',
   '/settings.php',
-  '/completed.php',
-  '/task.php',
   '/dynamic-formatting.js'
 ];
 
@@ -28,6 +25,19 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') {
     return;
   }
+
+  const url = new URL(event.request.url);
+  const isNavigational =
+    event.request.mode === 'navigate' ||
+    ['/index.php', '/task.php', '/completed.php'].some(path => url.pathname.endsWith(path));
+
+  if (isNavigational) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) {
