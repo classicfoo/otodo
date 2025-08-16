@@ -148,16 +148,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsEditable" class="form-control" contenteditable="true"><?=nl2br(htmlspecialchars($task['details'] ?? ''))?></div>
-            <input type="hidden" name="details" id="detailsInput" value="<?=htmlspecialchars($task['details'] ?? '')?>">
+            <textarea name="details" id="detailsInput" class="form-control" rows="5"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
         </div>
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
 </div>
-<script>
-window.dynamicFormattingEnabled = <?=(int)($_SESSION['dynamic_formatting'] ?? 1)?>;
-</script>
-<script src="dynamic-formatting.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
@@ -184,11 +179,6 @@ window.dynamicFormattingEnabled = <?=(int)($_SESSION['dynamic_formatting'] ?? 1)
   }
 
   function sendSave(immediate = false) {
-    const editable = document.getElementById('detailsEditable');
-    const input = document.getElementById('detailsInput');
-    if (editable && input) {
-      input.value = editable.innerText.trim();
-    }
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
