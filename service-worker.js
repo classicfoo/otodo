@@ -1,10 +1,10 @@
-const CACHE_NAME = 'otodo-cache-v2';
+const CACHE_NAME = 'otodo-cache-v3';
 const URLS_TO_CACHE = [
   '/',
   '/login.php',
   '/register.php',
   '/settings.php',
-  '/dynamic-formatting.js'
+  // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 
 self.addEventListener('install', event => {

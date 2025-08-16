@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = get_db()->prepare('INSERT INTO users (username, password, dynamic_formatting, default_priority) VALUES (:username, :password, 1, 0)');
+            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority) VALUES (:username, :password, 0)');
             $stmt->execute([':username' => $username, ':password' => $hash]);
             header('Location: login.php');
             exit();
