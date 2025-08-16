@@ -64,12 +64,37 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
     <?php else: ?>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
-            <?php $p = (int)($task['priority'] ?? 0); if ($p < 0 || $p > 3) { $p = 0; } ?>
+            <?php
+                $p = (int)($task['priority'] ?? 0);
+                if ($p < 0 || $p > 3) { $p = 0; }
+                $due = $task['due_date'] ?? '';
+                if ($due !== '') {
+                    try {
+                        $dueDate = new DateTime($due);
+                        $today = new DateTime('today');
+                        $tomorrow = (clone $today)->modify('+1 day');
+                        if ($dueDate < $today) {
+                            $due = 'overdue';
+                        } else {
+                            $dueFmt = $dueDate->format('Y-m-d');
+                            if ($dueFmt === $today->format('Y-m-d')) {
+                                $due = 'today';
+                            } elseif ($dueFmt === $tomorrow->format('Y-m-d')) {
+                                $due = 'tomorrow';
+                            } else {
+                                $due = $dueDate->format('j M Y');
+                            }
+                        }
+                    } catch (Exception $e) {
+                        // leave $due unchanged if parsing fails
+                    }
+                }
+            ?>
             <div class="list-group-item d-flex align-items-start list-group-item-action" onclick="location.href='task.php?id=<?=$task['id']?>'" style="cursor: pointer;">
                 <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
                 <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
-                    <?php if (!empty($task['due_date'])): ?>
-                        <span class="text-muted small"><?=htmlspecialchars($task['due_date'])?></span>
+                    <?php if ($due !== ''): ?>
+                        <span class="text-muted small"><?=htmlspecialchars($due)?></span>
                     <?php endif; ?>
                     <?php if ($p > 0): ?>
                         <span class="badge <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>

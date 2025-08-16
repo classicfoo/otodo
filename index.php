@@ -64,7 +64,21 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
                 $due = $task['due_date'] ?? '';
                 if ($due !== '') {
                     try {
-                        $due = (new DateTime($due))->format('j M Y');
+                        $dueDate = new DateTime($due);
+                        $today = new DateTime('today');
+                        $tomorrow = (clone $today)->modify('+1 day');
+                        if ($dueDate < $today) {
+                            $due = 'overdue';
+                        } else {
+                            $dueFmt = $dueDate->format('Y-m-d');
+                            if ($dueFmt === $today->format('Y-m-d')) {
+                                $due = 'today';
+                            } elseif ($dueFmt === $tomorrow->format('Y-m-d')) {
+                                $due = 'tomorrow';
+                            } else {
+                                $due = $dueDate->format('j M Y');
+                            }
+                        }
                     } catch (Exception $e) {
                         // leave $due unchanged if parsing fails
                     }
