@@ -12,7 +12,8 @@ function get_db() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             location TEXT,
-            dynamic_formatting INTEGER NOT NULL DEFAULT 1
+            dynamic_formatting INTEGER NOT NULL DEFAULT 1,
+            default_priority INTEGER NOT NULL DEFAULT 0
         )");
 
         $db->exec("CREATE TABLE IF NOT EXISTS tasks (
@@ -45,6 +46,9 @@ function get_db() {
         }
         if (!in_array('dynamic_formatting', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN dynamic_formatting INTEGER NOT NULL DEFAULT 1');
+        }
+        if (!in_array('default_priority', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN default_priority INTEGER NOT NULL DEFAULT 0');
         }
     }
     return $db;
