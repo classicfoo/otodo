@@ -10,19 +10,26 @@ $db = get_db();
 $message = '';
 $location = $_SESSION['location'] ?? '';
 $dynamic_formatting = (int)($_SESSION['dynamic_formatting'] ?? 1);
+$default_priority = (int)($_SESSION['default_priority'] ?? 0);
 $timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $location = trim($_POST['location'] ?? '');
     $dynamic_formatting = isset($_POST['dynamic_formatting']) ? 1 : 0;
-    $stmt = $db->prepare('UPDATE users SET location = :loc, dynamic_formatting = :dyn WHERE id = :id');
+    $default_priority = (int)($_POST['default_priority'] ?? 0);
+    if ($default_priority < 0 || $default_priority > 3) {
+        $default_priority = 0;
+    }
+    $stmt = $db->prepare('UPDATE users SET location = :loc, dynamic_formatting = :dyn, default_priority = :pri WHERE id = :id');
     $stmt->execute([
         ':loc' => $location !== '' ? $location : null,
         ':dyn' => $dynamic_formatting,
+        ':pri' => $default_priority,
         ':id' => $_SESSION['user_id'],
     ]);
     $_SESSION['location'] = $location !== '' ? $location : 'UTC';
     $_SESSION['dynamic_formatting'] = $dynamic_formatting;
+    $_SESSION['default_priority'] = $default_priority;
     $message = 'Settings saved';
 }
 ?>
@@ -77,6 +84,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="form-check mb-3">
             <input class="form-check-input" type="checkbox" name="dynamic_formatting" id="dynamicFormatting" <?php if ($dynamic_formatting) echo 'checked'; ?>>
             <label class="form-check-label" for="dynamicFormatting">Enable Dynamic Line Formatting</label>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="default_priority">Default Task Priority</label>
+            <select name="default_priority" id="default_priority" class="form-select">
+                <option value="3" <?php if ($default_priority == 3) echo 'selected'; ?>>High</option>
+                <option value="2" <?php if ($default_priority == 2) echo 'selected'; ?>>Medium</option>
+                <option value="1" <?php if ($default_priority == 1) echo 'selected'; ?>>Low</option>
+                <option value="0" <?php if ($default_priority == 0) echo 'selected'; ?>>None</option>
+            </select>
         </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="index.php" class="btn btn-secondary">Back</a>
