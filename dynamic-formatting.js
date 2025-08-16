@@ -74,10 +74,14 @@
       function update() {
         if (updating) return;
         updating = true;
-        const caret = getCaret(el);
+        let caret = getCaret(el);
         let text = el.innerText;
+        if (text.endsWith('\n')) {
+          text = text.slice(0, -1);
+          if (caret > text.length) caret--;
+        }
         const trailing = text.endsWith('\n');
-        text = text.replace(/\n$/, '');
+        if (trailing) text = text.slice(0, -1);
         const lines = text.split(/\n/);
 
         const formatted = lines.map(line => {
