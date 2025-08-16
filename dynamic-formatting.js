@@ -107,7 +107,7 @@
         } else {
           updating = false;
         }
-        if (hidden) hidden.value = text;
+        if (hidden) hidden.value = text + (trailing ? '\n' : '');
       }
 
     el.addEventListener('input', (e) => {
