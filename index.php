@@ -53,8 +53,10 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
 </div>
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
-        <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
-        <input type="submit" hidden>
+        <div class="input-group">
+            <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
+            <button class="btn btn-primary" type="submit">Add</button>
+        </div>
     </form>
     <div class="list-group">
         <?php foreach ($tasks as $task): ?>
