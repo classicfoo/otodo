@@ -86,6 +86,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
             background-color: inherit !important;
             color: inherit !important;
         }
+        @media (min-width: 992px) {
+            #detailsInput {
+                min-height: 15rem;
+            }
+        }
     </style>
     <title>Task Details</title>
 </head>
