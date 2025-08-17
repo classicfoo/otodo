@@ -88,7 +88,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         @media (min-width: 992px) {
             #detailsInput {
-                min-height: 15rem;
+                min-height: 30rem;
             }
         }
     </style>
