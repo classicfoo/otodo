@@ -8,25 +8,52 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $message = '';
+$error = '';
+$username = $_SESSION['username'] ?? '';
 $location = $_SESSION['location'] ?? '';
 $default_priority = (int)($_SESSION['default_priority'] ?? 0);
 $timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username'] ?? $username);
+    $password = $_POST['password'] ?? '';
     $location = trim($_POST['location'] ?? '');
     $default_priority = (int)($_POST['default_priority'] ?? 0);
     if ($default_priority < 0 || $default_priority > 3) {
         $default_priority = 0;
     }
-    $stmt = $db->prepare('UPDATE users SET location = :loc, default_priority = :pri WHERE id = :id');
-    $stmt->execute([
-        ':loc' => $location !== '' ? $location : null,
-        ':pri' => $default_priority,
-        ':id' => $_SESSION['user_id'],
-    ]);
-    $_SESSION['location'] = $location !== '' ? $location : 'UTC';
-    $_SESSION['default_priority'] = $default_priority;
-    $message = 'Settings saved';
+
+    if ($username === '') {
+        $error = 'Username cannot be empty';
+    } else {
+        try {
+            if ($password !== '') {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri WHERE id = :id');
+                $stmt->execute([
+                    ':username' => $username,
+                    ':password' => $hash,
+                    ':loc' => $location !== '' ? $location : null,
+                    ':pri' => $default_priority,
+                    ':id' => $_SESSION['user_id'],
+                ]);
+            } else {
+                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri WHERE id = :id');
+                $stmt->execute([
+                    ':username' => $username,
+                    ':loc' => $location !== '' ? $location : null,
+                    ':pri' => $default_priority,
+                    ':id' => $_SESSION['user_id'],
+                ]);
+            }
+            $_SESSION['username'] = $username;
+            $_SESSION['location'] = $location !== '' ? $location : 'UTC';
+            $_SESSION['default_priority'] = $default_priority;
+            $message = 'Settings saved';
+        } catch (PDOException $e) {
+            $error = 'Username already taken';
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -66,7 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if ($message): ?>
         <div class="alert alert-success"><?=$message?></div>
     <?php endif; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-danger"><?=$error?></div>
+    <?php endif; ?>
     <form method="post" class="mb-3" autocomplete="off">
+        <div class="mb-3">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" name="username" id="username" class="form-control" value="<?=htmlspecialchars($username)?>" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="password">New Password</label>
+            <input type="password" name="password" id="password" class="form-control" placeholder="Leave blank to keep current">
+        </div>
         <div class="mb-3">
             <label class="form-label" for="location">Location (timezone)</label>
             <input type="text" name="location" id="location" class="form-control" list="tz-list" value="<?=htmlspecialchars($location)?>" placeholder="Start typing your timezone">
