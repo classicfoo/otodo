@@ -192,6 +192,20 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
   }
 
+  const details = document.getElementById('detailsInput');
+  if (details) {
+    details.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.slice(0, start) + "\t" + this.value.slice(end);
+        this.selectionStart = this.selectionEnd = start + 1;
+        scheduleSave();
+      }
+    });
+  }
+
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
