@@ -1,2 +1,9 @@
+php -S localhost:8000
+
+http://localhost:8000/login.php
+
 git fetch origin
 git pull origin main       # or rebase: git pull --rebase origin main
+
+
+git remote set-url origin https://github.com/Chef6441/otodo.git
