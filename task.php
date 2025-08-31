@@ -202,6 +202,15 @@ if ($p < 0 || $p > 3) { $p = 0; }
           this.value = this.value.slice(0, start) + "\t" + this.value.slice(end);
           this.selectionStart = this.selectionEnd = start + 1;
           scheduleSave();
+        } else if (e.key === ' ') {
+          const start = this.selectionStart;
+          const end = this.selectionEnd;
+          if (start === end && start > 0 && this.value[start - 1] === ' ') {
+            e.preventDefault();
+            this.value = this.value.slice(0, start - 1) + "\t" + this.value.slice(end);
+            this.selectionStart = this.selectionEnd = start;
+            scheduleSave();
+          }
         } else if (e.key === 'Enter') {
           e.preventDefault();
           const start = this.selectionStart;
