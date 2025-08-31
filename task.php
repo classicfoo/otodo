@@ -192,6 +192,53 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
   }
 
+  const details = document.getElementById('detailsInput');
+  if (details) {
+      details.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const start = this.selectionStart;
+          const end = this.selectionEnd;
+          this.value = this.value.slice(0, start) + "\t" + this.value.slice(end);
+          this.selectionStart = this.selectionEnd = start + 1;
+          scheduleSave();
+        } else if (e.key === ' ') {
+          const start = this.selectionStart;
+          const end = this.selectionEnd;
+          if (start === end && start > 0 && this.value[start - 1] === ' ') {
+            e.preventDefault();
+            this.value = this.value.slice(0, start - 1) + "\t" + this.value.slice(end);
+            this.selectionStart = this.selectionEnd = start;
+            scheduleSave();
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const start = this.selectionStart;
+          const end = this.selectionEnd;
+          const value = this.value;
+          const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+          const lineBreak = value.indexOf('\n', start);
+          const lineEnd = lineBreak === -1 ? value.length : lineBreak;
+          const line = value.slice(lineStart, lineEnd);
+          const leading = line.match(/^[\t ]*/)[0];
+          if (/^[\t ]*$/.test(line)) {
+            const before = value.slice(0, lineStart);
+            const after = lineBreak === -1 ? '' : value.slice(lineBreak + 1);
+            this.value = before + "\n" + after;
+            const pos = before.length + 1;
+            this.selectionStart = this.selectionEnd = pos;
+          } else {
+            const before = value.slice(0, start);
+            const after = value.slice(end);
+            this.value = before + "\n" + leading + after;
+            const pos = start + 1 + leading.length;
+            this.selectionStart = this.selectionEnd = pos;
+          }
+          scheduleSave();
+        }
+      });
+    }
+
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
