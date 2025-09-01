@@ -13,6 +13,17 @@ $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
 $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success-subtle text-success', 2 => 'bg-warning-subtle text-warning', 3 => 'bg-danger-subtle text-danger'];
+
+$tz = $_SESSION['location'] ?? 'UTC';
+try {
+    $tzObj = new DateTimeZone($tz);
+} catch (Exception $e) {
+    $tzObj = new DateTimeZone('UTC');
+}
+$today = new DateTime('today', $tzObj);
+$tomorrow = (clone $today)->modify('+1 day');
+$todayFmt = $today->format('Y-m-d');
+$tomorrowFmt = $tomorrow->format('Y-m-d');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,18 +78,16 @@ $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success
                 $dueClass = 'text-muted';
                 if ($due !== '') {
                     try {
-                        $dueDate = new DateTime($due);
-                        $today = new DateTime('today');
-                        $tomorrow = (clone $today)->modify('+1 day');
+                        $dueDate = new DateTime($due, $tzObj);
                         if ($dueDate < $today) {
                             $due = 'Overdue';
                             $dueClass = 'text-danger';
                         } else {
                             $dueFmt = $dueDate->format('Y-m-d');
-                            if ($dueFmt === $today->format('Y-m-d')) {
+                            if ($dueFmt === $todayFmt) {
                                 $due = 'Today';
                                 $dueClass = 'text-success';
-                            } elseif ($dueFmt === $tomorrow->format('Y-m-d')) {
+                            } elseif ($dueFmt === $tomorrowFmt) {
                                 $due = 'Tomorrow';
                                 $dueClass = 'text-primary';
                             } else {
