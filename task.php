@@ -86,6 +86,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
             background-color: inherit !important;
             color: inherit !important;
         }
+        #detailsInput {
+            white-space: pre-wrap;
+        }
         @media (min-width: 992px) {
             #detailsInput {
                 min-height: 30rem;
@@ -153,7 +156,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <textarea name="details" id="detailsInput" class="form-control" rows="5"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+            <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
+            <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
@@ -178,12 +182,72 @@ if ($p < 0 || $p > 3) { $p = 0; }
   if (!form) return;
   let timer;
 
+  let updateDetails;
+  const details = document.getElementById('detailsInput');
+  const detailsField = document.getElementById('detailsField');
+  if (details && detailsField) {
+      updateDetails = function() {
+        detailsField.value = details.textContent;
+      };
+      details.addEventListener('input', function(){
+        updateDetails();
+        scheduleSave();
+      });
+      details.addEventListener('paste', function(e){
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        document.execCommand('insertText', false, text);
+        updateDetails();
+        scheduleSave();
+      });
+      details.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          document.execCommand('insertText', false, "\t");
+          updateDetails();
+          scheduleSave();
+        } else if (e.key === ' ') {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const node = range.startContainer;
+            const offset = range.startOffset;
+            if (node.nodeType === Node.TEXT_NODE && offset > 0 && node.textContent[offset-1] === ' ') {
+              e.preventDefault();
+              range.setStart(node, offset-1);
+              range.deleteContents();
+              document.execCommand('insertText', false, "\t");
+              updateDetails();
+              scheduleSave();
+            }
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const preRange = range.cloneRange();
+            preRange.setStart(details, 0);
+            const textBefore = preRange.toString();
+            const lineStart = textBefore.lastIndexOf('\n') + 1;
+            const currentLine = textBefore.slice(lineStart);
+            const leading = currentLine.match(/^[\t ]*/)[0];
+            document.execCommand('insertText', false, "\n" + leading);
+            updateDetails();
+            scheduleSave();
+          }
+        }
+      });
+      updateDetails();
+  }
+
   function scheduleSave() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(sendSave, 500);
   }
 
   function sendSave(immediate = false) {
+    if (updateDetails) updateDetails();
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
@@ -191,53 +255,6 @@ if ($p < 0 || $p > 3) { $p = 0; }
       fetch(window.location.href, {method: 'POST', body: data});
     }
   }
-
-  const details = document.getElementById('detailsInput');
-  if (details) {
-      details.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          const start = this.selectionStart;
-          const end = this.selectionEnd;
-          this.value = this.value.slice(0, start) + "\t" + this.value.slice(end);
-          this.selectionStart = this.selectionEnd = start + 1;
-          scheduleSave();
-        } else if (e.key === ' ') {
-          const start = this.selectionStart;
-          const end = this.selectionEnd;
-          if (start === end && start > 0 && this.value[start - 1] === ' ') {
-            e.preventDefault();
-            this.value = this.value.slice(0, start - 1) + "\t" + this.value.slice(end);
-            this.selectionStart = this.selectionEnd = start;
-            scheduleSave();
-          }
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          const start = this.selectionStart;
-          const end = this.selectionEnd;
-          const value = this.value;
-          const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-          const lineBreak = value.indexOf('\n', start);
-          const lineEnd = lineBreak === -1 ? value.length : lineBreak;
-          const line = value.slice(lineStart, lineEnd);
-          const leading = line.match(/^[\t ]*/)[0];
-          if (/^[\t ]*$/.test(line)) {
-            const before = value.slice(0, lineStart);
-            const after = lineBreak === -1 ? '' : value.slice(lineBreak + 1);
-            this.value = before + "\n" + after;
-            const pos = before.length + 1;
-            this.selectionStart = this.selectionEnd = pos;
-          } else {
-            const before = value.slice(0, start);
-            const after = value.slice(end);
-            this.value = before + "\n" + leading + after;
-            const pos = start + 1 + leading.length;
-            this.selectionStart = this.selectionEnd = pos;
-          }
-          scheduleSave();
-        }
-      });
-    }
 
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
