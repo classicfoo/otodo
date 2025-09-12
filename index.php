@@ -32,7 +32,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date-badge { display: inline-block; width: 100px; text-align: right; }
+        .due-date-badge { display: inline-block; width: 100px; text-align: centre; }
         .priority-text { display: inline-block; width: 70px; text-align: center; }
     </style>
     <title>Todo List</title>
