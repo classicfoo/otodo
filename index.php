@@ -12,7 +12,7 @@ $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success-subtle text-success', 2 => 'bg-warning-subtle text-warning', 3 => 'bg-danger-subtle text-danger'];
+$priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
 
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
@@ -32,8 +32,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date { display: inline-block; width: 100px; text-align: right; }
-        .priority-badge { display: inline-block; width: 70px; text-align: center; }
+        .due-date-badge { display: inline-block; width: 100px; text-align: right; }
+        .priority-text { display: inline-block; width: 70px; text-align: center; }
     </style>
     <title>Todo List</title>
 </head>
@@ -75,24 +75,24 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 $p = (int)($task['priority'] ?? 0);
                 if ($p < 0 || $p > 3) { $p = 0; }
                 $due = $task['due_date'] ?? '';
-                $dueClass = 'text-muted';
+                $dueClass = 'bg-secondary-subtle text-secondary';
                 if ($due !== '') {
                     try {
                         $dueDate = new DateTime($due, $tzObj);
                         if ($dueDate < $today) {
                             $due = 'Overdue';
-                            $dueClass = 'text-danger';
+                            $dueClass = 'bg-danger-subtle text-danger';
                         } else {
                             $dueFmt = $dueDate->format('Y-m-d');
                             if ($dueFmt === $todayFmt) {
                                 $due = 'Today';
-                                $dueClass = 'text-success';
+                                $dueClass = 'bg-success-subtle text-success';
                             } elseif ($dueFmt === $tomorrowFmt) {
                                 $due = 'Tomorrow';
-                                $dueClass = 'text-primary';
+                                $dueClass = 'bg-primary-subtle text-primary';
                             } else {
                                 $due = 'Later';
-                                $dueClass = 'text-primary';
+                                $dueClass = 'bg-primary-subtle text-primary';
 
                             }
                         }
@@ -104,8 +104,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                 <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
                 <span class="d-flex align-items-center gap-2">
-                    <span class="small due-date text-end <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
-                    <span class="badge <?=$priority_classes[$p]?> priority-badge"><?=$priority_labels[$p]?></span>
+                    <?php if ($due !== ''): ?>
+                        <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
+                    <?php else: ?>
+                        <span class="due-date-badge"></span>
+                    <?php endif; ?>
+                    <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
 
                 </span>
             </a>
