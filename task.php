@@ -232,7 +232,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
             const lineStart = textBefore.lastIndexOf('\n') + 1;
             const currentLine = textBefore.slice(lineStart);
             const leading = currentLine.match(/^[\t ]*/)[0];
-            document.execCommand('insertText', false, "\n" + leading);
+            // insert newline using <br> to avoid collapsing when reading textContent
+            document.execCommand('insertHTML', false, '<br>');
+            if (leading) {
+              document.execCommand('insertText', false, leading);
+            }
             updateDetails();
             scheduleSave();
           }
