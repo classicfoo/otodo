@@ -118,5 +118,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 </div>
 <script src="sw-register.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.addEventListener('pageshow', e => {
+    if (e.persisted) location.reload();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) location.reload();
+  });
+</script>
 </body>
 </html>
