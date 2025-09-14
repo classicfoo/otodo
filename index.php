@@ -41,7 +41,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <span class="navbar-brand mb-0 h1">Otodo</span>
-        <span id="navStatus" class="badge bg-secondary d-none">Offline ⨯</span>
         <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -90,7 +89,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 (function(){
   const taskListEl = document.getElementById('taskList');
   const form = document.querySelector('form');
-  const navStatus = document.getElementById('navStatus');
   const netStatus = document.getElementById('netStatus');
   const checkNowBtn = document.getElementById('checkNow');
   const pendingInfo = document.getElementById('pendingInfo');
@@ -199,9 +197,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const on = online !== undefined ? online : navigator.onLine;
     const text = on ? 'Online ✓' : 'Offline ⨯';
     const cls = on ? 'badge bg-success' : 'badge bg-secondary';
-    navStatus.className = cls;
-    navStatus.textContent = text;
-    navStatus.classList.remove('d-none');
     netStatus.className = cls;
     netStatus.textContent = text;
   }
@@ -255,7 +250,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   checkNowBtn.addEventListener('click',checkNow);
   document.getElementById('menu').addEventListener('show.bs.offcanvas',checkNow);
-  window.addEventListener('online',sync);
+  window.addEventListener('online',()=>{updateStatus(true);sync();});
+  window.addEventListener('offline',()=>updateStatus(false));
 
   loadState();
   render();
