@@ -1,6 +1,7 @@
 const CACHE_NAME = 'otodo-cache-v3';
 const URLS_TO_CACHE = [
   '/',
+  '/index.php',
   '/login.php',
   '/register.php',
   '/settings.php',
