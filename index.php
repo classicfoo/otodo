@@ -77,11 +77,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </form>
     <div id="taskList" class="list-group"></div>
 </div>
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
-  <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="toast-body"></div>
-  </div>
-</div>
 <script>
   window.initialTasks = <?=json_encode($tasks)?>;
   window.defaultPriority = <?=json_encode((int)($_SESSION['default_priority'] ?? 0))?>;
@@ -99,9 +94,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const netStatus = document.getElementById('netStatus');
   const checkNowBtn = document.getElementById('checkNow');
   const pendingInfo = document.getElementById('pendingInfo');
-  const toastEl = document.getElementById('toast');
-  const toastBody = toastEl.querySelector('.toast-body');
-  const toast = new bootstrap.Toast(toastEl);
 
   let tasks = [];
   let queue = [];
@@ -147,12 +139,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       link.className='text-reset text-decoration-none flex-grow-1';
       if(t.done) link.classList.add('text-decoration-line-through');
       left.appendChild(link);
-      const editBtn=document.createElement('button');
-      editBtn.className='btn btn-sm btn-link p-0';
-      editBtn.textContent='✎';
-      editBtn.setAttribute('aria-label','Edit title');
-      editBtn.addEventListener('click',e=>{e.preventDefault();editTask(t.id);});
-      left.appendChild(editBtn);
       const right=document.createElement('div');
       right.className='d-flex align-items-center gap-2';
       if(t.due_date){
@@ -171,11 +157,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       pr.className='small priority-text '+window.priorityClasses[p];
       pr.textContent=window.priorityLabels[p];
       right.appendChild(pr);
-      const del=document.createElement('button');
-      del.className='btn btn-sm btn-link text-danger';
-      del.textContent='×';
-      del.addEventListener('click',()=>deleteTask(t.id));
-      right.appendChild(del);
       if(queue.some(op=>op.id===t.id)){
         const clock=document.createElement('span');
         clock.textContent='⏰';
@@ -209,38 +190,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     render();
   }
 
-  function editTask(id){
-    const t=tasks.find(x=>x.id===id); if(!t)return;
-    const desc=prompt('Edit task',t.description); if(desc===null)return;
-    t.description=normalize(desc.trim());
-    const addOp=queue.find(o=>o.type==='add'&&o.id===id);
-    if(addOp){addOp.task.description=t.description;} else {
-      let op=queue.find(o=>o.type==='update'&&o.id===id);
-      if(op){op.task.description=t.description;} else {queue.push({type:'update',id,task:{description:t.description}});}
-    }
-    saveState();
-    render();
-  }
-
-  function deleteTask(id){
-    tasks=tasks.filter(t=>t.id!==id);
-    const addIdx=queue.findIndex(o=>o.type==='add'&&o.id===id);
-    if(addIdx!==-1){queue.splice(addIdx,1);}else{
-      queue=queue.filter(o=>!(o.type==='update'&&o.id===id));
-      queue.push({type:'delete',id});
-    }
-    saveState();
-    render();
-  }
-
-  function showToast(msg,retry=false){
-    toastBody.innerHTML=msg;
-    toast.show();
-    if(retry){
-      const btn=document.getElementById('retryNow');
-      if(btn) btn.addEventListener('click',()=>{toast.hide();sync();});
-    }
-  }
 
   async function ping(){
     try{await fetch('sw-register.js',{method:'HEAD',cache:'no-store'});return true;}catch(e){return false;}
@@ -265,7 +214,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   async function sync(){
     if(!navigator.onLine || queue.length===0){
-      if(queue.length===0) showToast('All changes saved');
       updateStatus();
       return;
     }
@@ -295,14 +243,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           queue.splice(i,1);
         }
       }
-      saveState();
-      render();
-      showToast('All changes saved');
-    }catch(e){
-      saveState();
-      render();
-      showToast("Couldn't sync. Will retry when online. <button class='btn btn-link p-0' id='retryNow'>Retry now</button>", true);
-    }
+        saveState();
+        render();
+      }catch(e){
+        saveState();
+        render();
+      }
   }
 
   form.addEventListener('submit',e=>{e.preventDefault();const d=form.description.value.trim();if(!d)return;addTask(d);form.reset();});
