@@ -10,6 +10,9 @@ $db = get_db();
 
 $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
 
+$inserted = false;
+$id = null;
+
 if ($description !== '') {
     // Determine today's date based on user location
     $tz = $_SESSION['location'] ?? null;
@@ -35,6 +38,16 @@ if ($description !== '') {
         ':priority' => $priority,
         ':due_date' => $due_date,
     ]);
+    $id = $db->lastInsertId();
+    $inserted = true;
+}
+
+$is_ajax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+if ($is_ajax) {
+    header('Content-Type: application/json');
+    echo json_encode($inserted ? ['status' => 'ok', 'id' => (int)$id] : ['status' => 'error']);
+    exit();
 }
 
 header('Location: index.php');

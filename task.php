@@ -17,6 +17,20 @@ if (!$task) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Allow lightweight updates for done-only changes
+    if (isset($_POST['done']) && !isset($_POST['description']) && !isset($_POST['due_date']) && !isset($_POST['details']) && !isset($_POST['priority'])) {
+        $done = $_POST['done'] ? 1 : 0;
+        $stmt = $db->prepare('UPDATE tasks SET done = :done WHERE id = :id AND user_id = :uid');
+        $stmt->execute([
+            ':done' => $done,
+            ':id' => $id,
+            ':uid' => $_SESSION['user_id'],
+        ]);
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'ok']);
+        exit();
+    }
+
     $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');

@@ -1,9 +1,11 @@
 const CACHE_NAME = 'otodo-cache-v3';
 const URLS_TO_CACHE = [
   '/',
+  '/index.php',
   '/login.php',
   '/register.php',
   '/settings.php',
+  '/sw-register.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 
@@ -27,6 +29,10 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   const isNavigational =
     event.request.mode === 'navigate' ||
     ['/index.php', '/task.php', '/completed.php'].some(path => url.pathname.endsWith(path));
@@ -49,7 +55,7 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         }
         return networkResponse;
-      }).catch(() => caches.match('/'));
+      });
     })
   );
 });
