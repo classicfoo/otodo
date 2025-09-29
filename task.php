@@ -187,7 +187,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const detailsField = document.getElementById('detailsField');
   if (details && detailsField) {
       updateDetails = function() {
-        detailsField.value = details.textContent;
+        const text = details.innerText
+          .replace(/\r\n/g, "\n")
+          .replace(/\r/g, "\n");
+        detailsField.value = text;
       };
       details.addEventListener('input', function(){
         updateDetails();
