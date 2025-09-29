@@ -187,7 +187,37 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const detailsField = document.getElementById('detailsField');
   if (details && detailsField) {
       updateDetails = function() {
-        detailsField.value = details.textContent;
+        let text = typeof details.innerText === 'string' ? details.innerText : '';
+        if (!text) {
+          text = details.textContent || '';
+        }
+
+        text = text
+          .replace(/\r\n?/g, "\n")
+          .replace(/[\u2028\u2029]/g, "\n");
+
+        if (!text.includes("\n")) {
+          const html = details.innerHTML;
+          if (/<\/?(div|br)\b/i.test(html)) {
+            const normalizedHtml = html
+              .replace(/\r\n?/g, "\n")
+              .replace(/<div><br\s*\/?><\/div>/gi, "\n")
+              .replace(/<div[^>]*>/gi, "\n")
+              .replace(/<br\s*\/?>(?=\n?)/gi, "\n")
+              .replace(/<\/div>/gi, "")
+              .replace(/&nbsp;/gi, " ");
+            const parser = document.createElement('textarea');
+            parser.innerHTML = normalizedHtml;
+            text = parser.value
+              .replace(/\r\n?/g, "\n")
+              .replace(/[\u2028\u2029]/g, "\n");
+            if (/^<div[^>]*>/i.test(html) && !/^<div><br\s*\/?><\/div>/i.test(html)) {
+              text = text.replace(/^\n/, '');
+            }
+          }
+        }
+
+        detailsField.value = text;
       };
       details.addEventListener('input', function(){
         updateDetails();
