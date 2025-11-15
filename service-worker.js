@@ -1,10 +1,14 @@
-const CACHE_NAME = 'otodo-cache-v4';
+const CACHE_NAME = 'otodo-cache-v5';
 const URLS_TO_CACHE = [
   '/',
+  '/index.php',
+  '/task.php',
+  '/completed.php',
+  '/settings.php',
   '/login.php',
   '/register.php',
-  '/settings.php',
   '/sync-status.js',
+  '/sw-register.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 
@@ -176,9 +180,7 @@ self.addEventListener('fetch', event => {
     ['/index.php', '/task.php', '/completed.php', '/settings.php'].some(path => url.pathname.endsWith(path));
 
   if (isNavigational) {
-    event.respondWith(
-      fetch(request).catch(() => caches.match(request))
-    );
+    event.respondWith(handleNavigationRequest(event));
     return;
   }
 
@@ -193,10 +195,51 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone));
         }
         return networkResponse;
-      }).catch(() => caches.match('/'));
+      }).catch(() => caches.match(request)
+        .then(match => match || caches.match('/index.php'))
+        .then(match => match || caches.match('/')));
     })
   );
 });
+
+async function handleNavigationRequest(event) {
+  const { request } = event;
+  const url = new URL(request.url);
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  } catch (error) {
+    const exactMatch = await caches.match(request);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    const pathMatch = await caches.match(url.pathname, { ignoreSearch: true });
+    if (pathMatch) {
+      return pathMatch;
+    }
+
+    const cachedIndex = await caches.match('/index.php');
+    if (cachedIndex) {
+      return cachedIndex;
+    }
+
+    const cachedRoot = await caches.match('/');
+    if (cachedRoot) {
+      return cachedRoot;
+    }
+
+    return new Response('<!DOCTYPE html><html><body><h1>Offline</h1><p>The app is unavailable offline because this page was not cached yet.</p></body></html>', {
+      status: 503,
+      headers: { 'Content-Type': 'text/html' },
+    });
+  }
+}
 
 async function handleQueueableRequest(event) {
   const url = new URL(event.request.url);
