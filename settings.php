@@ -86,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-4 small text-secondary" data-sync-status>All changes synced</div>
     </div>
 </div>
 <div class="container">
@@ -96,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if ($error): ?>
         <div class="alert alert-danger"><?=$error?></div>
     <?php endif; ?>
-    <form method="post" class="mb-3" autocomplete="off">
+    <form method="post" class="mb-3" autocomplete="off" data-sync-form>
         <div class="mb-3">
             <label class="form-label" for="username">Username</label>
             <input type="text" name="username" id="username" class="form-control" value="<?=htmlspecialchars($username)?>" required>
@@ -128,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
 </div>
+<script src="sync-status.js"></script>
 <script src="sw-register.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>

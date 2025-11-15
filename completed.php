@@ -59,13 +59,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-4 small text-secondary" data-sync-status>All changes synced</div>
     </div>
 </div>
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Completed Tasks</h5>
         <?php if (!empty($tasks)) : ?>
-        <form action="delete_completed.php" method="post" onsubmit="return confirm('Delete all completed tasks?');">
+        <form action="delete_completed.php" method="post" data-sync-form data-confirm="Delete all completed tasks?">
             <button class="btn btn-danger btn-sm" type="submit">Delete All</button>
         </form>
         <?php endif; ?>
@@ -121,6 +122,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
     <?php endif; ?>
 </div>
+<script src="sync-status.js"></script>
 <script src="sw-register.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>

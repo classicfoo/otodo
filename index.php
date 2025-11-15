@@ -60,10 +60,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-4 small text-secondary" data-sync-status>All changes synced</div>
     </div>
 </div>
 <div class="container">
-    <form action="add_task.php" method="post" class="mb-3">
+    <form action="add_task.php" method="post" class="mb-3" data-sync-form>
         <div class="input-group">
             <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
             <button class="btn btn-primary" type="submit">Add</button>
@@ -116,6 +117,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         <?php endforeach; ?>
     </div>
 </div>
+<script src="sync-status.js"></script>
 <script src="sw-register.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
