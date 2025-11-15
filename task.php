@@ -16,6 +16,13 @@ if (!$task) {
     exit();
 }
 
+$next_stmt = $db->prepare('SELECT id FROM tasks WHERE id > :id AND user_id = :uid ORDER BY id ASC LIMIT 1');
+$next_stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
+$next_task_id = $next_stmt->fetchColumn();
+if ($next_task_id === false) {
+    $next_task_id = null;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
     $due_date = trim($_POST['due_date'] ?? '');
@@ -159,7 +166,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
-        <a href="index.php" class="btn btn-secondary">Back</a>
+        <div class="d-flex align-items-center gap-2">
+            <a href="index.php" class="btn btn-secondary">Back</a>
+            <button type="button" class="btn btn-primary" id="nextTaskBtn">Next</button>
+        </div>
+        <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
     </form>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -181,6 +192,27 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
+
+  const nextTaskId = <?= $next_task_id !== null ? (int)$next_task_id : 'null' ?>;
+  const nextButton = document.getElementById('nextTaskBtn');
+  const nextMessage = document.getElementById('nextTaskMessage');
+  if (nextButton) {
+    if (nextTaskId === null) {
+      nextButton.disabled = true;
+      if (nextMessage) {
+        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.classList.remove('d-none');
+      }
+    }
+    nextButton.addEventListener('click', function(){
+      if (nextTaskId !== null) {
+        window.location.href = 'task.php?id=' + nextTaskId;
+      } else if (nextMessage) {
+        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.classList.remove('d-none');
+      }
+    });
+  }
 
   let updateDetails;
   const details = document.getElementById('detailsInput');
