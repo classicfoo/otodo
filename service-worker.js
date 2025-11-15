@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otodo-cache-v5';
+const CACHE_NAME = 'otodo-cache-v6';
 const URLS_TO_CACHE = [
   '/',
   '/index.php',
@@ -154,18 +154,43 @@ async function processQueue() {
 }
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
-  );
+  event.waitUntil(precacheEssentialShell().then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
       keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
+    )).then(() => self.clients.claim())
   );
 });
+
+async function precacheEssentialShell() {
+  const cache = await caches.open(CACHE_NAME);
+
+  await Promise.allSettled(URLS_TO_CACHE.map(async url => {
+    try {
+      const response = await fetch(new Request(url, {
+        credentials: 'include',
+        cache: 'no-cache',
+        redirect: 'follow',
+      }));
+
+      if (response && response.ok) {
+        const request = new Request(url, { credentials: 'include' });
+        await storeNavigationResponse(cache, request, response.clone());
+
+        const resolvedUrl = response.url ? new URL(response.url) : null;
+        const originalUrl = new URL(url, self.location.origin);
+        if (resolvedUrl && resolvedUrl.href !== originalUrl.href) {
+          await storeNavigationResponse(cache, resolvedUrl.href, response.clone());
+        }
+      }
+    } catch (error) {
+      // Ignore individual precache failures so one bad response does not prevent install.
+    }
+  }));
+}
 
 self.addEventListener('fetch', event => {
   const { request } = event;
@@ -209,8 +234,12 @@ async function handleNavigationRequest(event) {
 
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse && networkResponse.ok) {
-      cache.put(request, networkResponse.clone());
+    if (networkResponse) {
+      if (networkResponse.type === 'opaqueredirect') {
+        cacheRedirectTarget(cache, url).catch(() => {});
+      } else if (networkResponse.ok) {
+        await storeNavigationResponse(cache, request, networkResponse.clone());
+      }
     }
     return networkResponse;
   } catch (error) {
@@ -238,6 +267,75 @@ async function handleNavigationRequest(event) {
       status: 503,
       headers: { 'Content-Type': 'text/html' },
     });
+  }
+}
+
+async function storeNavigationResponse(cache, request, response) {
+  const url = typeof request === 'string' ? new URL(request, self.location.origin) : new URL(request.url);
+  const variants = [];
+  const seen = new Set();
+
+  const addVariant = variant => {
+    if (!variant) {
+      return;
+    }
+    const key = variant instanceof Request ? `${variant.method || 'GET'}:${variant.url}` : `string:${variant}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    variants.push(variant);
+  };
+
+  if (typeof request === 'string') {
+    addVariant(request);
+  } else if (request instanceof Request && request.mode !== 'navigate') {
+    addVariant(request);
+  }
+
+  addVariant(url.pathname || '/');
+
+  addVariant(url.href);
+
+  if (url.pathname === '/' || url.pathname === '') {
+    addVariant('/index.php');
+  }
+
+  if (url.pathname === '/index.php') {
+    addVariant('/');
+  }
+
+  addVariant(new Request(url.href, { credentials: 'include' }));
+
+  for (const variant of variants) {
+    try {
+      await cache.put(variant, response.clone());
+    } catch (error) {
+      // Ignore cache.put errors so that unsupported variants do not stop caching.
+    }
+  }
+}
+
+async function cacheRedirectTarget(cache, url) {
+  try {
+    const redirectedResponse = await fetch(new Request(url.href, {
+      credentials: 'include',
+      cache: 'no-cache',
+      redirect: 'follow',
+    }));
+
+    if (!redirectedResponse || !redirectedResponse.ok) {
+      return;
+    }
+
+    await storeNavigationResponse(cache, url.href, redirectedResponse.clone());
+
+    const finalUrl = redirectedResponse.url ? new URL(redirectedResponse.url) : null;
+    if (finalUrl && finalUrl.href !== url.href) {
+      await storeNavigationResponse(cache, finalUrl.href, redirectedResponse.clone());
+    }
+  } catch (error) {
+    // Ignore redirect caching failures to avoid breaking the main response flow.
   }
 }
 
