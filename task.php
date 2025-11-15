@@ -16,11 +16,21 @@ if (!$task) {
     exit();
 }
 
-$next_stmt = $db->prepare('SELECT id FROM tasks WHERE id > :id AND user_id = :uid ORDER BY id ASC LIMIT 1');
-$next_stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
-$next_task_id = $next_stmt->fetchColumn();
-if ($next_task_id === false) {
-    $next_task_id = null;
+$ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$ordered_stmt->execute([':uid' => $_SESSION['user_id']]);
+$ordered_ids = $ordered_stmt->fetchAll(PDO::FETCH_COLUMN);
+$next_task_id = null;
+$current_task_id = (int)$task['id'];
+$found_current = false;
+foreach ($ordered_ids as $ordered_id) {
+    $ordered_id = (int)$ordered_id;
+    if ($found_current) {
+        $next_task_id = $ordered_id;
+        break;
+    }
+    if ($ordered_id === $current_task_id) {
+        $found_current = true;
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
