@@ -127,6 +127,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-4 small text-secondary" data-sync-status>All changes synced</div>
     </div>
 </div>
 <div class="container">
@@ -252,11 +253,19 @@ if ($p < 0 || $p > 3) { $p = 0; }
   function sendSave(immediate = false) {
     if (updateDetails) updateDetails();
     const data = new FormData(form);
-    if (immediate && navigator.sendBeacon) {
-      navigator.sendBeacon(window.location.href, data);
-    } else {
-      fetch(window.location.href, {method: 'POST', body: data});
-    }
+    const options = {
+      method: 'POST',
+      body: data,
+      credentials: 'include',
+      keepalive: immediate,
+    };
+    fetch(window.location.href, options).then(response => {
+      if (!response.ok && response.status !== 202) {
+        throw new Error('Failed');
+      }
+    }).catch(() => {
+      // Errors are surfaced through the sync status indicator.
+    });
   }
 
   form.addEventListener('input', scheduleSave);
@@ -269,6 +278,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
   });
 })();
 </script>
+<script src="sync-status.js"></script>
 <script src="sw-register.js"></script>
 </body>
 </html>
