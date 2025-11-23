@@ -315,15 +315,19 @@ if ($p < 0 || $p > 3) { $p = 0; }
     deleteLink.addEventListener('click', function(e){
       e.preventDefault();
       const url = deleteLink.getAttribute('href');
-      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Deleting task…');
+      if (window.updateSharedSyncStatus) window.updateSharedSyncStatus('syncing', 'Deleting task…', {followUpUrl: url});
       if (url) {
         fetch(url, {
           method: 'GET',
           headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
           keepalive: true,
           credentials: 'same-origin'
+        }).then(resp => {
+          if (resp && resp.ok && window.updateSharedSyncStatus) {
+            window.updateSharedSyncStatus('synced', 'Task deleted');
+          }
         }).catch(() => {
-          if (window.updateSyncStatus) window.updateSyncStatus('error', 'Delete failed. Check connection.');
+          if (window.updateSharedSyncStatus) window.updateSharedSyncStatus('error', 'Delete failed. Check connection.', {followUpUrl: url});
         });
       }
       setTimeout(instantNavigateToIndex, 0);
