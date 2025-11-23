@@ -1,9 +1,14 @@
-const CACHE_NAME = 'otodo-cache-v3';
+const CACHE_NAME = 'otodo-cache-v5';
 const URLS_TO_CACHE = [
   '/',
+  '/index.php',
+  '/task.php',
+  '/completed.php',
   '/login.php',
   '/register.php',
   '/settings.php',
+  '/sync-status.js',
+  '/sw-register.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 
@@ -33,23 +38,38 @@ self.addEventListener('fetch', event => {
 
   if (isNavigational) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(event.request))
+      caches.match(event.request).then(cacheHit => {
+        const fetchPromise = fetch(event.request)
+          .then(networkResponse => {
+            if (networkResponse && networkResponse.status === 200) {
+              const copy = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+            }
+            return networkResponse;
+          })
+          .catch(() => cacheHit || caches.match('/'));
+
+        event.waitUntil(fetchPromise.catch(() => {}));
+        return cacheHit || fetchPromise;
+      })
     );
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then(response => {
-      if (response) {
-        return response;
-      }
-      return fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
-        }
-        return networkResponse;
-      }).catch(() => caches.match('/'));
+      const fetchPromise = fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('/'));
+
+      event.waitUntil(fetchPromise.catch(() => {}));
+      return response || fetchPromise;
     })
   );
 });

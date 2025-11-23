@@ -123,7 +123,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div class="dropdown">
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
-                    <li><a class="dropdown-item text-danger" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
+                    <li><a class="dropdown-item text-danger" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
                 </ul>
             </div>
         </div>
@@ -144,6 +144,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -177,12 +178,13 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="index.php" class="btn btn-secondary">Back</a>
+            <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
             <button type="button" class="btn btn-primary" id="nextTaskBtn">Next</button>
         </div>
         <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
     </form>
 </div>
+<script src="sync-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
@@ -198,6 +200,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
     select.addEventListener('change', updateBadge);
   }
+
+  const backLink = document.getElementById('backToList');
+  const deleteLink = document.getElementById('taskDeleteLink');
 
   const form = document.querySelector('form');
   if (!form) return;
@@ -291,13 +296,51 @@ if ($p < 0 || $p > 3) { $p = 0; }
     timer = setTimeout(sendSave, 500);
   }
 
+  function instantNavigateToIndex() {
+    if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Returning to tasks…');
+    window.location.replace('index.php');
+  }
+
+  if (backLink) {
+    backLink.addEventListener('click', function(e){
+      e.preventDefault();
+      if (timer) {
+        sendSave(true);
+      }
+      instantNavigateToIndex();
+    });
+  }
+
+  if (deleteLink) {
+    deleteLink.addEventListener('click', function(e){
+      e.preventDefault();
+      const url = deleteLink.getAttribute('href');
+      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Deleting task…');
+      if (url) {
+        fetch(url, {
+          method: 'GET',
+          headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
+          keepalive: true,
+          credentials: 'same-origin'
+        }).catch(() => {
+          if (window.updateSyncStatus) window.updateSyncStatus('error', 'Delete failed. Check connection.');
+        });
+      }
+      setTimeout(instantNavigateToIndex, 0);
+    });
+  }
+
   function sendSave(immediate = false) {
     if (updateDetails) updateDetails();
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
+      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      fetch(window.location.href, {method: 'POST', body: data});
+      const request = fetch(window.location.href, {method: 'POST', body: data});
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
+      }
     }
   }
 
@@ -309,6 +352,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
       sendSave(true);
     }
   });
+  if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
 <script src="sw-register.js"></script>
