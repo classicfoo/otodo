@@ -37,7 +37,6 @@
   window.updateSharedSyncStatus = function(state, message, extra = {}) {
     setSharedState(state, message, extra);
   };
-
   const defaultMessages = {
     synced: 'All changes saved',
     syncing: 'Syncing changes…',
@@ -60,7 +59,7 @@
   window.addEventListener('online', () => setState('synced', 'Back online. Synced'));
   window.addEventListener('offline', () => setState('error', 'Offline. Changes will sync later'));
 
-  const sharedRaw = sessionStorage.getItem('sharedSyncStatus');
+const sharedRaw = sessionStorage.getItem('sharedSyncStatus');
   if (sharedRaw) {
     try {
       const shared = JSON.parse(sharedRaw);
