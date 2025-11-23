@@ -142,16 +142,22 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       tempItem.innerHTML = `<span>${description}</span><span class="d-flex align-items-center gap-2"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span></span>`;
       listGroup.prepend(tempItem);
 
-      if (window.trackBackgroundSync) {
-        window.trackBackgroundSync(Promise.resolve());
-      }
-
       data.set('description', description);
-      fetch('add_task.php', {
+      const request = fetch('add_task.php', {
         method: 'POST',
         body: data,
         headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
-      }).then(resp => resp.ok ? resp.json() : Promise.reject())
+      });
+
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {
+          syncing: 'Saving task…',
+          synced: 'Task saved',
+          error: 'Could not reach server'
+        });
+      }
+
+      request.then(resp => resp.ok ? resp.json() : Promise.reject())
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;

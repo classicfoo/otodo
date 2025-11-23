@@ -4,20 +4,18 @@
 
   let hideTimer;
   function setState(state, message) {
+    if (hideTimer) clearTimeout(hideTimer);
     statusEl.dataset.state = state;
     statusEl.textContent = message;
-    statusEl.classList.remove('text-success', 'text-warning', 'text-danger');
+    statusEl.classList.remove('text-success', 'text-warning', 'text-danger', 'opacity-75');
     if (state === 'synced') {
       statusEl.classList.add('text-success');
-      if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         statusEl.classList.add('opacity-75');
       }, 3000);
     } else if (state === 'syncing') {
-      statusEl.classList.remove('opacity-75');
       statusEl.classList.add('text-warning');
     } else if (state === 'error') {
-      statusEl.classList.remove('opacity-75');
       statusEl.classList.add('text-danger');
     }
   }
