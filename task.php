@@ -144,6 +144,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -183,6 +184,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
     </form>
 </div>
+<script src="sync-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
@@ -296,8 +298,12 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
+      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      fetch(window.location.href, {method: 'POST', body: data});
+      const request = fetch(window.location.href, {method: 'POST', body: data});
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
+      }
     }
   }
 
@@ -309,6 +315,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
       sendSave(true);
     }
   });
+  if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
 <script src="sw-register.js"></script>

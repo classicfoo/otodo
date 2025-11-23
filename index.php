@@ -60,6 +60,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -117,6 +118,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
 </div>
 <script src="sw-register.js"></script>
+<script src="sync-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.addEventListener('pageshow', e => {
@@ -125,6 +127,58 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) location.reload();
   });
+
+  const form = document.querySelector('form[action="add_task.php"]');
+  const listGroup = document.querySelector('.container .list-group');
+  if (form && listGroup) {
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      const data = new FormData(form);
+      const description = (data.get('description') || '').toString().trim();
+      if (!description) return;
+
+      const tempItem = document.createElement('a');
+      tempItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center opacity-75';
+      tempItem.innerHTML = `<span>${description}</span><span class="d-flex align-items-center gap-2"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span></span>`;
+      listGroup.prepend(tempItem);
+
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(Promise.resolve());
+      }
+
+      data.set('description', description);
+      fetch('add_task.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      }).then(resp => resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Save failed');
+        tempItem.href = `task.php?id=${json.id}`;
+        tempItem.classList.remove('opacity-75');
+        tempItem.querySelector('span').textContent = json.description;
+        const badge = tempItem.querySelector('.badge');
+        if (badge) {
+          badge.textContent = json.due_label || '';
+          badge.className = `badge due-date-badge ${json.due_class || ''}`;
+        }
+        const priority = tempItem.querySelector('.priority-text');
+        if (priority) {
+          priority.textContent = json.priority_label || '';
+          priority.className = `small priority-text ${json.priority_class || ''}`;
+        }
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(() => {
+        tempItem.classList.add('text-danger');
+        tempItem.querySelector('.priority-text').textContent = 'Retry needed';
+        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+      })
+      .finally(() => {
+        form.reset();
+      });
+    });
+  }
 </script>
 </body>
 </html>

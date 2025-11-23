@@ -86,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -129,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 </div>
 <script src="sw-register.js"></script>
+<script src="sync-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 const input = document.getElementById('location');
