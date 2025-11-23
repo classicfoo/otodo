@@ -123,7 +123,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <div class="dropdown">
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
-                    <li><a class="dropdown-item text-danger" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
+                    <li><a class="dropdown-item text-danger" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
                 </ul>
             </div>
         </div>
@@ -178,7 +178,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="index.php" class="btn btn-secondary">Back</a>
+            <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
             <button type="button" class="btn btn-primary" id="nextTaskBtn">Next</button>
         </div>
         <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
@@ -200,6 +200,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
     select.addEventListener('change', updateBadge);
   }
+
+  const backLink = document.getElementById('backToList');
+  const deleteLink = document.getElementById('taskDeleteLink');
 
   const form = document.querySelector('form');
   if (!form) return;
@@ -291,6 +294,44 @@ if ($p < 0 || $p > 3) { $p = 0; }
   function scheduleSave() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(sendSave, 500);
+  }
+
+  function instantNavigateToIndex() {
+    if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Returning to tasks…');
+    window.location.replace('index.php');
+  }
+
+  if (backLink) {
+    backLink.addEventListener('click', function(e){
+      e.preventDefault();
+      if (timer) {
+        sendSave(true);
+      }
+      instantNavigateToIndex();
+    });
+  }
+
+  if (deleteLink) {
+    deleteLink.addEventListener('click', function(e){
+      e.preventDefault();
+      const url = deleteLink.getAttribute('href');
+      if (window.updateSharedSyncStatus) window.updateSharedSyncStatus('syncing', 'Deleting task…', {followUpUrl: url});
+      if (url) {
+        fetch(url, {
+          method: 'GET',
+          headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
+          keepalive: true,
+          credentials: 'same-origin'
+        }).then(resp => {
+          if (resp && resp.ok && window.updateSharedSyncStatus) {
+            window.updateSharedSyncStatus('synced', 'Task deleted');
+          }
+        }).catch(() => {
+          if (window.updateSharedSyncStatus) window.updateSharedSyncStatus('error', 'Delete failed. Check connection.', {followUpUrl: url});
+        });
+      }
+      setTimeout(instantNavigateToIndex, 0);
+    });
   }
 
   function sendSave(immediate = false) {

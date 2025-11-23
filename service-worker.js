@@ -1,6 +1,9 @@
-const CACHE_NAME = 'otodo-cache-v4';
+const CACHE_NAME = 'otodo-cache-v5';
 const URLS_TO_CACHE = [
   '/',
+  '/index.php',
+  '/task.php',
+  '/completed.php',
   '/login.php',
   '/register.php',
   '/settings.php',
