@@ -33,26 +33,25 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .task-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr);
             align-items: center;
             padding: 0.75rem 1rem;
-            gap: 0.75rem;
+            column-gap: 1rem;
         }
         .task-main {
-            flex: 1 1 70%;
             min-width: 0;
             word-break: break-word;
         }
         .task-meta {
-            flex: 0 0 30%;
             display: grid;
-            grid-template-columns: 1fr 1fr auto;
-            gap: 0.5rem;
-            justify-items: center;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            column-gap: 0.5rem;
             align-items: center;
+            justify-items: center;
         }
-        .due-date-badge { width: 100%; max-width: 110px; text-align: center; }
-        .priority-text { width: 100%; max-width: 90px; text-align: center; }
+        .due-date-badge { width: 100%; text-align: center; }
+        .priority-text { width: 100%; text-align: center; }
         .star-toggle { min-width: 44px; }
         .task-star {
             border: 1px solid #f3c24c;
@@ -63,18 +62,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .star-icon { font-size: 1rem; line-height: 1; }
         .starred .star-icon { color: #ffc107; }
-        @media (max-width: 600px) {
+        @media (max-width: 768px) {
             .task-row {
-                flex-direction: column;
-                align-items: stretch;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
+                column-gap: 0.5rem;
             }
             .task-meta {
-                width: 100%;
-                margin-top: 0.25rem;
                 grid-template-columns: auto auto auto;
-                justify-content: flex-start;
-                justify-items: start;
+                justify-content: end;
+                justify-items: end;
             }
+            .due-date-badge, .priority-text { width: auto; min-width: 0; }
         }
     </style>
     <title>Todo List</title>
