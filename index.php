@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -32,8 +32,50 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date-badge { display: inline-block; width: 100px; text-align: centre; }
-        .priority-text { display: inline-block; width: 70px; text-align: center; }
+        .task-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 300px;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            column-gap: 1rem;
+        }
+        .task-main {
+            min-width: 0;
+            word-break: break-word;
+        }
+        .task-meta {
+            display: grid;
+            grid-template-columns: auto auto auto;
+            column-gap: 0.5rem;
+            align-items: center;
+            justify-items: center;
+        }
+        .due-date-badge { width: 100%; text-align: center; }
+        .priority-text { width: 100%; text-align: center; }
+        .star-toggle { min-width: 44px; }
+        .task-star {
+            border: none;
+            border-radius: 4px;
+            padding: 0.2rem 0.6rem;
+            background: transparent;
+            cursor: pointer;
+        }
+        .task-star:focus-visible { outline: 2px solid #0a2a66; outline-offset: 2px; }
+        .task-star:active { background: transparent; }
+        .star-icon { font-size: 2rem; line-height: 1; color:rgba(108, 117, 125, 0.51); }
+        .starred .star-icon { color: #f4ca4c }
+        @media (max-width: 768px) {
+            .task-row {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
+                column-gap: 0.5rem;
+            }
+            .task-meta {
+                grid-template-columns: auto auto auto;
+                justify-content: end;
+                justify-items: end;
+            }
+            .due-date-badge, .priority-text { width: auto; min-width: 0; }
+        }
     </style>
     <title>Todo List</title>
 </head>
@@ -102,17 +144,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
-                <span class="d-flex align-items-center gap-2">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row">
+                <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
                     <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-
-                </span>
+                    <button type="button" class="task-star star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
+                        <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
+                        <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
+                    </button>
+                </div>
             </a>
         <?php endforeach; ?>
     </div>
@@ -128,6 +173,53 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!document.hidden) location.reload();
   });
 
+  function setStarAppearance(button, starred) {
+    button.classList.toggle('starred', !!starred);
+    button.setAttribute('aria-pressed', starred ? 'true' : 'false');
+    button.setAttribute('aria-label', starred ? 'Unstar task' : 'Star task');
+    const icon = button.querySelector('.star-icon');
+    if (icon) icon.textContent = starred ? '★' : '☆';
+    const sr = button.querySelector('.visually-hidden');
+    if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
+  }
+
+  function bindStarButton(button) {
+    button.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      const id = this.dataset.id;
+      if (!id) return;
+      const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
+      const data = new FormData();
+      data.append('id', id);
+      data.append('starred', next);
+      const request = fetch('toggle_star.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      });
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {
+          syncing: next ? 'Starring task…' : 'Unstarring task…',
+          synced: 'Task updated',
+          error: 'Could not reach server'
+        });
+      }
+      request.then(resp => resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Update failed');
+        setStarAppearance(button, json.starred);
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(() => {
+        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+      });
+    });
+  }
+
+  const starButtons = document.querySelectorAll('.star-toggle');
+  starButtons.forEach(bindStarButton);
+
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
   if (form && listGroup) {
@@ -138,8 +230,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (!description) return;
 
       const tempItem = document.createElement('a');
-      tempItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center opacity-75';
-      tempItem.innerHTML = `<span>${description}</span><span class="d-flex align-items-center gap-2"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span></span>`;
+      tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
+      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       data.set('description', description);
@@ -162,7 +254,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-        tempItem.querySelector('span').textContent = json.description;
+          const title = tempItem.querySelector('.task-main');
+          if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           badge.textContent = json.due_label || '';
@@ -173,11 +266,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           priority.textContent = json.priority_label || '';
           priority.className = `small priority-text ${json.priority_class || ''}`;
         }
+        const star = tempItem.querySelector('.star-toggle');
+        if (star) {
+          star.dataset.id = json.id;
+          star.disabled = false;
+          setStarAppearance(star, json.starred || 0);
+          bindStarButton(star);
+        }
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
         tempItem.classList.add('text-danger');
-        tempItem.querySelector('.priority-text').textContent = 'Retry needed';
+        const priority = tempItem.querySelector('.priority-text');
+        if (priority) priority.textContent = 'Retry needed';
         if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
       })
       .finally(() => {

@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE id = :id AND user_id = :uid');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
 $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
@@ -16,7 +16,7 @@ if (!$task) {
     exit();
 }
 
-$ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
 $ordered_stmt->execute([':uid' => $_SESSION['user_id']]);
 $ordered_ids = $ordered_stmt->fetchAll(PDO::FETCH_COLUMN);
 $next_task_id = null;
@@ -42,13 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $priority = 0;
     }
     $done = isset($_POST['done']) ? 1 : 0;
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done WHERE id = :id AND user_id = :uid');
+    $starred = isset($_POST['starred']) ? 1 : 0;
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
         ':priority' => $priority,
         ':done' => $done,
+        ':starred' => $starred,
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
@@ -171,6 +173,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
                 <option value="2" class="bg-warning-subtle text-warning" <?php if (($task['priority'] ?? 2) == 2) echo 'selected'; ?>>Medium</option>
                 <option value="1" class="bg-success-subtle text-success" <?php if (($task['priority'] ?? 2) == 1) echo 'selected'; ?>>Low</option>
             </select>
+        </div>
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" name="starred" id="starredCheckbox" <?php if (!empty($task['starred'])) echo 'checked'; ?>>
+            <label class="form-check-label" for="starredCheckbox">Star this task</label>
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>

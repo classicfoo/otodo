@@ -30,7 +30,7 @@ if ($description !== '') {
 
     // Insert new task using user's default priority
     $priority = (int)($_SESSION['default_priority'] ?? 0);
-    $stmt = $db->prepare('INSERT INTO tasks (user_id, description, priority, due_date) VALUES (:uid, :description, :priority, :due_date)');
+    $stmt = $db->prepare('INSERT INTO tasks (user_id, description, priority, due_date, starred) VALUES (:uid, :description, :priority, :due_date, 0)');
     $stmt->execute([
         ':uid' => $_SESSION['user_id'],
         ':description' => $description,
@@ -90,6 +90,7 @@ if ($description !== '') {
             'due_class' => $dueClass,
             'priority_label' => $priority_labels[$priority] ?? 'None',
             'priority_class' => $priority_classes[$priority] ?? 'text-secondary',
+            'starred' => 0,
         ]);
         exit();
     }
