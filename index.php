@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -32,8 +32,50 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date-badge { display: inline-block; width: 100px; text-align: centre; }
-        .priority-text { display: inline-block; width: 70px; text-align: center; }
+        .task-row {
+            display: grid;
+            grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr);
+            align-items: center;
+            padding: 0.75rem 1rem;
+            column-gap: 1rem;
+        }
+        .task-main {
+            min-width: 0;
+            word-break: break-word;
+        }
+        .task-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            column-gap: 0.5rem;
+            align-items: center;
+            justify-items: center;
+        }
+        .due-date-badge { width: 100%; text-align: center; }
+        .priority-text { width: 100%; text-align: center; }
+        .star-toggle { min-width: 44px; }
+        .task-star {
+            border: none;
+            border-radius: 4px;
+            padding: 0.2rem 0.6rem;
+            background: transparent;
+            cursor: pointer;
+        }
+        .task-star:focus-visible { outline: 2px solid #0a2a66; outline-offset: 2px; }
+        .task-star:active { background: transparent; }
+        .star-icon { font-size: 1rem; line-height: 1; color: #6c757d; }
+        .starred .star-icon { color: #0a2a66; }
+        @media (max-width: 768px) {
+            .task-row {
+                grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
+                column-gap: 0.5rem;
+            }
+            .task-meta {
+                grid-template-columns: auto auto auto;
+                justify-content: end;
+                justify-items: end;
+            }
+            .due-date-badge, .priority-text { width: auto; min-width: 0; }
+        }
     </style>
     <title>Todo List</title>
 </head>
@@ -102,17 +144,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
-                <span class="d-flex align-items-center gap-2">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row">
+                <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
                     <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-
-                </span>
+                    <button type="button" class="task-star star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
+                        <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
+                        <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
+                    </button>
+                </div>
             </a>
         <?php endforeach; ?>
     </div>
@@ -128,6 +173,176 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!document.hidden) location.reload();
   });
 
+  const pendingStarKey = 'pendingStarToggles';
+  const starOverrideKey = 'starStateOverrides';
+  function loadPendingStars() {
+    try {
+      const raw = localStorage.getItem(pendingStarKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  }
+  let pendingStarQueue = loadPendingStars();
+
+  function loadStarOverrides() {
+    try {
+      const raw = localStorage.getItem(starOverrideKey);
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (e) {}
+    return {};
+  }
+
+  let starOverrides = loadStarOverrides();
+
+  function persistPendingStars() {
+    try { localStorage.setItem(pendingStarKey, JSON.stringify(pendingStarQueue)); } catch (e) {}
+  }
+
+  function persistStarOverrides() {
+    try { localStorage.setItem(starOverrideKey, JSON.stringify(starOverrides)); } catch (e) {}
+  }
+
+  function recordStarOverride(id, starred) {
+    const key = String(id);
+    starOverrides[key] = { starred: starred ? 1 : 0, at: Date.now() };
+    persistStarOverrides();
+  }
+
+  function clearMatchingOverride(id, starred) {
+    const key = String(id);
+    const entry = starOverrides[key];
+    if (entry && entry.starred === (starred ? 1 : 0)) {
+      delete starOverrides[key];
+      persistStarOverrides();
+    }
+  }
+
+  function latestStarOverride(id) {
+    const entry = starOverrides[String(id)];
+    if (entry && typeof entry === 'object' && 'starred' in entry) return entry;
+    return null;
+  }
+
+  function latestPendingFor(id) {
+    let latest = null;
+    for (const entry of pendingStarQueue) {
+      if (String(entry.id) === String(id)) {
+        if (!latest || entry.at > latest.at) latest = entry;
+      }
+    }
+    return latest;
+  }
+
+  function setStarAppearance(button, starred) {
+    button.classList.toggle('starred', !!starred);
+    button.setAttribute('aria-pressed', starred ? 'true' : 'false');
+    button.setAttribute('aria-label', starred ? 'Unstar task' : 'Star task');
+    const icon = button.querySelector('.star-icon');
+    if (icon) icon.textContent = starred ? '★' : '☆';
+    const sr = button.querySelector('.visually-hidden');
+    if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
+  }
+
+  function enqueuePendingStar(id, starred) {
+    const entry = { id: Number(id), starred: starred ? 1 : 0, at: Date.now() };
+    pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(id) && item.starred === entry.starred));
+    pendingStarQueue.push(entry);
+    persistPendingStars();
+    recordStarOverride(id, starred);
+    return entry;
+  }
+
+  function clearPendingUpTo(entry) {
+    pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(entry.id) && item.at <= entry.at));
+    persistPendingStars();
+  }
+
+  function findStarButton(id) {
+    return document.querySelector('.star-toggle[data-id="' + id + '"]');
+  }
+
+  function sendStarUpdate(entry, options = {}) {
+    const data = new FormData();
+    data.append('id', entry.id);
+    data.append('starred', entry.starred);
+
+    const request = fetch('toggle_star.php', {
+      method: 'POST',
+      body: data,
+      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+    });
+
+    const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {
+      syncing: entry.starred ? 'Starring task…' : 'Unstarring task…',
+      synced: 'Task updated',
+      error: 'Could not reach server'
+    }) : request;
+
+    return tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Update failed');
+        const btn = findStarButton(entry.id);
+        if (btn) setStarAppearance(btn, json.starred);
+        recordStarOverride(entry.id, json.starred);
+        clearMatchingOverride(entry.id, json.starred);
+        clearPendingUpTo(entry);
+        if (!options.silent && window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(err => {
+        if (!options.silent && window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+        throw err;
+      });
+  }
+
+  function bindStarButton(button) {
+    button.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      const id = this.dataset.id;
+      if (!id) return;
+      const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
+
+      setStarAppearance(this, next);
+      const queued = enqueuePendingStar(id, next);
+
+      sendStarUpdate(queued).catch(() => {});
+    });
+  }
+
+  function applyPendingStars(buttons) {
+    buttons.forEach(btn => {
+      const pending = latestPendingFor(btn.dataset.id);
+      const override = latestStarOverride(btn.dataset.id);
+      const chosen = (() => {
+        if (pending && override) return pending.at >= override.at ? pending : override;
+        return pending || override || null;
+      })();
+      if (chosen) setStarAppearance(btn, chosen.starred);
+    });
+  }
+
+  function flushPendingStars() {
+    if (!pendingStarQueue.length) return;
+    const latestById = {};
+    for (const entry of pendingStarQueue) {
+      if (!latestById[entry.id] || entry.at > latestById[entry.id].at) {
+        latestById[entry.id] = entry;
+      }
+    }
+    const entries = Object.values(latestById);
+    entries.forEach(entry => {
+      sendStarUpdate(entry, { silent: true }).catch(() => {});
+    });
+  }
+
+  const starButtons = document.querySelectorAll('.star-toggle');
+  starButtons.forEach(bindStarButton);
+  applyPendingStars(starButtons);
+  flushPendingStars();
+  window.addEventListener('online', flushPendingStars);
+
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
   if (form && listGroup) {
@@ -138,8 +353,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (!description) return;
 
       const tempItem = document.createElement('a');
-      tempItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center opacity-75';
-      tempItem.innerHTML = `<span>${description}</span><span class="d-flex align-items-center gap-2"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span></span>`;
+      tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
+      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       data.set('description', description);
@@ -162,7 +377,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-        tempItem.querySelector('span').textContent = json.description;
+          const title = tempItem.querySelector('.task-main');
+          if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           badge.textContent = json.due_label || '';
@@ -173,11 +389,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           priority.textContent = json.priority_label || '';
           priority.className = `small priority-text ${json.priority_class || ''}`;
         }
+        const star = tempItem.querySelector('.star-toggle');
+        if (star) {
+          star.dataset.id = json.id;
+          star.disabled = false;
+          setStarAppearance(star, json.starred || 0);
+          bindStarButton(star);
+        }
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
         tempItem.classList.add('text-danger');
-        tempItem.querySelector('.priority-text').textContent = 'Retry needed';
+        const priority = tempItem.querySelector('.priority-text');
+        if (priority) priority.textContent = 'Retry needed';
         if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
       })
       .finally(() => {
