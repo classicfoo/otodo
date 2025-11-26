@@ -54,14 +54,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .priority-text { width: 100%; text-align: center; }
         .star-toggle { min-width: 44px; }
         .task-star {
-            border: 1px solid #f3c24c;
+            border: none;
             border-radius: 4px;
             padding: 0.2rem 0.6rem;
-            background: #fff;
+            background: transparent;
             cursor: pointer;
         }
-        .star-icon { font-size: 1rem; line-height: 1; }
-        .starred .star-icon { color: #ffc107; }
+        .task-star:focus-visible { outline: 2px solid #0a2a66; outline-offset: 2px; }
+        .task-star:active { background: transparent; }
+        .star-icon { font-size: 1rem; line-height: 1; color: #6c757d; }
+        .starred .star-icon { color: #0a2a66; }
         @media (max-width: 768px) {
             .task-row {
                 grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
@@ -151,7 +153,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
                     <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-                    <button type="button" class="task-star btn btn-sm btn-outline-warning star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
+                    <button type="button" class="task-star star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
                         <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
                         <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
                     </button>
@@ -229,7 +231,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
-      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star btn btn-sm btn-outline-warning star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       data.set('description', description);
