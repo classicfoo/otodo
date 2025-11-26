@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -34,7 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <style>
         .task-row {
             display: grid;
-            grid-template-columns: minmax(0, 7fr) minmax(220px, 3fr);
+            grid-template-columns: minmax(0, 1fr) 300px;
             align-items: center;
             padding: 0.75rem 1rem;
             column-gap: 1rem;
@@ -45,7 +45,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .task-meta {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: auto auto auto;
             column-gap: 0.5rem;
             align-items: center;
             justify-items: center;
@@ -62,8 +62,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .task-star:focus-visible { outline: 2px solid #0a2a66; outline-offset: 2px; }
         .task-star:active { background: transparent; }
-        .star-icon { font-size: 1rem; line-height: 1; color: #6c757d; }
-        .starred .star-icon { color: #0a2a66; }
+        .star-icon { font-size: 2rem; line-height: 1; color:rgba(108, 117, 125, 0.51); }
+        .starred .star-icon { color: #f4ca4c }
         @media (max-width: 768px) {
             .task-row {
                 grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
