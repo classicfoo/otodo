@@ -173,6 +173,31 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!document.hidden) location.reload();
   });
 
+  const pendingStarKey = 'pendingStarToggles';
+  function loadPendingStars() {
+    try {
+      const raw = localStorage.getItem(pendingStarKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return [];
+  }
+  let pendingStarQueue = loadPendingStars();
+
+  function persistPendingStars() {
+    try { localStorage.setItem(pendingStarKey, JSON.stringify(pendingStarQueue)); } catch (e) {}
+  }
+
+  function latestPendingFor(id) {
+    let latest = null;
+    for (const entry of pendingStarQueue) {
+      if (String(entry.id) === String(id)) {
+        if (!latest || entry.at > latest.at) latest = entry;
+      }
+    }
+    return latest;
+  }
+
   function setStarAppearance(button, starred) {
     button.classList.toggle('starred', !!starred);
     button.setAttribute('aria-pressed', starred ? 'true' : 'false');
@@ -183,6 +208,54 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
   }
 
+  function enqueuePendingStar(id, starred) {
+    const entry = { id: Number(id), starred: starred ? 1 : 0, at: Date.now() };
+    pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(id) && item.starred === entry.starred));
+    pendingStarQueue.push(entry);
+    persistPendingStars();
+    return entry;
+  }
+
+  function clearPendingUpTo(entry) {
+    pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(entry.id) && item.at <= entry.at));
+    persistPendingStars();
+  }
+
+  function findStarButton(id) {
+    return document.querySelector('.star-toggle[data-id="' + id + '"]');
+  }
+
+  function sendStarUpdate(entry, options = {}) {
+    const data = new FormData();
+    data.append('id', entry.id);
+    data.append('starred', entry.starred);
+
+    const request = fetch('toggle_star.php', {
+      method: 'POST',
+      body: data,
+      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+    });
+
+    const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {
+      syncing: entry.starred ? 'Starring task…' : 'Unstarring task…',
+      synced: 'Task updated',
+      error: 'Could not reach server'
+    }) : request;
+
+    return tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Update failed');
+        const btn = findStarButton(entry.id);
+        if (btn) setStarAppearance(btn, json.starred);
+        clearPendingUpTo(entry);
+        if (!options.silent && window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(err => {
+        if (!options.silent && window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+        throw err;
+      });
+  }
+
   function bindStarButton(button) {
     button.addEventListener('click', function(e){
       e.preventDefault();
@@ -190,35 +263,40 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const id = this.dataset.id;
       if (!id) return;
       const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
-      const data = new FormData();
-      data.append('id', id);
-      data.append('starred', next);
-      const request = fetch('toggle_star.php', {
-        method: 'POST',
-        body: data,
-        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
-      });
-      if (window.trackBackgroundSync) {
-        window.trackBackgroundSync(request, {
-          syncing: next ? 'Starring task…' : 'Unstarring task…',
-          synced: 'Task updated',
-          error: 'Could not reach server'
-        });
+
+      setStarAppearance(this, next);
+      const queued = enqueuePendingStar(id, next);
+
+      sendStarUpdate(queued).catch(() => {});
+    });
+  }
+
+  function applyPendingStars(buttons) {
+    buttons.forEach(btn => {
+      const pending = latestPendingFor(btn.dataset.id);
+      if (pending) setStarAppearance(btn, pending.starred);
+    });
+  }
+
+  function flushPendingStars() {
+    if (!pendingStarQueue.length) return;
+    const latestById = {};
+    for (const entry of pendingStarQueue) {
+      if (!latestById[entry.id] || entry.at > latestById[entry.id].at) {
+        latestById[entry.id] = entry;
       }
-      request.then(resp => resp.ok ? resp.json() : Promise.reject())
-      .then(json => {
-        if (!json || json.status !== 'ok') throw new Error('Update failed');
-        setStarAppearance(button, json.starred);
-        if (window.updateSyncStatus) window.updateSyncStatus('synced');
-      })
-      .catch(() => {
-        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
-      });
+    }
+    const entries = Object.values(latestById);
+    entries.forEach(entry => {
+      sendStarUpdate(entry, { silent: true }).catch(() => {});
     });
   }
 
   const starButtons = document.querySelectorAll('.star-toggle');
   starButtons.forEach(bindStarButton);
+  applyPendingStars(starButtons);
+  flushPendingStars();
+  window.addEventListener('online', flushPendingStars);
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
