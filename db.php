@@ -22,6 +22,7 @@ function get_db() {
             due_date TEXT,
             details TEXT,
             priority INTEGER NOT NULL DEFAULT 2,
+            starred INTEGER NOT NULL DEFAULT 0,
             done INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )");
@@ -36,6 +37,9 @@ function get_db() {
         }
         if (!in_array('priority', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
+        }
+        if (!in_array('starred', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN starred INTEGER NOT NULL DEFAULT 0');
         }
 
         // Ensure user columns exist for older databases
