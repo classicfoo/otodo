@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -32,8 +32,18 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date-badge { display: inline-block; width: 100px; text-align: centre; }
+        .due-date-badge { display: inline-block; width: 100px; text-align: center; }
         .priority-text { display: inline-block; width: 70px; text-align: center; }
+        .task-link { gap: 0.75rem; flex-wrap: wrap; }
+        .task-title { flex: 1 1 70%; min-width: 200px; }
+        .task-meta { flex: 0 0 30%; min-width: 220px; justify-content: flex-end; }
+        .star-toggle { min-width: 44px; }
+        .star-icon { font-size: 1rem; line-height: 1; }
+        .starred .star-icon { color: #ffc107; }
+        @media (max-width: 576px) {
+            .task-link { align-items: flex-start; }
+            .task-meta { flex: 1 1 100%; justify-content: flex-start; }
+        }
     </style>
     <title>Todo List</title>
 </head>
@@ -102,15 +112,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                <span class="<?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
-                <span class="d-flex align-items-center gap-2">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex align-items-center task-link">
+                <span class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
+                <span class="d-flex align-items-center gap-2 task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
                     <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
+                    <button type="button" class="btn btn-sm btn-outline-warning star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
+                        <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
+                        <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
+                    </button>
 
                 </span>
             </a>
@@ -128,6 +142,53 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!document.hidden) location.reload();
   });
 
+  function setStarAppearance(button, starred) {
+    button.classList.toggle('starred', !!starred);
+    button.setAttribute('aria-pressed', starred ? 'true' : 'false');
+    button.setAttribute('aria-label', starred ? 'Unstar task' : 'Star task');
+    const icon = button.querySelector('.star-icon');
+    if (icon) icon.textContent = starred ? '★' : '☆';
+    const sr = button.querySelector('.visually-hidden');
+    if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
+  }
+
+  function bindStarButton(button) {
+    button.addEventListener('click', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      const id = this.dataset.id;
+      if (!id) return;
+      const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
+      const data = new FormData();
+      data.append('id', id);
+      data.append('starred', next);
+      const request = fetch('toggle_star.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      });
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {
+          syncing: next ? 'Starring task…' : 'Unstarring task…',
+          synced: 'Task updated',
+          error: 'Could not reach server'
+        });
+      }
+      request.then(resp => resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Update failed');
+        setStarAppearance(button, json.starred);
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(() => {
+        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+      });
+    });
+  }
+
+  const starButtons = document.querySelectorAll('.star-toggle');
+  starButtons.forEach(bindStarButton);
+
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
   if (form && listGroup) {
@@ -138,8 +199,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (!description) return;
 
       const tempItem = document.createElement('a');
-      tempItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center opacity-75';
-      tempItem.innerHTML = `<span>${description}</span><span class="d-flex align-items-center gap-2"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span></span>`;
+      tempItem.className = 'list-group-item list-group-item-action d-flex align-items-center task-link opacity-75';
+      tempItem.innerHTML = `<span class="task-title">${description}</span><span class="d-flex align-items-center gap-2 task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="btn btn-sm btn-outline-warning star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></span>`;
       listGroup.prepend(tempItem);
 
       data.set('description', description);
@@ -162,7 +223,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-        tempItem.querySelector('span').textContent = json.description;
+        const title = tempItem.querySelector('.task-title');
+        if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           badge.textContent = json.due_label || '';
@@ -173,11 +235,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           priority.textContent = json.priority_label || '';
           priority.className = `small priority-text ${json.priority_class || ''}`;
         }
+        const star = tempItem.querySelector('.star-toggle');
+        if (star) {
+          star.dataset.id = json.id;
+          star.disabled = false;
+          setStarAppearance(star, json.starred || 0);
+          bindStarButton(star);
+        }
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
         tempItem.classList.add('text-danger');
-        tempItem.querySelector('.priority-text').textContent = 'Retry needed';
+        const priority = tempItem.querySelector('.priority-text');
+        if (priority) priority.textContent = 'Retry needed';
         if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
       })
       .finally(() => {
