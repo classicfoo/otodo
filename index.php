@@ -32,17 +32,49 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .due-date-badge { display: inline-block; width: 100px; text-align: center; }
-        .priority-text { display: inline-block; width: 70px; text-align: center; }
-        .task-link { gap: 0.75rem; flex-wrap: wrap; }
-        .task-title { flex: 1 1 70%; min-width: 200px; }
-        .task-meta { flex: 0 0 30%; min-width: 220px; justify-content: flex-end; }
+        .task-row {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            gap: 0.75rem;
+        }
+        .task-main {
+            flex: 1 1 70%;
+            min-width: 0;
+            word-break: break-word;
+        }
+        .task-meta {
+            flex: 0 0 30%;
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 0.5rem;
+            justify-items: center;
+            align-items: center;
+        }
+        .due-date-badge { width: 100%; max-width: 110px; text-align: center; }
+        .priority-text { width: 100%; max-width: 90px; text-align: center; }
         .star-toggle { min-width: 44px; }
+        .task-star {
+            border: 1px solid #f3c24c;
+            border-radius: 4px;
+            padding: 0.2rem 0.6rem;
+            background: #fff;
+            cursor: pointer;
+        }
         .star-icon { font-size: 1rem; line-height: 1; }
         .starred .star-icon { color: #ffc107; }
-        @media (max-width: 576px) {
-            .task-link { align-items: flex-start; }
-            .task-meta { flex: 1 1 100%; justify-content: flex-start; }
+        @media (max-width: 600px) {
+            .task-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .task-meta {
+                width: 100%;
+                margin-top: 0.25rem;
+                grid-template-columns: auto auto auto;
+                justify-content: flex-start;
+                justify-items: start;
+            }
         }
     </style>
     <title>Todo List</title>
@@ -112,21 +144,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action d-flex align-items-center task-link">
-                <span class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
-                <span class="d-flex align-items-center gap-2 task-meta">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row">
+                <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
                     <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
-                    <button type="button" class="btn btn-sm btn-outline-warning star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
+                    <button type="button" class="task-star btn btn-sm btn-outline-warning star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
                         <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
                         <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
                     </button>
-
-                </span>
+                </div>
             </a>
         <?php endforeach; ?>
     </div>
@@ -199,8 +230,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (!description) return;
 
       const tempItem = document.createElement('a');
-      tempItem.className = 'list-group-item list-group-item-action d-flex align-items-center task-link opacity-75';
-      tempItem.innerHTML = `<span class="task-title">${description}</span><span class="d-flex align-items-center gap-2 task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="btn btn-sm btn-outline-warning star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></span>`;
+      tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
+      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star btn btn-sm btn-outline-warning star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       data.set('description', description);
@@ -223,8 +254,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-        const title = tempItem.querySelector('.task-title');
-        if (title) title.textContent = json.description;
+          const title = tempItem.querySelector('.task-main');
+          if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           badge.textContent = json.due_label || '';
