@@ -384,6 +384,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function updateTaskRowUI(taskEl, payload) {
+    taskEl.dataset.dueDate = payload.due_date || '';
+    taskEl.dataset.priority = payload.priority ?? '0';
     if (!taskEl) return;
     if (payload.priority !== undefined && payload.priority !== null) {
       taskEl.dataset.priority = payload.priority;
@@ -408,6 +410,31 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       priorityEl.textContent = payload.priority_label || '';
       priorityEl.className = 'small priority-text ' + (payload.priority_class || '');
     }
+  }
+
+  const taskList = document.querySelector('.container .list-group');
+
+  function compareTaskRows(a, b) {
+    const dueA = (a.dataset.dueDate || '').slice(0, 10);
+    const dueB = (b.dataset.dueDate || '').slice(0, 10);
+    const hasDueA = !!dueA;
+    const hasDueB = !!dueB;
+    if (hasDueA !== hasDueB) return hasDueA ? -1 : 1;
+    if (hasDueA && dueA !== dueB) return dueA < dueB ? -1 : 1;
+
+    const prioA = parseInt(a.dataset.priority || '0', 10);
+    const prioB = parseInt(b.dataset.priority || '0', 10);
+    if (prioA !== prioB) return prioB - prioA;
+
+    const idA = parseInt(a.dataset.taskId || '0', 10);
+    const idB = parseInt(b.dataset.taskId || '0', 10);
+    return idB - idA;
+  }
+
+  function reorderTaskList() {
+    if (!taskList) return;
+    const tasks = Array.from(taskList.querySelectorAll('.task-row'));
+    tasks.sort(compareTaskRows).forEach(row => taskList.appendChild(row));
   }
 
   const contextMenu = document.createElement('div');
@@ -521,6 +548,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(contextTask, json);
+          reorderTaskList();
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
         })
         .catch(() => {
@@ -552,8 +580,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hideContextMenu(); });
 
   const form = document.querySelector('form[action="add_task.php"]');
-  const listGroup = document.querySelector('.container .list-group');
-  if (form && listGroup) {
+  if (form && taskList) {
     form.addEventListener('submit', function(e){
       e.preventDefault();
       const data = new FormData(form);
@@ -563,7 +590,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
       tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
-      listGroup.prepend(tempItem);
+      taskList.prepend(tempItem);
 
       data.set('description', description);
       const request = fetch('add_task.php', {
