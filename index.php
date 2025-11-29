@@ -415,6 +415,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const taskList = document.querySelector('.container .list-group');
 
   function compareTaskRows(a, b) {
+    const normalizeInt = (value) => {
+      const parsed = parseInt(value || '0', 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
     const dueA = (a.dataset.dueDate || '').slice(0, 10);
     const dueB = (b.dataset.dueDate || '').slice(0, 10);
     const hasDueA = !!dueA;
@@ -422,12 +427,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (hasDueA !== hasDueB) return hasDueA ? -1 : 1;
     if (hasDueA && dueA !== dueB) return dueA < dueB ? -1 : 1;
 
-    const prioA = parseInt(a.dataset.priority || '0', 10);
-    const prioB = parseInt(b.dataset.priority || '0', 10);
+    const prioA = normalizeInt(a.dataset.priority);
+    const prioB = normalizeInt(b.dataset.priority);
     if (prioA !== prioB) return prioB - prioA;
 
-    const idA = parseInt(a.dataset.taskId || '0', 10);
-    const idB = parseInt(b.dataset.taskId || '0', 10);
+    const idA = normalizeInt(a.dataset.taskId);
+    const idB = normalizeInt(b.dataset.taskId);
     return idB - idA;
   }
 
@@ -435,6 +440,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!taskList) return;
     const tasks = Array.from(taskList.querySelectorAll('.task-row'));
     tasks.sort(compareTaskRows).forEach(row => taskList.appendChild(row));
+  }
+
+  function scheduleReorder() {
+    if (!taskList) return;
+    requestAnimationFrame(reorderTaskList);
   }
 
   const contextMenu = document.createElement('div');
@@ -548,7 +558,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(contextTask, json);
-          reorderTaskList();
+          scheduleReorder();
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
         })
         .catch(() => {
@@ -634,6 +644,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         tempItem.dataset.taskId = json.id;
         tempItem.dataset.dueDate = json.due_date || '';
         tempItem.dataset.priority = json.priority ?? '0';
+        scheduleReorder();
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
