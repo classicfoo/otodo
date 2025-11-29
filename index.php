@@ -64,6 +64,37 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-star:active { background: transparent; }
         .star-icon { font-size: 2rem; line-height: 1; color:rgba(108, 117, 125, 0.51); }
         .starred .star-icon { color: #f4ca4c }
+        .task-context-menu {
+            position: fixed;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,.1);
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+            z-index: 1080;
+            min-width: 220px;
+            overflow: hidden;
+        }
+        .task-context-menu .context-header {
+            padding: 0.5rem 0.75rem;
+            background-color: #f8f9fa;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .task-context-menu .context-group + .context-group { border-top: 1px solid #e9ecef; }
+        .task-context-menu .context-label { font-size: 0.75rem; color: #6c757d; padding: 0.35rem 0.75rem 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        .task-context-menu button {
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border: 0;
+            background: transparent;
+            font-size: 0.95rem;
+        }
+        .task-context-menu button:hover,
+        .task-context-menu button:focus { background-color: #f1f3f5; }
+        .task-context-menu button:focus-visible { outline: 2px solid #0a2a66; outline-offset: -2px; }
+        .task-context-menu button .badge { float: right; }
+        .task-context-menu button.active { background-color: #e7f1ff; }
         @media (max-width: 768px) {
             .task-row {
                 grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
@@ -117,7 +148,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <?php
                 $p = (int)($task['priority'] ?? 0);
                 if ($p < 0 || $p > 3) { $p = 0; }
-                $due = $task['due_date'] ?? '';
+                $rawDue = $task['due_date'] ?? '';
+                $due = $rawDue;
                 $dueClass = 'bg-secondary-subtle text-secondary';
                 if ($due !== '') {
                     try {
@@ -144,7 +176,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
                 <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
@@ -344,6 +376,164 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   flushPendingStars();
   window.addEventListener('online', flushPendingStars);
 
+  function isoDateFromToday(offset) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    now.setDate(now.getDate() + offset);
+    return now.toISOString().slice(0, 10);
+  }
+
+  function updateTaskRowUI(taskEl, payload) {
+    if (!taskEl) return;
+    if (payload.priority !== undefined && payload.priority !== null) {
+      taskEl.dataset.priority = payload.priority;
+    }
+    if (payload.due_date !== undefined && payload.due_date !== null) {
+      taskEl.dataset.dueDate = payload.due_date;
+    }
+
+    const badge = taskEl.querySelector('.due-date-badge');
+    if (badge) {
+      if (payload.due_label) {
+        badge.textContent = payload.due_label;
+        badge.className = 'badge due-date-badge ' + (payload.due_class || '');
+      } else {
+        badge.textContent = '';
+        badge.className = 'due-date-badge';
+      }
+    }
+
+    const priorityEl = taskEl.querySelector('.priority-text');
+    if (priorityEl) {
+      priorityEl.textContent = payload.priority_label || '';
+      priorityEl.className = 'small priority-text ' + (payload.priority_class || '');
+    }
+  }
+
+  const contextMenu = document.createElement('div');
+  contextMenu.className = 'task-context-menu d-none';
+  contextMenu.innerHTML = `
+    <div class="context-header">Quick edit</div>
+    <div class="context-group" data-group="due">
+      <div class="context-label">Due date</div>
+      <button type="button" data-action="due" data-value="today">Today <span class="badge bg-success-subtle text-success">Today</span></button>
+      <button type="button" data-action="due" data-value="tomorrow">Tomorrow <span class="badge bg-primary-subtle text-primary">Tomorrow</span></button>
+      <button type="button" data-action="due" data-value="next-week">Next week <span class="badge bg-primary-subtle text-primary">Later</span></button>
+      <button type="button" data-action="due" data-value="clear">No due date</button>
+    </div>
+    <div class="context-group" data-group="priority">
+      <div class="context-label">Priority</div>
+      <button type="button" data-action="priority" data-value="3">High</button>
+      <button type="button" data-action="priority" data-value="2">Medium</button>
+      <button type="button" data-action="priority" data-value="1">Low</button>
+      <button type="button" data-action="priority" data-value="0">None</button>
+    </div>
+  `;
+  document.body.appendChild(contextMenu);
+
+  let contextTask = null;
+
+  function setActiveOption(group, value) {
+    contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.value === value);
+    });
+  }
+
+  function updateActiveOptions(taskEl) {
+    const priorityVal = taskEl.dataset.priority || '0';
+    setActiveOption('priority', priorityVal);
+
+    const dueDate = (taskEl.dataset.dueDate || '').slice(0, 10);
+    let dueChoice = '';
+    if (!dueDate) {
+      dueChoice = 'clear';
+    } else if (dueDate === isoDateFromToday(0)) {
+      dueChoice = 'today';
+    } else if (dueDate === isoDateFromToday(1)) {
+      dueChoice = 'tomorrow';
+    } else if (dueDate === isoDateFromToday(7)) {
+      dueChoice = 'next-week';
+    }
+    setActiveOption('due', dueChoice);
+  }
+
+  function hideContextMenu() {
+    contextMenu.classList.add('d-none');
+    contextTask = null;
+  }
+
+  function showContextMenu(taskEl, x, y) {
+    contextTask = taskEl;
+    updateActiveOptions(taskEl);
+    contextMenu.classList.remove('d-none');
+    contextMenu.style.left = '0px';
+    contextMenu.style.top = '0px';
+    const { width, height } = contextMenu.getBoundingClientRect();
+    const padding = 8;
+    const maxLeft = window.innerWidth - width - padding;
+    const maxTop = window.innerHeight - height - padding;
+    const left = Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
+    const top = Math.min(Math.max(padding, y), Math.max(padding, maxTop));
+    contextMenu.style.left = `${left}px`;
+    contextMenu.style.top = `${top}px`;
+  }
+
+  contextMenu.addEventListener('click', function(e){
+    const btn = e.target.closest('button[data-action]');
+    if (!btn || !contextTask) return;
+    e.preventDefault();
+    const taskId = contextTask.dataset.taskId;
+    if (!taskId) {
+      hideContextMenu();
+      return;
+    }
+    const data = new FormData();
+    data.append('id', taskId);
+    if (btn.dataset.action === 'priority') {
+      data.append('priority', btn.dataset.value);
+    } else if (btn.dataset.action === 'due') {
+      data.append('due_shortcut', btn.dataset.value);
+    }
+
+    if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
+
+    const request = fetch('update_task_meta.php', {
+      method: 'POST',
+      body: data,
+      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+    });
+
+    const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
+
+    tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Update failed');
+        updateTaskRowUI(contextTask, json);
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(() => {
+        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not update task');
+      })
+      .finally(hideContextMenu);
+  });
+
+  document.addEventListener('contextmenu', function(e){
+    const taskEl = e.target.closest('.task-row');
+    if (!taskEl) return;
+    if (!window.matchMedia('(pointer: fine)').matches) return;
+    e.preventDefault();
+    showContextMenu(taskEl, e.clientX, e.clientY);
+  });
+
+  document.addEventListener('click', function(e){
+    if (contextMenu.contains(e.target)) return;
+    hideContextMenu();
+  });
+
+  window.addEventListener('scroll', hideContextMenu, true);
+  window.addEventListener('resize', hideContextMenu);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hideContextMenu(); });
+
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
   if (form && listGroup) {
@@ -397,6 +587,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           setStarAppearance(star, json.starred || 0);
           bindStarButton(star);
         }
+        tempItem.dataset.taskId = json.id;
+        tempItem.dataset.dueDate = json.due_date || '';
+        tempItem.dataset.priority = json.priority ?? '0';
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
