@@ -122,6 +122,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
     <?php endif; ?>
 </div>
+<script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
