@@ -457,82 +457,99 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     setActiveOption('due', dueChoice);
   }
 
-  function hideContextMenu() {
-    contextMenu.classList.add('d-none');
-    contextTask = null;
-  }
-
-  function showContextMenu(taskEl, x, y) {
-    contextTask = taskEl;
-    updateActiveOptions(taskEl);
-    contextMenu.classList.remove('d-none');
-    contextMenu.style.left = '0px';
-    contextMenu.style.top = '0px';
-    const { width, height } = contextMenu.getBoundingClientRect();
-    const padding = 8;
-    const maxLeft = window.innerWidth - width - padding;
-    const maxTop = window.innerHeight - height - padding;
-    const left = Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
-    const top = Math.min(Math.max(padding, y), Math.max(padding, maxTop));
-    contextMenu.style.left = `${left}px`;
-    contextMenu.style.top = `${top}px`;
-  }
-
-  contextMenu.addEventListener('click', function(e){
-    const btn = e.target.closest('button[data-action]');
-    if (!btn || !contextTask) return;
-    e.preventDefault();
-    const taskId = contextTask.dataset.taskId;
-    if (!taskId) {
-      hideContextMenu();
-      return;
-    }
-    const data = new FormData();
-    data.append('id', taskId);
-    if (btn.dataset.action === 'priority') {
-      data.append('priority', btn.dataset.value);
-    } else if (btn.dataset.action === 'due') {
-      data.append('due_shortcut', btn.dataset.value);
+    function hideContextMenu() {
+      contextMenu.classList.add('d-none');
+      contextTask = null;
     }
 
-    if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
+    function setContextMode(mode) {
+      const header = contextMenu.querySelector('.context-header');
+      if (header) {
+        header.textContent = mode === 'priority' ? 'Set priority' : 'Set due date';
+      }
+      contextMenu.dataset.mode = mode;
+      contextMenu.querySelectorAll('.context-group').forEach(group => {
+        group.classList.toggle('d-none', group.dataset.group !== mode);
+      });
+    }
 
-    const request = fetch('update_task_meta.php', {
-      method: 'POST',
-      body: data,
-      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+    function showContextMenu(taskEl, x, y, mode) {
+      contextTask = taskEl;
+      setContextMode(mode);
+      updateActiveOptions(taskEl);
+      contextMenu.classList.remove('d-none');
+      contextMenu.style.left = '0px';
+      contextMenu.style.top = '0px';
+      const { width, height } = contextMenu.getBoundingClientRect();
+      const padding = 8;
+      const maxLeft = window.innerWidth - width - padding;
+      const maxTop = window.innerHeight - height - padding;
+      const left = Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
+      const top = Math.min(Math.max(padding, y), Math.max(padding, maxTop));
+      contextMenu.style.left = `${left}px`;
+      contextMenu.style.top = `${top}px`;
+    }
+
+    contextMenu.addEventListener('click', function(e){
+      const btn = e.target.closest('button[data-action]');
+      if (!btn || !contextTask) return;
+      e.preventDefault();
+      const taskId = contextTask.dataset.taskId;
+      if (!taskId) {
+        hideContextMenu();
+        return;
+      }
+      const data = new FormData();
+      data.append('id', taskId);
+      if (btn.dataset.action === 'priority') {
+        data.append('priority', btn.dataset.value);
+      } else if (btn.dataset.action === 'due') {
+        data.append('due_shortcut', btn.dataset.value);
+      }
+
+      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
+
+      const request = fetch('update_task_meta.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      });
+
+      const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
+
+      tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+        .then(json => {
+          if (!json || json.status !== 'ok') throw new Error('Update failed');
+          updateTaskRowUI(contextTask, json);
+          if (window.updateSyncStatus) window.updateSyncStatus('synced');
+        })
+        .catch(() => {
+          if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not update task');
+        })
+        .finally(hideContextMenu);
     });
 
-    const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
+    document.addEventListener('contextmenu', function(e){
+      const targetDue = e.target.closest('.due-date-badge');
+      const targetPriority = e.target.closest('.priority-text');
+      const targetGroup = targetDue ? 'due' : (targetPriority ? 'priority' : null);
+      if (!targetGroup) return;
 
-    tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
-      .then(json => {
-        if (!json || json.status !== 'ok') throw new Error('Update failed');
-        updateTaskRowUI(contextTask, json);
-        if (window.updateSyncStatus) window.updateSyncStatus('synced');
-      })
-      .catch(() => {
-        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not update task');
-      })
-      .finally(hideContextMenu);
-  });
+      const taskEl = e.target.closest('.task-row');
+      if (!taskEl) return;
+      if (!window.matchMedia('(pointer: fine)').matches) return;
+      e.preventDefault();
+      showContextMenu(taskEl, e.clientX, e.clientY, targetGroup);
+    });
 
-  document.addEventListener('contextmenu', function(e){
-    const taskEl = e.target.closest('.task-row');
-    if (!taskEl) return;
-    if (!window.matchMedia('(pointer: fine)').matches) return;
-    e.preventDefault();
-    showContextMenu(taskEl, e.clientX, e.clientY);
-  });
+    document.addEventListener('click', function(e){
+      if (contextMenu.contains(e.target)) return;
+      hideContextMenu();
+    });
 
-  document.addEventListener('click', function(e){
-    if (contextMenu.contains(e.target)) return;
-    hideContextMenu();
-  });
-
-  window.addEventListener('scroll', hideContextMenu, true);
-  window.addEventListener('resize', hideContextMenu);
-  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hideContextMenu(); });
+    window.addEventListener('scroll', hideContextMenu, true);
+    window.addEventListener('resize', hideContextMenu);
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape') hideContextMenu(); });
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
