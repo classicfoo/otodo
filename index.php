@@ -757,8 +757,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
+  let isFallbackSubmit = false;
   if (form && listGroup) {
     form.addEventListener('submit', function(e){
+      if (isFallbackSubmit) return;
       e.preventDefault();
       const data = new FormData(form);
       const description = (data.get('description') || '').toString().trim();
@@ -818,13 +820,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
-        tempItem.classList.add('text-danger');
-        const priority = tempItem.querySelector('.priority-text');
-        if (priority) priority.textContent = 'Retry needed';
-        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+        tempItem.remove();
+        const descInput = form.querySelector('input[name="description"]');
+        if (descInput) descInput.value = description;
+        isFallbackSubmit = true;
+        form.submit();
       })
       .finally(() => {
-        form.reset();
+        if (!isFallbackSubmit) {
+          form.reset();
+        }
       });
     });
   }
