@@ -157,7 +157,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .search-input:focus {
             outline: none;
-            box-shadow: 0 0 0 2px rgba(0,0,0,0.12);
+            box-shadow: none;
         }
         .search-clear {
             opacity: 0;
