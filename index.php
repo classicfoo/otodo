@@ -131,8 +131,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             min-height: 2rem;
         }
         .search-toggle:focus-visible,
-        .search-clear:focus-visible,
-        .task-search.expanded .search-input:focus-visible {
+        .search-clear:focus-visible {
             outline: 2px solid #0a2a66;
             outline-offset: 2px;
         }
@@ -148,12 +147,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             background: transparent;
             font-size: 0.95rem;
             line-height: 1.25;
+            border-radius: 999px;
         }
         .task-search.expanded .search-input {
             opacity: 1;
             pointer-events: auto;
             padding-left: 0.35rem;
             padding-right: 0.35rem;
+        }
+        .search-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.12);
         }
         .search-clear {
             opacity: 0;
