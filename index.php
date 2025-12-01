@@ -282,7 +282,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         const clearButton = document.getElementById('task-search-clear');
         const taskRows = Array.from(document.querySelectorAll('.task-row'));
 
-        if (!searchContainer || !searchToggle || !searchInput || !clearButton || taskRows.length === 0) {
+        if (!searchContainer || !searchToggle || !searchInput || !clearButton) {
             return;
         }
 
