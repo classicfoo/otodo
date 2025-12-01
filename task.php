@@ -210,6 +210,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
 
   const backLink = document.getElementById('backToList');
   const deleteLink = document.getElementById('taskDeleteLink');
+  const currentTaskId = <?=$task['id']?>;
 
   const form = document.querySelector('form');
   if (!form) return;
@@ -322,6 +323,17 @@ if ($p < 0 || $p > 3) { $p = 0; }
     deleteLink.addEventListener('click', function(e){
       e.preventDefault();
       const url = deleteLink.getAttribute('href');
+      if (currentTaskId) {
+        try {
+          const raw = sessionStorage.getItem('deletedTaskIds');
+          const parsed = raw ? JSON.parse(raw) : [];
+          const list = Array.isArray(parsed) ? parsed : [parsed];
+          if (!list.includes(currentTaskId)) list.push(currentTaskId);
+          sessionStorage.setItem('deletedTaskIds', JSON.stringify(list));
+        } catch (err) {
+          sessionStorage.setItem('deletedTaskIds', JSON.stringify([currentTaskId]));
+        }
+      }
       if (window.updateSharedSyncStatus) window.updateSharedSyncStatus('syncing', 'Deleting task…', {followUpUrl: url});
       if (url) {
         fetch(url, {

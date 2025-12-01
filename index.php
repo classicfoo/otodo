@@ -404,6 +404,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.addEventListener('pageshow', e => {
+    consumeDeletedTasks();
     if (e.persisted) location.reload();
   });
   document.addEventListener('visibilitychange', () => {
@@ -613,6 +614,39 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       priorityEl.className = 'small priority-text ' + (payload.priority_class || '');
     }
   }
+
+  const deletedTaskKey = 'deletedTaskIds';
+  function consumeDeletedTasks() {
+    const raw = sessionStorage.getItem(deletedTaskKey);
+    if (!raw) return;
+    let ids = [];
+    try {
+      const parsed = JSON.parse(raw);
+      ids = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (err) {
+      ids = [raw];
+    }
+    const remaining = [];
+    ids.forEach(id => {
+      const normalized = Number(id);
+      const target = document.querySelector('.task-row[data-task-id="' + normalized + '"]');
+      if (target) {
+        target.remove();
+      } else {
+        remaining.push(normalized);
+      }
+    });
+    if (remaining.length) {
+      sessionStorage.setItem(deletedTaskKey, JSON.stringify(remaining));
+    } else {
+      sessionStorage.removeItem(deletedTaskKey);
+    }
+    if (window.applyTaskSearchFilter) {
+      const currentQuery = window.getTaskSearchValue ? window.getTaskSearchValue() : '';
+      window.applyTaskSearchFilter(currentQuery);
+    }
+  }
+  consumeDeletedTasks();
 
   const contextMenu = document.createElement('div');
   contextMenu.className = 'task-context-menu d-none';
