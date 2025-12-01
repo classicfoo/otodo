@@ -95,6 +95,71 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button:focus-visible { outline: 2px solid #0a2a66; outline-offset: -2px; }
         .task-context-menu button .badge { float: right; }
         .task-context-menu button.active { background-color: #e7f1ff; }
+        .header-actions { gap: 0.5rem; }
+        .task-search {
+            display: flex;
+            align-items: center;
+            width: 2.75rem;
+            height: calc(2.25rem + 2px);
+            border: 1px solid transparent;
+            border-radius: 999px;
+            background: transparent;
+            overflow: hidden;
+            transition: width 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+            box-shadow: none;
+            flex-shrink: 1;
+            max-width: 360px;
+        }
+        .task-search.expanded {
+            width: min(360px, 70vw);
+            border-color: #ced4da;
+            background: #fff;
+            box-shadow: 0 0.35rem 0.75rem rgba(0, 0, 0, 0.08);
+        }
+        .search-toggle,
+        .search-clear {
+            background: transparent;
+            border: none;
+            padding: 0.4rem 0.6rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #212529;
+        }
+        .search-toggle:focus-visible,
+        .search-clear:focus-visible,
+        .task-search.expanded .search-input:focus-visible {
+            outline: 2px solid #0a2a66;
+            outline-offset: 2px;
+        }
+        .search-toggle svg { width: 1rem; height: 1rem; }
+        .search-input {
+            flex: 1 1 auto;
+            border: 0;
+            outline: none;
+            padding: 0.35rem 0;
+            min-width: 0;
+            opacity: 0;
+            pointer-events: none;
+            background: transparent;
+            font-size: 0.95rem;
+        }
+        .task-search.expanded .search-input {
+            opacity: 1;
+            pointer-events: auto;
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
+        }
+        .search-clear {
+            opacity: 0;
+            pointer-events: none;
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+        .task-search.expanded .search-clear {
+            opacity: 1;
+            pointer-events: auto;
+        }
         @media (max-width: 768px) {
             .task-row {
                 grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
@@ -106,6 +171,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 justify-items: end;
             }
             .due-date-badge, .priority-text { width: auto; min-width: 0; }
+            .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
     <title>Todo List</title>
@@ -114,9 +180,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <span class="navbar-brand mb-0 h1">Otodo</span>
-        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        <div class="d-flex align-items-center header-actions ms-auto">
+            <div class="task-search" id="task-search" aria-expanded="false">
+                <button class="search-toggle" type="button" id="task-search-toggle" aria-label="Search tasks">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                    </svg>
+                </button>
+                <input type="search" id="task-search-input" class="search-input" placeholder="Search tasks…" aria-label="Search tasks" tabindex="-1">
+                <button class="search-clear" type="button" id="task-search-clear" aria-label="Clear search">&times;</button>
+            </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
     </div>
 </nav>
 
@@ -177,7 +254,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 }
             ?>
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
-                <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                <div class="task-main task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
@@ -197,6 +274,107 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
+<script>
+    (function() {
+        const searchContainer = document.getElementById('task-search');
+        const searchToggle = document.getElementById('task-search-toggle');
+        const searchInput = document.getElementById('task-search-input');
+        const clearButton = document.getElementById('task-search-clear');
+        const taskRows = Array.from(document.querySelectorAll('.task-row'));
+
+        if (!searchContainer || !searchToggle || !searchInput || !clearButton || taskRows.length === 0) {
+            return;
+        }
+
+        const isTypingField = (el) => {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+        };
+
+        const applyFilter = (value) => {
+            const query = (value || '').trim().toLowerCase();
+            taskRows.forEach((row) => {
+                const title = row.querySelector('.task-title');
+                const text = (title ? title.textContent : '').toLowerCase();
+                row.style.display = query === '' || text.includes(query) ? '' : 'none';
+            });
+        };
+
+        const expandSearch = () => {
+            if (searchContainer.classList.contains('expanded')) return;
+            searchContainer.classList.add('expanded');
+            searchContainer.setAttribute('aria-expanded', 'true');
+            searchInput.removeAttribute('tabindex');
+            requestAnimationFrame(() => {
+                searchInput.focus({ preventScroll: true });
+                searchInput.select();
+            });
+        };
+
+        const collapseSearch = (clearValue) => {
+            searchContainer.classList.remove('expanded');
+            searchContainer.setAttribute('aria-expanded', 'false');
+            searchInput.setAttribute('tabindex', '-1');
+            if (clearValue) {
+                if (searchInput.value !== '') {
+                    searchInput.value = '';
+                    applyFilter('');
+                }
+            }
+        };
+
+        searchToggle.addEventListener('click', () => {
+            expandSearch();
+        });
+
+        clearButton.addEventListener('click', () => {
+            collapseSearch(true);
+        });
+
+        searchInput.addEventListener('input', (event) => {
+            applyFilter(event.target.value);
+        });
+
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                collapseSearch(true);
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            const activeEl = document.activeElement;
+            const typing = isTypingField(activeEl);
+            if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                if (!typing) {
+                    event.preventDefault();
+                    expandSearch();
+                }
+                return;
+            }
+            if ((event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+                if (!typing) {
+                    event.preventDefault();
+                    expandSearch();
+                }
+                return;
+            }
+            if (event.key === 'Escape' && searchContainer.classList.contains('expanded')) {
+                event.preventDefault();
+                collapseSearch(true);
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!searchContainer.classList.contains('expanded')) return;
+            if (searchContainer.contains(event.target)) return;
+            if (searchInput.value.trim() === '') {
+                collapseSearch(true);
+            }
+        });
+    })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.addEventListener('pageshow', e => {
