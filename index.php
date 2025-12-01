@@ -97,18 +97,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button.active { background-color: #e7f1ff; }
         .header-actions { gap: 0.5rem; }
         .task-search {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            width: 2.75rem;
-            height: calc(2.25rem + 2px);
-            border: 1px solid transparent;
+            width: 2.65rem;
+            height: calc(2.5rem + 2px);
+            border: 1px solid #e9ecef;
             border-radius: 999px;
-            background: transparent;
+            background: #f8f9fa;
             overflow: hidden;
             transition: width 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
             box-shadow: none;
             flex-shrink: 1;
             max-width: 360px;
+            padding: 0.125rem;
+            gap: 0.15rem;
         }
         .task-search.expanded {
             width: min(360px, 70vw);
@@ -120,11 +122,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .search-clear {
             background: transparent;
             border: none;
-            padding: 0.4rem 0.6rem;
+            padding: 0.35rem 0.5rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: #212529;
+            min-width: 2rem;
+            min-height: 2rem;
         }
         .search-toggle:focus-visible,
         .search-clear:focus-visible,
@@ -143,12 +147,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             pointer-events: none;
             background: transparent;
             font-size: 0.95rem;
+            line-height: 1.25;
         }
         .task-search.expanded .search-input {
             opacity: 1;
             pointer-events: auto;
-            padding-left: 0.25rem;
-            padding-right: 0.25rem;
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
         }
         .search-clear {
             opacity: 0;
@@ -280,7 +285,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         const searchToggle = document.getElementById('task-search-toggle');
         const searchInput = document.getElementById('task-search-input');
         const clearButton = document.getElementById('task-search-clear');
-        const taskRows = Array.from(document.querySelectorAll('.task-row'));
 
         if (!searchContainer || !searchToggle || !searchInput || !clearButton) {
             return;
@@ -292,9 +296,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
         };
 
+        const currentTaskRows = () => Array.from(document.querySelectorAll('.task-row'));
+
         const applyFilter = (value) => {
             const query = (value || '').trim().toLowerCase();
-            taskRows.forEach((row) => {
+            const rows = currentTaskRows();
+            rows.forEach((row) => {
                 const title = row.querySelector('.task-title');
                 const text = (title ? title.textContent : '').toLowerCase();
                 row.style.display = query === '' || text.includes(query) ? '' : 'none';
