@@ -149,6 +149,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             line-height: 1.25;
             border-radius: 999px;
         }
+        .search-input::-webkit-search-cancel-button,
+        .search-input::-webkit-search-decoration,
+        .search-input::-ms-clear,
+        .search-input::-ms-reveal {
+            display: none;
+            width: 0;
+            height: 0;
+        }
         .task-search.expanded .search-input {
             opacity: 1;
             pointer-events: auto;
