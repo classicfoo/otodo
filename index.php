@@ -148,6 +148,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             font-size: 0.95rem;
             line-height: 1.25;
             border-radius: 999px;
+            -webkit-appearance: none;
+            appearance: none;
         }
         .search-input::-webkit-search-cancel-button,
         .search-input::-webkit-search-decoration,
@@ -156,6 +158,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             display: none;
             width: 0;
             height: 0;
+            -webkit-appearance: none;
+            appearance: none;
         }
         .task-search.expanded .search-input {
             opacity: 1;
