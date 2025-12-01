@@ -324,6 +324,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             });
         };
 
+        window.applyTaskSearchFilter = applyFilter;
+        window.getTaskSearchValue = () => searchInput ? searchInput.value : '';
+
         const expandSearch = () => {
             if (searchContainer.classList.contains('expanded')) return;
             searchContainer.classList.add('expanded');
@@ -763,8 +766,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
-      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      tempItem.innerHTML = `<div class="task-main task-title">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
+
+      if (window.applyTaskSearchFilter) {
+        window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
+      }
 
       data.set('description', description);
       const request = fetch('add_task.php', {
