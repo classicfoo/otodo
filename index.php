@@ -95,6 +95,92 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button:focus-visible { outline: 2px solid #0a2a66; outline-offset: -2px; }
         .task-context-menu button .badge { float: right; }
         .task-context-menu button.active { background-color: #e7f1ff; }
+        .header-actions { gap: 0.5rem; }
+        .task-search {
+            display: inline-flex;
+            align-items: center;
+            width: 2.65rem;
+            height: calc(2.5rem + 2px);
+            border: 1px solid #e9ecef;
+            border-radius: 999px;
+            background: #f8f9fa;
+            overflow: hidden;
+            transition: width 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+            box-shadow: none;
+            flex-shrink: 1;
+            max-width: 360px;
+            padding: 0.125rem;
+            gap: 0.15rem;
+        }
+        .task-search.expanded {
+            width: min(360px, 70vw);
+            border-color: #ced4da;
+            background: #fff;
+            box-shadow: 0 0.35rem 0.75rem rgba(0, 0, 0, 0.08);
+        }
+        .search-toggle,
+        .search-clear {
+            background: transparent;
+            border: none;
+            padding: 0.35rem 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #212529;
+            min-width: 2rem;
+            min-height: 2rem;
+        }
+        .search-toggle:focus-visible,
+        .search-clear:focus-visible {
+            outline: 2px solid #0a2a66;
+            outline-offset: 2px;
+        }
+        .search-toggle svg { width: 1rem; height: 1rem; }
+        .search-input {
+            flex: 1 1 auto;
+            border: 0;
+            outline: none;
+            padding: 0.35rem 0;
+            min-width: 0;
+            opacity: 0;
+            pointer-events: none;
+            background: transparent;
+            font-size: 0.95rem;
+            line-height: 1.25;
+            border-radius: 999px;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .search-input::-webkit-search-cancel-button,
+        .search-input::-webkit-search-decoration,
+        .search-input::-ms-clear,
+        .search-input::-ms-reveal {
+            display: none;
+            width: 0;
+            height: 0;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .task-search.expanded .search-input {
+            opacity: 1;
+            pointer-events: auto;
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
+        }
+        .search-input:focus {
+            outline: none;
+            box-shadow: none;
+        }
+        .search-clear {
+            opacity: 0;
+            pointer-events: none;
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+        .task-search.expanded .search-clear {
+            opacity: 1;
+            pointer-events: auto;
+        }
         @media (max-width: 768px) {
             .task-row {
                 grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
@@ -106,6 +192,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 justify-items: end;
             }
             .due-date-badge, .priority-text { width: auto; min-width: 0; }
+            .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
     <title>Todo List</title>
@@ -114,9 +201,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <span class="navbar-brand mb-0 h1">Otodo</span>
-        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+        <div class="d-flex align-items-center header-actions ms-auto">
+            <div class="task-search" id="task-search" aria-expanded="false">
+                <button class="search-toggle" type="button" id="task-search-toggle" aria-label="Search tasks">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                    </svg>
+                </button>
+                <input type="text" id="task-search-input" class="search-input" placeholder="Search tasks…" aria-label="Search tasks" tabindex="-1" inputmode="search">
+                <button class="search-clear" type="button" id="task-search-clear" aria-label="Clear search">&times;</button>
+            </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
     </div>
 </nav>
 
@@ -177,7 +275,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 }
             ?>
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
-                <div class="task-main <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                <div class="task-main task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
@@ -197,9 +295,116 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
+<script>
+    (function() {
+        const searchContainer = document.getElementById('task-search');
+        const searchToggle = document.getElementById('task-search-toggle');
+        const searchInput = document.getElementById('task-search-input');
+        const clearButton = document.getElementById('task-search-clear');
+
+        if (!searchContainer || !searchToggle || !searchInput || !clearButton) {
+            return;
+        }
+
+        const isTypingField = (el) => {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+        };
+
+        const currentTaskRows = () => Array.from(document.querySelectorAll('.task-row'));
+
+        const applyFilter = (value) => {
+            const query = (value || '').trim().toLowerCase();
+            const rows = currentTaskRows();
+            rows.forEach((row) => {
+                const title = row.querySelector('.task-title');
+                const text = (title ? title.textContent : '').toLowerCase();
+                row.style.display = query === '' || text.includes(query) ? '' : 'none';
+            });
+        };
+
+        window.applyTaskSearchFilter = applyFilter;
+        window.getTaskSearchValue = () => searchInput ? searchInput.value : '';
+
+        const expandSearch = () => {
+            if (searchContainer.classList.contains('expanded')) return;
+            searchContainer.classList.add('expanded');
+            searchContainer.setAttribute('aria-expanded', 'true');
+            searchInput.removeAttribute('tabindex');
+            requestAnimationFrame(() => {
+                searchInput.focus({ preventScroll: true });
+                searchInput.select();
+            });
+        };
+
+        const collapseSearch = (clearValue) => {
+            searchContainer.classList.remove('expanded');
+            searchContainer.setAttribute('aria-expanded', 'false');
+            searchInput.setAttribute('tabindex', '-1');
+            if (clearValue) {
+                if (searchInput.value !== '') {
+                    searchInput.value = '';
+                    applyFilter('');
+                }
+            }
+        };
+
+        searchToggle.addEventListener('click', () => {
+            expandSearch();
+        });
+
+        clearButton.addEventListener('click', () => {
+            collapseSearch(true);
+        });
+
+        searchInput.addEventListener('input', (event) => {
+            applyFilter(event.target.value);
+        });
+
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                collapseSearch(true);
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            const activeEl = document.activeElement;
+            const typing = isTypingField(activeEl);
+            if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                if (!typing) {
+                    event.preventDefault();
+                    expandSearch();
+                }
+                return;
+            }
+            if ((event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
+                if (!typing) {
+                    event.preventDefault();
+                    expandSearch();
+                }
+                return;
+            }
+            if (event.key === 'Escape' && searchContainer.classList.contains('expanded')) {
+                event.preventDefault();
+                collapseSearch(true);
+            }
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!searchContainer.classList.contains('expanded')) return;
+            if (searchContainer.contains(event.target)) return;
+            if (searchInput.value.trim() === '') {
+                collapseSearch(true);
+            }
+        });
+    })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.addEventListener('pageshow', e => {
+    consumeDeletedTasks();
     if (e.persisted) location.reload();
   });
   document.addEventListener('visibilitychange', () => {
@@ -410,6 +615,39 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     }
   }
 
+  const deletedTaskKey = 'deletedTaskIds';
+  function consumeDeletedTasks() {
+    const raw = sessionStorage.getItem(deletedTaskKey);
+    if (!raw) return;
+    let ids = [];
+    try {
+      const parsed = JSON.parse(raw);
+      ids = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (err) {
+      ids = [raw];
+    }
+    const remaining = [];
+    ids.forEach(id => {
+      const normalized = Number(id);
+      const target = document.querySelector('.task-row[data-task-id="' + normalized + '"]');
+      if (target) {
+        target.remove();
+      } else {
+        remaining.push(normalized);
+      }
+    });
+    if (remaining.length) {
+      sessionStorage.setItem(deletedTaskKey, JSON.stringify(remaining));
+    } else {
+      sessionStorage.removeItem(deletedTaskKey);
+    }
+    if (window.applyTaskSearchFilter) {
+      const currentQuery = window.getTaskSearchValue ? window.getTaskSearchValue() : '';
+      window.applyTaskSearchFilter(currentQuery);
+    }
+  }
+  consumeDeletedTasks();
+
   const contextMenu = document.createElement('div');
   contextMenu.className = 'task-context-menu d-none';
   contextMenu.innerHTML = `
@@ -553,8 +791,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
+  let isFallbackSubmit = false;
   if (form && listGroup) {
     form.addEventListener('submit', function(e){
+      if (isFallbackSubmit) return;
       e.preventDefault();
       const data = new FormData(form);
       const description = (data.get('description') || '').toString().trim();
@@ -562,8 +802,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
-      tempItem.innerHTML = `<div class="task-main">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      tempItem.innerHTML = `<div class="task-main task-title">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
+
+      if (window.applyTaskSearchFilter) {
+        window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
+      }
 
       data.set('description', description);
       const request = fetch('add_task.php', {
@@ -610,13 +854,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
-        tempItem.classList.add('text-danger');
-        const priority = tempItem.querySelector('.priority-text');
-        if (priority) priority.textContent = 'Retry needed';
-        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not reach server');
+        tempItem.remove();
+        const descInput = form.querySelector('input[name="description"]');
+        if (descInput) descInput.value = description;
+        isFallbackSubmit = true;
+        form.submit();
       })
       .finally(() => {
-        form.reset();
+        if (!isFallbackSubmit) {
+          form.reset();
+        }
       });
     });
   }
