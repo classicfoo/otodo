@@ -307,7 +307,51 @@ if ($p < 0 || $p > 3) { $p = 0; }
     } catch (err) {}
   }
 
+  const updateKey = 'pendingTaskUpdates';
+
+  function readPendingUpdates() {
+    try {
+      const raw = sessionStorage.getItem(updateKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writePendingUpdates(updates) {
+    try {
+      sessionStorage.setItem(updateKey, JSON.stringify(updates));
+    } catch (err) {}
+  }
+
+  function recordPendingUpdate(partial) {
+    if (!currentTaskId) return;
+    const updates = readPendingUpdates();
+    const existing = updates[currentTaskId] || { id: currentTaskId };
+    updates[currentTaskId] = { ...existing, ...partial };
+    writePendingUpdates(updates);
+  }
+
+  function captureFormState() {
+    const titleInput = form.querySelector('input[name="description"]');
+    const dueInput = form.querySelector('input[name="due_date"]');
+    const doneCheckbox = form.querySelector('input[name="done"]');
+    const prioritySelect = form.querySelector('select[name="priority"]');
+    const starredCheckbox = form.querySelector('input[name="starred"]');
+
+    recordPendingUpdate({
+      description: titleInput ? titleInput.value.trim() : undefined,
+      due_date: dueInput ? dueInput.value : undefined,
+      done: doneCheckbox ? doneCheckbox.checked : undefined,
+      priority: prioritySelect ? Number(prioritySelect.value) : undefined,
+      starred: starredCheckbox ? starredCheckbox.checked : undefined
+    });
+  }
+
   function scheduleSave() {
+    captureFormState();
     markListReloadNeeded();
     if (timer) clearTimeout(timer);
     timer = setTimeout(sendSave, 500);
