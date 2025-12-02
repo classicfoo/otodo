@@ -657,6 +657,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     return false;
   }
 
+  // Run an early check in case the page was reloaded normally (not from bfcache)
+  // so the refreshed data is fetched immediately when returning from edits.
+  reloadIfPendingUpdates();
+
   window.addEventListener('pageshow', e => {
     consumeDeletedTasks();
     if (reloadIfPendingUpdates()) return;
