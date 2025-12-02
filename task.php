@@ -107,17 +107,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         #detailsInput.notething-text-widget {
             white-space: pre-wrap;
-            min-height: 24rem;
             position: relative;
         }
         #detailsInput.notething-text-widget:empty:before {
             content: attr(data-placeholder);
             color: #6c757d;
-        }
-        @media (min-width: 992px) {
-            #detailsInput.notething-text-widget {
-                min-height: 30rem;
-            }
         }
     </style>
     <title>Task Details</title>
