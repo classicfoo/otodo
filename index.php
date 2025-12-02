@@ -403,14 +403,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  window.addEventListener('pageshow', e => {
-    consumeDeletedTasks();
-    if (e.persisted) location.reload();
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) location.reload();
-  });
-
   const pendingStarKey = 'pendingStarToggles';
   const starOverrideKey = 'starStateOverrides';
   function loadPendingStars() {
@@ -647,6 +639,146 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     }
   }
   consumeDeletedTasks();
+
+  const taskReloadKey = 'taskListNeedsReload';
+  const updateKey = 'pendingTaskUpdates';
+
+  function readPendingUpdates() {
+    try {
+      const raw = sessionStorage.getItem(updateKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writePendingUpdates(updates) {
+    try {
+      sessionStorage.setItem(updateKey, JSON.stringify(updates));
+    } catch (err) {}
+  }
+
+  function toIsoDate(offsetDays = 0) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatDue(dateStr) {
+    if (!dateStr) return { label: '', className: '' };
+    const today = toIsoDate(0);
+    const tomorrow = toIsoDate(1);
+    try {
+      const dt = new Date(`${dateStr}T00:00:00`);
+      const iso = dt.toISOString().slice(0, 10);
+      if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+      if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+      if (dt < new Date(today)) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+      return { label: 'Later', className: 'bg-primary-subtle text-primary' };
+    } catch (err) {
+      return { label: '', className: '' };
+    }
+  }
+
+  const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
+  const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
+
+  function applyPendingTaskUpdates() {
+    const updates = readPendingUpdates();
+    const remaining = { ...updates };
+    let changed = false;
+
+    Object.values(updates).forEach(update => {
+      const taskId = update.id || update.task_id;
+      if (!taskId) return;
+      const row = document.querySelector(`.task-row[data-task-id="${taskId}"]`);
+      if (!row) return;
+      const titleEl = row.querySelector('.task-title');
+      if (titleEl && typeof update.description === 'string') {
+        titleEl.textContent = update.description || '\u200B';
+      }
+      if (titleEl && typeof update.done === 'boolean') {
+        titleEl.classList.toggle('text-decoration-line-through', update.done);
+      }
+      if (typeof update.priority === 'number') {
+        row.dataset.priority = String(update.priority);
+        const priorityEl = row.querySelector('.priority-text');
+        if (priorityEl) {
+          priorityEl.textContent = priorityLabels[update.priority] || priorityLabels[0];
+          priorityEl.className = `small priority-text ${priorityClasses[update.priority] || priorityClasses[0]}`;
+        }
+      }
+      if (typeof update.starred === 'boolean') {
+        const starBtn = row.querySelector('.task-star');
+        if (starBtn) {
+          starBtn.classList.toggle('starred', update.starred);
+          starBtn.setAttribute('aria-pressed', update.starred ? 'true' : 'false');
+          starBtn.setAttribute('aria-label', update.starred ? 'Unstar task' : 'Star task');
+          const starIcon = starBtn.querySelector('.star-icon');
+          if (starIcon) starIcon.textContent = update.starred ? '★' : '☆';
+          const srText = starBtn.querySelector('.visually-hidden');
+          if (srText) srText.textContent = update.starred ? 'Starred' : 'Not starred';
+        }
+      }
+      if (typeof update.due_date === 'string') {
+        row.dataset.dueDate = update.due_date;
+        const badge = row.querySelector('.due-date-badge');
+        if (badge) {
+          const formatted = formatDue(update.due_date);
+          badge.textContent = formatted.label;
+          badge.className = `badge due-date-badge ${formatted.className}`.trim();
+        }
+      }
+      delete remaining[taskId];
+      changed = true;
+    });
+
+    if (changed) {
+      writePendingUpdates(remaining);
+      if (window.applyTaskSearchFilter) {
+        const currentQuery = window.getTaskSearchValue ? window.getTaskSearchValue() : '';
+        window.applyTaskSearchFilter(currentQuery);
+      }
+    }
+
+    return changed;
+  }
+
+  function consumeTaskReloadFlag() {
+    const needsReload = sessionStorage.getItem(taskReloadKey);
+    if (!needsReload) return false;
+    sessionStorage.removeItem(taskReloadKey);
+    return true;
+  }
+
+  function reloadIfPendingUpdates() {
+    const updated = applyPendingTaskUpdates();
+    if (updated) return true;
+    if (consumeTaskReloadFlag()) {
+      applyPendingTaskUpdates();
+      return true;
+    }
+    return false;
+  }
+
+  // Run an early check in case the page was reloaded normally (not from bfcache)
+  // so the refreshed data is fetched immediately when returning from edits.
+  reloadIfPendingUpdates();
+
+  window.addEventListener('pageshow', e => {
+    consumeDeletedTasks();
+    if (reloadIfPendingUpdates()) return;
+    if (e.persisted) location.reload();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      if (reloadIfPendingUpdates()) return;
+      location.reload();
+    }
+  });
 
   const contextMenu = document.createElement('div');
   contextMenu.className = 'task-context-menu d-none';

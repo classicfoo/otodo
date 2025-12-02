@@ -38,20 +38,17 @@ self.addEventListener('fetch', event => {
 
   if (isNavigational) {
     event.respondWith(
-      caches.match(event.request).then(cacheHit => {
-        const fetchPromise = fetch(event.request)
-          .then(networkResponse => {
-            if (networkResponse && networkResponse.status === 200) {
-              const copy = networkResponse.clone();
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-            }
-            return networkResponse;
-          })
-          .catch(() => cacheHit || caches.match('/'));
-
-        event.waitUntil(fetchPromise.catch(() => {}));
-        return cacheHit || fetchPromise;
-      })
+      fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            event.waitUntil(
+              caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)).catch(() => {})
+            );
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request).then(cacheHit => cacheHit || caches.match('/')))
     );
     return;
   }
