@@ -105,11 +105,17 @@ if ($p < 0 || $p > 3) { $p = 0; }
             background-color: inherit !important;
             color: inherit !important;
         }
-        #detailsInput {
+        #detailsInput.notething-text-widget {
             white-space: pre-wrap;
+            min-height: 24rem;
+            position: relative;
+        }
+        #detailsInput.notething-text-widget:empty:before {
+            content: attr(data-placeholder);
+            color: #6c757d;
         }
         @media (min-width: 992px) {
-            #detailsInput {
+            #detailsInput.notething-text-widget {
                 min-height: 30rem;
             }
         }
@@ -180,7 +186,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
+            <div id="detailsInput" class="form-control" contenteditable="true" aria-label="Task details" data-placeholder="Write notes, todos, and lists here…"><?=htmlspecialchars($task['details'] ?? '')?></div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -192,6 +198,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sync-status.js"></script>
+<script src="notething-text-widget.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
@@ -237,66 +244,17 @@ if ($p < 0 || $p > 3) { $p = 0; }
     });
   }
 
-  let updateDetails;
+  let detailsWidget;
   const details = document.getElementById('detailsInput');
   const detailsField = document.getElementById('detailsField');
-  if (details && detailsField) {
-      updateDetails = function() {
-        const text = details.innerText
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n");
-        detailsField.value = text;
-      };
-      details.addEventListener('input', function(){
-        updateDetails();
-        scheduleSave();
-      });
-      details.addEventListener('paste', function(e){
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
-        updateDetails();
-        scheduleSave();
-      });
-      details.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          document.execCommand('insertText', false, "\t");
-          updateDetails();
-          scheduleSave();
-        } else if (e.key === ' ') {
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const node = range.startContainer;
-            const offset = range.startOffset;
-            if (node.nodeType === Node.TEXT_NODE && offset > 0 && node.textContent[offset-1] === ' ') {
-              e.preventDefault();
-              range.setStart(node, offset-1);
-              range.deleteContents();
-              document.execCommand('insertText', false, "\t");
-              updateDetails();
-              scheduleSave();
-            }
-          }
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const preRange = range.cloneRange();
-            preRange.setStart(details, 0);
-            const textBefore = preRange.toString();
-            const lineStart = textBefore.lastIndexOf('\n') + 1;
-            const currentLine = textBefore.slice(lineStart);
-            const leading = currentLine.match(/^[\t ]*/)[0];
-            document.execCommand('insertText', false, "\n" + leading);
-            updateDetails();
-            scheduleSave();
-          }
-        }
-      });
-      updateDetails();
+  if (details && detailsField && window.NotethingTextWidget) {
+    detailsWidget = new NotethingTextWidget(details, {
+      hiddenInput: detailsField,
+      value: detailsField.value,
+      placeholder: details.dataset.placeholder || 'Write notes…',
+      onChange: () => scheduleSave(),
+      indentString: '\t'
+    });
   }
 
   const taskReloadKey = 'taskListNeedsReload';
@@ -385,7 +343,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
     if (detailsField && typeof pending.details === 'string') {
       detailsField.value = pending.details;
-      if (details) {
+      if (detailsWidget) {
+        detailsWidget.setText(pending.details);
+      } else if (details) {
         details.innerText = pending.details;
       }
     }
@@ -450,7 +410,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
   }
 
   function sendSave(immediate = false) {
-    if (updateDetails) updateDetails();
+    if (detailsWidget) detailsWidget.sync();
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
