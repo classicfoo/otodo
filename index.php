@@ -403,14 +403,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  window.addEventListener('pageshow', e => {
-    consumeDeletedTasks();
-    if (e.persisted) location.reload();
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) location.reload();
-  });
-
   const pendingStarKey = 'pendingStarToggles';
   const starOverrideKey = 'starStateOverrides';
   function loadPendingStars() {
@@ -647,6 +639,35 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     }
   }
   consumeDeletedTasks();
+
+  const taskReloadKey = 'taskListNeedsReload';
+
+  function consumeTaskReloadFlag() {
+    const needsReload = sessionStorage.getItem(taskReloadKey);
+    if (!needsReload) return false;
+    sessionStorage.removeItem(taskReloadKey);
+    return true;
+  }
+
+  function reloadIfPendingUpdates() {
+    if (consumeTaskReloadFlag()) {
+      location.reload();
+      return true;
+    }
+    return false;
+  }
+
+  window.addEventListener('pageshow', e => {
+    consumeDeletedTasks();
+    if (reloadIfPendingUpdates()) return;
+    if (e.persisted) location.reload();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      if (reloadIfPendingUpdates()) return;
+      location.reload();
+    }
+  });
 
   const contextMenu = document.createElement('div');
   contextMenu.className = 'task-context-menu d-none';

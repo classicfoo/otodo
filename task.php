@@ -299,7 +299,16 @@ if ($p < 0 || $p > 3) { $p = 0; }
       updateDetails();
   }
 
+  const taskReloadKey = 'taskListNeedsReload';
+
+  function markListReloadNeeded() {
+    try {
+      sessionStorage.setItem(taskReloadKey, '1');
+    } catch (err) {}
+  }
+
   function scheduleSave() {
+    markListReloadNeeded();
     if (timer) clearTimeout(timer);
     timer = setTimeout(sendSave, 500);
   }
