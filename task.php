@@ -340,14 +340,55 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsField = form.querySelector('input[name="details"]');
 
     recordPendingUpdate({
       description: titleInput ? titleInput.value.trim() : undefined,
       due_date: dueInput ? dueInput.value : undefined,
       done: doneCheckbox ? doneCheckbox.checked : undefined,
       priority: prioritySelect ? Number(prioritySelect.value) : undefined,
-      starred: starredCheckbox ? starredCheckbox.checked : undefined
+      starred: starredCheckbox ? starredCheckbox.checked : undefined,
+      details: detailsField ? detailsField.value : undefined
     });
+  }
+
+  function applyPendingUpdatesToForm() {
+    const updates = readPendingUpdates();
+    const pending = updates[currentTaskId];
+    if (!pending) return;
+
+    const titleInput = form.querySelector('input[name="description"]');
+    const dueInput = form.querySelector('input[name="due_date"]');
+    const doneCheckbox = form.querySelector('input[name="done"]');
+    const prioritySelect = form.querySelector('select[name="priority"]');
+    const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsField = form.querySelector('input[name="details"]');
+
+    if (titleInput && typeof pending.description === 'string') {
+      titleInput.value = pending.description;
+    }
+    if (dueInput && typeof pending.due_date === 'string') {
+      dueInput.value = pending.due_date;
+    }
+    if (doneCheckbox && typeof pending.done === 'boolean') {
+      doneCheckbox.checked = pending.done;
+    }
+    if (prioritySelect && typeof pending.priority === 'number') {
+      const nextVal = String(pending.priority);
+      if (prioritySelect.value !== nextVal) {
+        prioritySelect.value = nextVal;
+        prioritySelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    if (starredCheckbox && typeof pending.starred === 'boolean') {
+      starredCheckbox.checked = pending.starred;
+    }
+    if (detailsField && typeof pending.details === 'string') {
+      detailsField.value = pending.details;
+      if (details) {
+        details.innerText = pending.details;
+      }
+    }
   }
 
   function scheduleSave() {
@@ -356,6 +397,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
     if (timer) clearTimeout(timer);
     timer = setTimeout(sendSave, 500);
   }
+
+  applyPendingUpdatesToForm();
 
   function instantNavigateToIndex() {
     if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Returning to tasks…');
