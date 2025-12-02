@@ -4,7 +4,19 @@ session_start();
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $db = new PDO('sqlite:' . __DIR__ . '/database.sqlite');
+        $databaseFile = __DIR__ . '/.database.sqlite';
+        $legacyDatabaseFile = __DIR__ . '/database.sqlite';
+        $previousHiddenFile = __DIR__ . '/.database.sql';
+
+        if (!file_exists($databaseFile)) {
+            if (file_exists($previousHiddenFile)) {
+                rename($previousHiddenFile, $databaseFile);
+            } elseif (file_exists($legacyDatabaseFile)) {
+                rename($legacyDatabaseFile, $databaseFile);
+            }
+        }
+
+        $db = new PDO('sqlite:' . $databaseFile);
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         $db->exec("CREATE TABLE IF NOT EXISTS users (
@@ -49,6 +61,10 @@ function get_db() {
         }
         if (!in_array('default_priority', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN default_priority INTEGER NOT NULL DEFAULT 0');
+        }
+
+        if (PHP_OS_FAMILY === 'Windows' && file_exists($databaseFile)) {
+            exec('attrib +h ' . escapeshellarg($databaseFile));
         }
     }
     return $db;
