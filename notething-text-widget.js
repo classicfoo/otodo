@@ -124,6 +124,10 @@
       setTextContent(this.el, value);
       this.sync();
       if (typeof cursorOffset === 'number') {
+        // Set immediately so the caret moves within the same key press and
+        // schedule a follow-up placement to survive DOM normalization.
+        if (document.activeElement !== this.el) this.el.focus();
+        setCursor(this.el, cursorOffset);
         requestAnimationFrame(() => setCursor(this.el, cursorOffset));
       }
     }
