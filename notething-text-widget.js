@@ -120,6 +120,14 @@
       this.sync();
     }
 
+    updateTextAndCursor(value, cursorOffset) {
+      setTextContent(this.el, value);
+      this.sync();
+      if (typeof cursorOffset === 'number') {
+        requestAnimationFrame(() => setCursor(this.el, cursorOffset));
+      }
+    }
+
     sync() {
       const text = this.getText();
       if (this.hiddenInput) {
@@ -259,22 +267,19 @@
         if (content.trim().length === 0) {
           const newLine = lead + content;
           const updated = replaceRange(text, line.start, line.end, newLine);
-          this.setText(updated);
-          setCursor(this.el, line.start + lead.length);
+          this.updateTextAndCursor(updated, line.start + lead.length);
           return;
         }
         const nextPrefix = bulletMatch[0].startsWith('- [') ? '- [ ] ' : '- ';
         const addition = '\n' + lead + nextPrefix;
         const updated = replaceRange(text, cursor, cursor, addition);
-        this.setText(updated);
-        setCursor(this.el, cursor + addition.length);
+        this.updateTextAndCursor(updated, cursor + addition.length);
         return;
       }
 
       const addition = isWhitespaceOnly ? '\n' : ('\n' + lead);
       const updated = replaceRange(text, cursor, cursor, addition);
-      this.setText(updated);
-      setCursor(this.el, cursor + addition.length);
+      this.updateTextAndCursor(updated, cursor + addition.length);
     }
 
     toggleBullet() {
