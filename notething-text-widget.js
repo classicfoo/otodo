@@ -1,8 +1,11 @@
 (function(global){
   'use strict';
 
+  const CURSOR_SENTINEL = '\u200b';
+
   function normalizeText(text) {
     return (text || '')
+      .replace(new RegExp(CURSOR_SENTINEL, 'g'), '')
       .replace(/\r\n?/g, '\n')
       .replace(/\u00a0/g, ' ');
   }
@@ -12,7 +15,8 @@
   }
 
   function setTextContent(el, value) {
-    el.textContent = normalizeText(value);
+    const cleaned = normalizeText(value);
+    el.textContent = cleaned + CURSOR_SENTINEL;
   }
 
   function getCursorOffset(root) {
@@ -22,7 +26,7 @@
     const pre = range.cloneRange();
     pre.selectNodeContents(root);
     pre.setEnd(range.endContainer, range.endOffset);
-    return pre.toString().length;
+    return normalizeText(pre.toString()).length;
   }
 
   function setCursor(root, offset) {
@@ -30,11 +34,20 @@
     let currentOffset = 0;
     let node;
     while ((node = walker.nextNode())) {
-      const nextOffset = currentOffset + node.textContent.length;
+      const text = node.textContent || '';
+      const visibleLength = normalizeText(text).length;
+      const nextOffset = currentOffset + visibleLength;
       if (nextOffset >= offset) {
-        const position = Math.max(0, offset - currentOffset);
+        const positionInVisible = Math.max(0, offset - currentOffset);
+        let domIndex = positionInVisible;
+        if (text.includes(CURSOR_SENTINEL)) {
+          const withoutSentinelLength = visibleLength;
+          if (positionInVisible >= withoutSentinelLength) {
+            domIndex = text.length - 1; // place before the sentinel
+          }
+        }
         const range = document.createRange();
-        range.setStart(node, position);
+        range.setStart(node, Math.min(domIndex, text.length));
         range.collapse(true);
         const sel = window.getSelection();
         if (sel) {
