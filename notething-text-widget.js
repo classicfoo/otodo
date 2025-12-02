@@ -254,11 +254,9 @@
       const lead = leadingWhitespace(line.text);
       const bulletMatch = line.text.slice(lead.length).match(/^(- \[[ x]\] |- )/);
       const isWhitespaceOnly = line.text.trim().length === 0;
-      let addition = isWhitespaceOnly ? '\n' : ('\n' + lead);
       if (bulletMatch) {
         const content = line.text.slice(lead.length + bulletMatch[0].length);
         if (content.trim().length === 0) {
-          addition = '\n' + lead;
           const newLine = lead + content;
           const updated = replaceRange(text, line.start, line.end, newLine);
           this.setText(updated);
@@ -266,10 +264,17 @@
           return;
         }
         const nextPrefix = bulletMatch[0].startsWith('- [') ? '- [ ] ' : '- ';
-        addition = '\n' + lead + nextPrefix;
+        const addition = '\n' + lead + nextPrefix;
+        const updated = replaceRange(text, cursor, cursor, addition);
+        this.setText(updated);
+        setCursor(this.el, cursor + addition.length);
+        return;
       }
-      document.execCommand('insertText', false, addition);
-      this.sync();
+
+      const addition = isWhitespaceOnly ? '\n' : ('\n' + lead);
+      const updated = replaceRange(text, cursor, cursor, addition);
+      this.setText(updated);
+      setCursor(this.el, cursor + addition.length);
     }
 
     toggleBullet() {
