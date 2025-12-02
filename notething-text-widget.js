@@ -253,7 +253,8 @@
       const line = getLineInfo(text, cursor);
       const lead = leadingWhitespace(line.text);
       const bulletMatch = line.text.slice(lead.length).match(/^(- \[[ x]\] |- )/);
-      let addition = '\n' + lead;
+      const isWhitespaceOnly = line.text.trim().length === 0;
+      let addition = isWhitespaceOnly ? '\n' : ('\n' + lead);
       if (bulletMatch) {
         const content = line.text.slice(lead.length + bulletMatch[0].length);
         if (content.trim().length === 0) {
