@@ -7,31 +7,22 @@
       .replace(/\u00a0/g, ' ');
   }
 
-  function getLineInfo(root) {
+  function getTextContent(el) {
+    return normalizeText(el.textContent || '');
+  }
+
+  function setTextContent(el, value) {
+    el.textContent = normalizeText(value);
+  }
+
+  function getCursorOffset(root) {
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return null;
+    if (!sel || sel.rangeCount === 0) return 0;
     const range = sel.getRangeAt(0);
     const pre = range.cloneRange();
     pre.selectNodeContents(root);
-    pre.setEnd(range.startContainer, range.startOffset);
-    const textBefore = pre.toString();
-    const start = textBefore.lastIndexOf('\n') + 1;
-
-    const post = range.cloneRange();
-    post.selectNodeContents(root);
-    post.setStart(range.endContainer, range.endOffset);
-    const textAfter = post.toString();
-    const endOffset = textBefore.length + (range.endContainer === range.startContainer ? range.endOffset - range.startOffset : range.endOffset);
-    const lineEnd = textBefore.length + textAfter.indexOf('\n');
-    const end = lineEnd >= textBefore.length ? lineEnd : textBefore.length + post.toString().length;
-
-    return {
-      start,
-      end,
-      textBefore,
-      textAfter,
-      range
-    };
+    pre.setEnd(range.endContainer, range.endOffset);
+    return pre.toString().length;
   }
 
   function setCursor(root, offset) {
@@ -41,7 +32,7 @@
     while ((node = walker.nextNode())) {
       const nextOffset = currentOffset + node.textContent.length;
       if (nextOffset >= offset) {
-        const position = offset - currentOffset;
+        const position = Math.max(0, offset - currentOffset);
         const range = document.createRange();
         range.setStart(node, position);
         range.collapse(true);
@@ -54,7 +45,6 @@
       }
       currentOffset = nextOffset;
     }
-    // Fallback to end
     const range = document.createRange();
     range.selectNodeContents(root);
     range.collapse(false);
@@ -63,6 +53,26 @@
       sel.removeAllRanges();
       sel.addRange(range);
     }
+  }
+
+  function getLineInfo(text, offset) {
+    const start = text.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
+    const endIndex = text.indexOf('\n', offset);
+    const end = endIndex === -1 ? text.length : endIndex;
+    return {
+      start,
+      end,
+      text: text.slice(start, end)
+    };
+  }
+
+  function replaceRange(text, start, end, replacement) {
+    return text.slice(0, start) + replacement + text.slice(end);
+  }
+
+  function leadingWhitespace(str) {
+    const match = str.match(/^[ \t]*/);
+    return match ? match[0] : '';
   }
 
   class NotethingTextWidget {
@@ -81,12 +91,17 @@
         this.el.dataset.placeholder = this.placeholder;
       }
 
-      const initial = options.value !== undefined ? options.value : this.hiddenInput ? this.hiddenInput.value : this.el.innerText;
+      const initial = options.value !== undefined
+        ? options.value
+        : this.hiddenInput
+          ? this.hiddenInput.value
+          : getTextContent(this.el);
       this.setText(initial);
 
       this.el.addEventListener('input', () => this.handleInput());
       this.el.addEventListener('keydown', (e) => this.handleKeydown(e));
       this.el.addEventListener('paste', (e) => this.handlePaste(e));
+      this.el.addEventListener('click', () => this.sync());
       this.el.addEventListener('blur', () => this.sync());
 
       if (this.autoFocus) {
@@ -97,20 +112,20 @@
     }
 
     getText() {
-      return normalizeText(this.el.innerText);
+      return getTextContent(this.el);
     }
 
     setText(value) {
-      const normalized = normalizeText(value);
-      this.el.innerText = normalized;
+      setTextContent(this.el, value);
       this.sync();
     }
 
     sync() {
+      const text = this.getText();
       if (this.hiddenInput) {
-        this.hiddenInput.value = this.getText();
+        this.hiddenInput.value = text;
       }
-      if (this.onChange) this.onChange(this.getText());
+      if (this.onChange) this.onChange(text);
     }
 
     handleInput() {
@@ -137,7 +152,7 @@
 
       if (event.key === 'Enter') {
         event.preventDefault();
-        this.insertNewlineWithIndent();
+        this.insertNewline();
         return;
       }
 
@@ -151,6 +166,28 @@
         event.preventDefault();
         this.toggleTodo();
         return;
+      }
+
+      if (event.key === 'Backspace') {
+        const text = this.getText();
+        const cursor = getCursorOffset(this.el);
+        const line = getLineInfo(text, cursor);
+        const beforeCursor = cursor - line.start;
+        if (beforeCursor <= 1) {
+          const match = line.text.match(/^([ \t]*)(- \[[ x]\] |- )/);
+          if (match) {
+            event.preventDefault();
+            const newLine = line.text.replace(match[2], '');
+            const updated = replaceRange(text, line.start, line.end, newLine);
+            this.setText(updated);
+            setCursor(this.el, line.start + match[1].length);
+          } else if (line.text.startsWith(this.indentString)) {
+            event.preventDefault();
+            const updated = replaceRange(text, line.start, line.end, line.text.slice(this.indentString.length));
+            this.setText(updated);
+            setCursor(this.el, Math.max(line.start, cursor - this.indentString.length));
+          }
+        }
       }
 
       if (event.key === ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -172,109 +209,117 @@
     }
 
     indentSelection() {
-      const info = getLineInfo(this.el);
-      if (!info) return;
-      const lines = this.getText().split('\n');
-      const before = lines.slice(0, 0);
-      const startLine = this.getText().slice(0, info.start).split('\n').length - 1;
-      const endLine = this.getText().slice(0, info.end).split('\n').length - 1;
-      let cursorOffset = this.getCursorOffset();
-      for (let i = startLine; i <= endLine; i++) {
-        const line = lines[i] || '';
-        const indentCount = line.match(/^[\t ]*/)[0].length;
-        if (indentCount / this.indentString.length >= this.maxIndent) continue;
-        lines[i] = this.indentString + line;
-        if (i === startLine) cursorOffset += this.indentString.length;
+      const text = this.getText();
+      const selStart = getCursorOffset(this.el);
+      const selEnd = selStart; // we only support collapsed selection reliably
+      const startLine = getLineInfo(text, selStart);
+      const endLine = getLineInfo(text, selEnd);
+      const lines = text.split('\n');
+      let cursorOffset = selStart;
+      for (let i = this.lineIndexAtOffset(text, startLine.start); i <= this.lineIndexAtOffset(text, endLine.start); i++) {
+        if ((lines[i].match(/^[ \t]*/)[0].length / this.indentString.length) >= this.maxIndent) continue;
+        lines[i] = this.indentString + lines[i];
+        if (i === this.lineIndexAtOffset(text, selStart)) cursorOffset += this.indentString.length;
       }
       this.setFromLines(lines, cursorOffset);
     }
 
     outdentSelection() {
-      const info = getLineInfo(this.el);
-      if (!info) return;
-      const lines = this.getText().split('\n');
-      const startLine = this.getText().slice(0, info.start).split('\n').length - 1;
-      const endLine = this.getText().slice(0, info.end).split('\n').length - 1;
-      let cursorOffset = this.getCursorOffset();
-      for (let i = startLine; i <= endLine; i++) {
-        const line = lines[i] || '';
+      const text = this.getText();
+      const cursor = getCursorOffset(this.el);
+      const startLine = getLineInfo(text, cursor);
+      const endLine = startLine;
+      const lines = text.split('\n');
+      let cursorOffset = cursor;
+      for (let i = this.lineIndexAtOffset(text, startLine.start); i <= this.lineIndexAtOffset(text, endLine.start); i++) {
+        const line = lines[i];
         if (line.startsWith('\t')) {
           lines[i] = line.slice(1);
-          if (i === startLine) cursorOffset = Math.max(0, cursorOffset - 1);
+          if (i === this.lineIndexAtOffset(text, cursor)) cursorOffset = Math.max(0, cursorOffset - 1);
         } else if (line.startsWith('    ')) {
           lines[i] = line.slice(4);
-          if (i === startLine) cursorOffset = Math.max(0, cursorOffset - 4);
+          if (i === this.lineIndexAtOffset(text, cursor)) cursorOffset = Math.max(0, cursorOffset - 4);
         } else if (line.startsWith(' ')) {
           lines[i] = line.slice(1);
-          if (i === startLine) cursorOffset = Math.max(0, cursorOffset - 1);
+          if (i === this.lineIndexAtOffset(text, cursor)) cursorOffset = Math.max(0, cursorOffset - 1);
         }
       }
       this.setFromLines(lines, cursorOffset);
     }
 
-    insertNewlineWithIndent() {
-      const info = getLineInfo(this.el);
+    insertNewline() {
       const text = this.getText();
-      const before = text.slice(0, info ? info.start : 0);
-      const currentLine = text.slice(info ? info.start : 0, info ? info.end : text.length);
-      const leading = currentLine.match(/^[\t ]*/)[0];
-      const addition = '\n' + leading;
+      const cursor = getCursorOffset(this.el);
+      const line = getLineInfo(text, cursor);
+      const lead = leadingWhitespace(line.text);
+      const bulletMatch = line.text.slice(lead.length).match(/^(- \[[ x]\] |- )/);
+      let addition = '\n' + lead;
+      if (bulletMatch) {
+        const content = line.text.slice(lead.length + bulletMatch[0].length);
+        if (content.trim().length === 0) {
+          addition = '\n' + lead;
+          const newLine = lead + content;
+          const updated = replaceRange(text, line.start, line.end, newLine);
+          this.setText(updated);
+          setCursor(this.el, line.start + lead.length);
+          return;
+        }
+        const nextPrefix = bulletMatch[0].startsWith('- [') ? '- [ ] ' : '- ';
+        addition = '\n' + lead + nextPrefix;
+      }
       document.execCommand('insertText', false, addition);
       this.sync();
     }
 
     toggleBullet() {
-      const info = getLineInfo(this.el);
-      if (!info) return;
       const text = this.getText();
-      const lines = text.split('\n');
-      const idx = text.slice(0, info.start).split('\n').length - 1;
-      const line = lines[idx] || '';
-      if (line.trim().startsWith('- ')) {
-        lines[idx] = line.replace(/^[\t ]*-\s+/, '');
+      const cursor = getCursorOffset(this.el);
+      const line = getLineInfo(text, cursor);
+      const lead = leadingWhitespace(line.text);
+      const hasBullet = /^- /.test(line.text.trimStart());
+      let replacement;
+      if (hasBullet) {
+        replacement = line.text.replace(/^[ \t]*-\s+/, lead);
       } else {
-        lines[idx] = line.replace(/^[\t ]*/, match => match) + '- ' + line.trimStart();
+        replacement = lead + '- ' + line.text.trimStart();
       }
-      const cursorOffset = lines.slice(0, idx).join('\n').length + (idx > 0 ? 1 : 0) + lines[idx].length;
-      this.setFromLines(lines, cursorOffset);
+      const updated = replaceRange(text, line.start, line.end, replacement);
+      this.setText(updated);
+      const newCursor = line.start + replacement.length;
+      setCursor(this.el, newCursor);
     }
 
     toggleTodo() {
-      const info = getLineInfo(this.el);
-      if (!info) return;
       const text = this.getText();
-      const lines = text.split('\n');
-      const idx = text.slice(0, info.start).split('\n').length - 1;
-      const line = lines[idx] || '';
-      const trimmed = line.trimStart();
-      const leading = line.slice(0, line.length - trimmed.length);
+      const cursor = getCursorOffset(this.el);
+      const line = getLineInfo(text, cursor);
+      const lead = leadingWhitespace(line.text);
+      const trimmed = line.text.trimStart();
+      let replacement = line.text;
       if (/^- \[ \]\s/.test(trimmed)) {
-        lines[idx] = leading + '- [x] ' + trimmed.slice(6);
+        replacement = lead + '- [x] ' + trimmed.slice(6);
       } else if (/^- \[x\]\s/.test(trimmed)) {
-        lines[idx] = leading + '- [ ] ' + trimmed.slice(6);
+        replacement = lead + '- [ ] ' + trimmed.slice(6);
+      } else if (/^-\s/.test(trimmed)) {
+        replacement = lead + '- [ ] ' + trimmed.replace(/^-\s*/, '');
       } else {
-        lines[idx] = leading + '- [ ] ' + trimmed;
+        replacement = lead + '- [ ] ' + trimmed;
       }
-      const cursorOffset = lines.slice(0, idx).join('\n').length + (idx > 0 ? 1 : 0) + lines[idx].length;
-      this.setFromLines(lines, cursorOffset);
+      const updated = replaceRange(text, line.start, line.end, replacement);
+      this.setText(updated);
+      setCursor(this.el, line.start + replacement.length);
+    }
+
+    lineIndexAtOffset(text, offset) {
+      return text.slice(0, offset).split('\n').length - 1;
     }
 
     setFromLines(lines, cursorOffset) {
-      this.el.innerText = lines.join('\n');
+      setTextContent(this.el, lines.join('\n'));
       this.sync();
       if (typeof cursorOffset === 'number') {
         setCursor(this.el, cursorOffset);
       }
-    }
-
-    getCursorOffset() {
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return 0;
-      const range = sel.getRangeAt(0);
-      const pre = range.cloneRange();
-      pre.selectNodeContents(this.el);
-      pre.setEnd(range.endContainer, range.endOffset);
-      return pre.toString().length;
     }
   }
 
