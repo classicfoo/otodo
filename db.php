@@ -4,11 +4,16 @@ session_start();
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $databaseFile = __DIR__ . '/.database.sql';
+        $databaseFile = __DIR__ . '/.database.sqlite';
         $legacyDatabaseFile = __DIR__ . '/database.sqlite';
+        $previousHiddenFile = __DIR__ . '/.database.sql';
 
-        if (!file_exists($databaseFile) && file_exists($legacyDatabaseFile)) {
-            rename($legacyDatabaseFile, $databaseFile);
+        if (!file_exists($databaseFile)) {
+            if (file_exists($previousHiddenFile)) {
+                rename($previousHiddenFile, $databaseFile);
+            } elseif (file_exists($legacyDatabaseFile)) {
+                rename($legacyDatabaseFile, $databaseFile);
+            }
         }
 
         $db = new PDO('sqlite:' . $databaseFile);
