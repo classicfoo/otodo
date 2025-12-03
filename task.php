@@ -255,8 +255,22 @@ if ($p < 0 || $p > 3) { $p = 0; }
           .replace(/\n/g, preferredLineEnding);
       }
 
+      function insertTextAtSelection(text) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return false;
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return true;
+      }
+
       updateDetails = function() {
-        const text = details.innerText;
+        const text = details.textContent || details.innerText;
         detailsField.value = normalizeLineEndings(text);
       };
       details.addEventListener('input', function(){
@@ -273,7 +287,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
       details.addEventListener('keydown', function(e) {
         if (e.key === 'Tab') {
           e.preventDefault();
-          document.execCommand('insertText', false, "\t");
+          if (!document.execCommand('insertText', false, "\t")) {
+            insertTextAtSelection("\t");
+          }
           updateDetails();
           scheduleSave();
         } else if (e.key === ' ') {
@@ -286,7 +302,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
               e.preventDefault();
               range.setStart(node, offset-1);
               range.deleteContents();
-              document.execCommand('insertText', false, "\t");
+              if (!document.execCommand('insertText', false, "\t")) {
+                insertTextAtSelection("\t");
+              }
               updateDetails();
               scheduleSave();
             }
@@ -302,7 +320,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
             const lineStart = textBefore.lastIndexOf('\n') + 1;
             const currentLine = textBefore.slice(lineStart);
             const leading = currentLine.match(/^[\t ]*/)[0];
-            document.execCommand('insertText', false, "\n" + leading);
+            const textToInsert = "\n" + leading;
+            if (!document.execCommand('insertText', false, textToInsert)) {
+              insertTextAtSelection(textToInsert);
+            }
             updateDetails();
             scheduleSave();
           }
