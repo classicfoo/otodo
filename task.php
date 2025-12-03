@@ -241,11 +241,23 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const details = document.getElementById('detailsInput');
   const detailsField = document.getElementById('detailsField');
   if (details && detailsField) {
-      updateDetails = function() {
-        const text = details.innerText
+      const preferredLineEnding = (function() {
+        const value = detailsField.value;
+        if (value.includes('\r\n')) return '\r\n';
+        if (value.includes('\r')) return '\r';
+        return '\n';
+      })();
+
+      function normalizeLineEndings(text) {
+        return text
           .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n");
-        detailsField.value = text;
+          .replace(/\r/g, "\n")
+          .replace(/\n/g, preferredLineEnding);
+      }
+
+      updateDetails = function() {
+        const text = details.innerText;
+        detailsField.value = normalizeLineEndings(text);
       };
       details.addEventListener('input', function(){
         updateDetails();
