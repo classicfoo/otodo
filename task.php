@@ -192,6 +192,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sync-status.js"></script>
+<script src="task-details.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
@@ -240,63 +241,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
   let updateDetails;
   const details = document.getElementById('detailsInput');
   const detailsField = document.getElementById('detailsField');
-  if (details && detailsField) {
-      updateDetails = function() {
-        const text = details.innerText
-          .replace(/\r\n/g, "\n")
-          .replace(/\r/g, "\n");
-        detailsField.value = text;
-      };
-      details.addEventListener('input', function(){
-        updateDetails();
-        scheduleSave();
-      });
-      details.addEventListener('paste', function(e){
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
-        updateDetails();
-        scheduleSave();
-      });
-      details.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          e.preventDefault();
-          document.execCommand('insertText', false, "\t");
-          updateDetails();
-          scheduleSave();
-        } else if (e.key === ' ') {
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const node = range.startContainer;
-            const offset = range.startOffset;
-            if (node.nodeType === Node.TEXT_NODE && offset > 0 && node.textContent[offset-1] === ' ') {
-              e.preventDefault();
-              range.setStart(node, offset-1);
-              range.deleteContents();
-              document.execCommand('insertText', false, "\t");
-              updateDetails();
-              scheduleSave();
-            }
-          }
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0);
-            const preRange = range.cloneRange();
-            preRange.setStart(details, 0);
-            const textBefore = preRange.toString();
-            const lineStart = textBefore.lastIndexOf('\n') + 1;
-            const currentLine = textBefore.slice(lineStart);
-            const leading = currentLine.match(/^[\t ]*/)[0];
-            document.execCommand('insertText', false, "\n" + leading);
-            updateDetails();
-            scheduleSave();
-          }
-        }
-      });
-      updateDetails();
+  if (details && detailsField && window.initTaskDetailsEditor) {
+    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave);
+    if (editor && typeof editor.updateDetails === 'function') {
+      updateDetails = editor.updateDetails;
+    }
   }
 
   const taskReloadKey = 'taskListNeedsReload';
