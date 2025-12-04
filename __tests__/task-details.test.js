@@ -24,21 +24,6 @@ describe('task details editor behaviors', () => {
       <div id="detailsInput" contenteditable="true"></div>
       <input id="detailsField" type="hidden" />
     `;
-
-    document.execCommand = jest.fn((command, _ui, value) => {
-      if (command !== 'insertText') return false;
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return false;
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      const textNode = document.createTextNode(value);
-      range.insertNode(textNode);
-      range.setStart(textNode, textNode.length);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return true;
-    });
   });
 
   test('normalizes newlines and syncs hidden field', () => {
