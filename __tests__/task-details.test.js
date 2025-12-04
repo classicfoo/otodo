@@ -88,7 +88,7 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
-  test('enter key preserves indentation on new line', () => {
+  test('enter key inserts newline on first press and preserves indentation', () => {
     const details = document.getElementById('detailsInput');
     const hidden = document.getElementById('detailsField');
     const saveSpy = jest.fn();
@@ -102,6 +102,23 @@ describe('task details editor behaviors', () => {
 
     expect(details.textContent).toBe('    indented\n    ');
     expect(hidden.value).toBe('    indented\n    ');
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('enter key inserts newline on first press when text exists', () => {
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    details.textContent = 'test';
+    setCaretAtEnd(details.firstChild);
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(event);
+
+    expect(details.textContent).toBe('test\n');
+    expect(hidden.value).toBe('test\n');
     expect(saveSpy).toHaveBeenCalled();
   });
 
