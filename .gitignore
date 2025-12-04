@@ -2,4 +2,3 @@
 .database.sql
 database.sqlite
 node_modules
-package-lock.json
