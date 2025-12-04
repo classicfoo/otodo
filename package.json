@@ -1,0 +1,17 @@
+{
+  "name": "otodo",
+  "version": "1.0.0",
+  "description": "A simple PHP online todo list application with user authentication and SQLite storage. The interface uses [Bootstrap](https://getbootstrap.com/) for a mobile‑responsive layout.",
+  "main": "prevent-save-shortcut.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
