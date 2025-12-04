@@ -105,6 +105,27 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('enter key requires two presses to insert newline when text exists', () => {
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    details.textContent = 'test';
+    setCaretAtEnd(details.firstChild);
+
+    const firstEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(firstEvent);
+
+    expect(details.textContent).toBe('test');
+
+    const secondEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(secondEvent);
+
+    expect(details.textContent).toBe('test\n');
+    expect(hidden.value).toBe('test\n');
+  });
+
   test('paste inserts plain text and triggers save', () => {
     const details = document.getElementById('detailsInput');
     const hidden = document.getElementById('detailsField');
