@@ -41,6 +41,10 @@ describe('task details editor behaviors', () => {
     });
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('normalizes newlines and syncs hidden field', () => {
     const details = document.getElementById('detailsInput');
     const hidden = document.getElementById('detailsField');
@@ -88,7 +92,7 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
-  test('enter key preserves indentation on new line', () => {
+  test('enter key inserts newline on first press and preserves indentation', () => {
     const details = document.getElementById('detailsInput');
     const hidden = document.getElementById('detailsField');
     const saveSpy = jest.fn();
@@ -102,6 +106,23 @@ describe('task details editor behaviors', () => {
 
     expect(details.textContent).toBe('    indented\n    ');
     expect(hidden.value).toBe('    indented\n    ');
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('enter key inserts newline on first press when text exists', () => {
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    details.textContent = 'test';
+    setCaretAtEnd(details.firstChild);
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(event);
+
+    expect(details.textContent).toBe('test\n');
+    expect(hidden.value).toBe('test\n');
     expect(saveSpy).toHaveBeenCalled();
   });
 
@@ -123,5 +144,25 @@ describe('task details editor behaviors', () => {
     expect(details.textContent).toBe('start paste');
     expect(hidden.value).toBe('start paste');
     expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('falls back when execCommand reports success but content is unchanged', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    document.execCommand = jest.fn(() => true);
+
+    details.textContent = 'line';
+    setCaretAtEnd(details.firstChild);
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(event);
+
+    expect(details.textContent).toBe('line\n');
+    expect(hidden.value).toBe('line\n');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('execCommand reported success'));
   });
 });

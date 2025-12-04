@@ -3,14 +3,55 @@
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-  function insertTextAtSelection(text) {
-    if (!text) return;
-    if (typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, text);
-      return;
+  function formatCharacters(text = '') {
+    return (text || '').split('').map(function(ch) {
+      var visible;
+      if (ch === '\n') {
+        visible = '\\n';
+      } else if (ch === '\r') {
+        visible = '\\r';
+      } else if (ch === '\t') {
+        visible = '\\t';
+      } else if (ch === ' ') {
+        visible = '·';
+      } else {
+        visible = ch;
+      }
+      var code = ch.codePointAt(0).toString(16).toUpperCase();
+      return visible + '[U+' + code.padStart(4, '0') + ']';
+    }).join(' ');
+  }
+
+  function insertTextAtSelection(text, rootElement) {
+    if (!text) return false;
+
+    var beforeText = null;
+    if (rootElement) {
+      beforeText = rootElement.textContent !== undefined ? rootElement.textContent : rootElement.innerText;
     }
+
+    if (typeof document.execCommand === 'function') {
+      try {
+        const result = document.execCommand('insertText', false, text);
+        if (result) {
+          if (rootElement) {
+            const afterText = rootElement.textContent !== undefined ? rootElement.textContent : rootElement.innerText;
+            if (beforeText !== null && afterText === beforeText) {
+              console.warn('[task-details] execCommand reported success but content did not change; falling back to range insertion.');
+            } else {
+              return true;
+            }
+          } else {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('[task-details] execCommand failed', err);
+      }
+    }
+
     const sel = window.getSelection && window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
+    if (!sel || sel.rangeCount === 0) return false;
     const range = sel.getRangeAt(0);
     range.deleteContents();
     const textNode = document.createTextNode(text);
@@ -19,6 +60,7 @@
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
+    return true;
   }
 
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
@@ -43,7 +85,7 @@
     details.addEventListener('paste', function(e) {
       e.preventDefault();
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-      insertTextAtSelection(text);
+      insertTextAtSelection(text, details);
       updateDetails();
       queueSave();
     });
@@ -51,7 +93,7 @@
     details.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
-        insertTextAtSelection('\t');
+        insertTextAtSelection('\t', details);
         updateDetails();
         queueSave();
       } else if (e.key === ' ') {
@@ -64,7 +106,7 @@
             e.preventDefault();
             range.setStart(node, offset - 1);
             range.deleteContents();
-            insertTextAtSelection('\t');
+            insertTextAtSelection('\t', details);
             updateDetails();
             queueSave();
           }
@@ -80,9 +122,16 @@
           const lineStart = textBefore.lastIndexOf('\n') + 1;
           const currentLine = textBefore.slice(lineStart);
           const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-          insertTextAtSelection('\n' + leading);
-          updateDetails();
+          const beforeText = details.textContent !== undefined ? details.textContent : details.innerText;
+          const inserted = insertTextAtSelection('\n' + leading, details);
+          const updated = updateDetails();
           queueSave();
+          const detailsText = details.textContent !== undefined ? details.textContent : details.innerText;
+          console.log('[task-details] Enter pressed. details:', formatCharacters(detailsText));
+          console.log('[task-details] Enter pressed. hidden:', formatCharacters(detailsField.value || ''));
+          if (!inserted || updated === normalizeNewlines(beforeText || '')) {
+            console.warn('[task-details] Newline insertion fallback was used or failed. Browser may ignore insertText for contentEditable.');
+          }
         }
       }
     });
