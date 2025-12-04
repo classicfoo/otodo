@@ -3,6 +3,25 @@
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
+  function formatCharacters(text = '') {
+    return (text || '').split('').map(function(ch) {
+      var visible;
+      if (ch === '\n') {
+        visible = '\\n';
+      } else if (ch === '\r') {
+        visible = '\\r';
+      } else if (ch === '\t') {
+        visible = '\\t';
+      } else if (ch === ' ') {
+        visible = '·';
+      } else {
+        visible = ch;
+      }
+      var code = ch.codePointAt(0).toString(16).toUpperCase();
+      return visible + '[U+' + code.padStart(4, '0') + ']';
+    }).join(' ');
+  }
+
   function insertTextAtSelection(text) {
     if (!text) return;
     if (typeof document.execCommand === 'function') {
@@ -83,6 +102,9 @@
           insertTextAtSelection('\n' + leading);
           updateDetails();
           queueSave();
+          const detailsText = details.textContent !== undefined ? details.textContent : details.innerText;
+          console.log('[task-details] Enter pressed. details:', formatCharacters(detailsText));
+          console.log('[task-details] Enter pressed. hidden:', formatCharacters(detailsField.value || ''));
         }
       }
     });
