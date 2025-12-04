@@ -5,17 +5,13 @@
 
   function insertTextAtSelection(text) {
     if (!text) return;
-    if (typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, text);
-      return;
-    }
     const sel = window.getSelection && window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     range.deleteContents();
     const textNode = document.createTextNode(text);
     range.insertNode(textNode);
-    range.setStart(textNode, textNode.length);
+    range.setStartAfter(textNode);
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
