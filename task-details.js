@@ -48,6 +48,8 @@
       queueSave();
     });
 
+    let enterAwaitingConfirm = false;
+
     details.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -69,6 +71,7 @@
             queueSave();
           }
         }
+        enterAwaitingConfirm = false;
       } else if (e.key === 'Enter') {
         e.preventDefault();
         const sel = window.getSelection ? window.getSelection() : null;
@@ -80,10 +83,21 @@
           const lineStart = textBefore.lastIndexOf('\n') + 1;
           const currentLine = textBefore.slice(lineStart);
           const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
+          const hasIndent = leading.length > 0;
+          const hasContent = (details.textContent || '').length > 0;
+
+          if (!hasIndent && hasContent && !enterAwaitingConfirm) {
+            enterAwaitingConfirm = true;
+            return;
+          }
+
+          enterAwaitingConfirm = false;
           insertTextAtSelection('\n' + leading);
           updateDetails();
           queueSave();
         }
+      } else {
+        enterAwaitingConfirm = false;
       }
     });
 
