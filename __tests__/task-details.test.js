@@ -41,6 +41,10 @@ describe('task details editor behaviors', () => {
     });
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('normalizes newlines and syncs hidden field', () => {
     const details = document.getElementById('detailsInput');
     const hidden = document.getElementById('detailsField');
@@ -140,5 +144,25 @@ describe('task details editor behaviors', () => {
     expect(details.textContent).toBe('start paste');
     expect(hidden.value).toBe('start paste');
     expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('falls back when execCommand reports success but content is unchanged', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    document.execCommand = jest.fn(() => true);
+
+    details.textContent = 'line';
+    setCaretAtEnd(details.firstChild);
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    details.dispatchEvent(event);
+
+    expect(details.textContent).toBe('line\n');
+    expect(hidden.value).toBe('line\n');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('execCommand reported success'));
   });
 });

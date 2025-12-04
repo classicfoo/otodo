@@ -22,14 +22,28 @@
     }).join(' ');
   }
 
-  function insertTextAtSelection(text) {
+  function insertTextAtSelection(text, rootElement) {
     if (!text) return false;
+
+    var beforeText = null;
+    if (rootElement) {
+      beforeText = rootElement.textContent !== undefined ? rootElement.textContent : rootElement.innerText;
+    }
 
     if (typeof document.execCommand === 'function') {
       try {
         const result = document.execCommand('insertText', false, text);
         if (result) {
-          return true;
+          if (rootElement) {
+            const afterText = rootElement.textContent !== undefined ? rootElement.textContent : rootElement.innerText;
+            if (beforeText !== null && afterText === beforeText) {
+              console.warn('[task-details] execCommand reported success but content did not change; falling back to range insertion.');
+            } else {
+              return true;
+            }
+          } else {
+            return true;
+          }
         }
       } catch (err) {
         console.warn('[task-details] execCommand failed', err);
@@ -71,7 +85,7 @@
     details.addEventListener('paste', function(e) {
       e.preventDefault();
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-      insertTextAtSelection(text);
+      insertTextAtSelection(text, details);
       updateDetails();
       queueSave();
     });
@@ -79,7 +93,7 @@
     details.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
-        insertTextAtSelection('\t');
+        insertTextAtSelection('\t', details);
         updateDetails();
         queueSave();
       } else if (e.key === ' ') {
@@ -92,7 +106,7 @@
             e.preventDefault();
             range.setStart(node, offset - 1);
             range.deleteContents();
-            insertTextAtSelection('\t');
+            insertTextAtSelection('\t', details);
             updateDetails();
             queueSave();
           }
@@ -108,13 +122,14 @@
           const lineStart = textBefore.lastIndexOf('\n') + 1;
           const currentLine = textBefore.slice(lineStart);
           const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-          const inserted = insertTextAtSelection('\n' + leading);
-          updateDetails();
+          const beforeText = details.textContent !== undefined ? details.textContent : details.innerText;
+          const inserted = insertTextAtSelection('\n' + leading, details);
+          const updated = updateDetails();
           queueSave();
           const detailsText = details.textContent !== undefined ? details.textContent : details.innerText;
           console.log('[task-details] Enter pressed. details:', formatCharacters(detailsText));
           console.log('[task-details] Enter pressed. hidden:', formatCharacters(detailsField.value || ''));
-          if (!inserted) {
+          if (!inserted || updated === normalizeNewlines(beforeText || '')) {
             console.warn('[task-details] Newline insertion fallback was used or failed. Browser may ignore insertText for contentEditable.');
           }
         }
