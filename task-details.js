@@ -23,13 +23,21 @@
   }
 
   function insertTextAtSelection(text) {
-    if (!text) return;
+    if (!text) return false;
+
     if (typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, text);
-      return;
+      try {
+        const result = document.execCommand('insertText', false, text);
+        if (result) {
+          return true;
+        }
+      } catch (err) {
+        console.warn('[task-details] execCommand failed', err);
+      }
     }
+
     const sel = window.getSelection && window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
+    if (!sel || sel.rangeCount === 0) return false;
     const range = sel.getRangeAt(0);
     range.deleteContents();
     const textNode = document.createTextNode(text);
@@ -38,6 +46,7 @@
     range.collapse(true);
     sel.removeAllRanges();
     sel.addRange(range);
+    return true;
   }
 
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
@@ -99,12 +108,15 @@
           const lineStart = textBefore.lastIndexOf('\n') + 1;
           const currentLine = textBefore.slice(lineStart);
           const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-          insertTextAtSelection('\n' + leading);
+          const inserted = insertTextAtSelection('\n' + leading);
           updateDetails();
           queueSave();
           const detailsText = details.textContent !== undefined ? details.textContent : details.innerText;
           console.log('[task-details] Enter pressed. details:', formatCharacters(detailsText));
           console.log('[task-details] Enter pressed. hidden:', formatCharacters(detailsField.value || ''));
+          if (!inserted) {
+            console.warn('[task-details] Newline insertion fallback was used or failed. Browser may ignore insertText for contentEditable.');
+          }
         }
       }
     });
