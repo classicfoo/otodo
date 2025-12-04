@@ -19,35 +19,47 @@ function setCaret(node, offset) {
 }
 
 describe('task details editor behaviors', () => {
+  let details;
+  let hidden;
+  let saveSpy;
+  let editor;
+
   beforeEach(() => {
     document.body.innerHTML = `
-      <div id="detailsInput" contenteditable="true"></div>
-      <input id="detailsField" type="hidden" />
+    <div id="detailsInput" contenteditable="true"></div>
+    <input id="detailsField" type="hidden" />
     `;
 
+    // jsdom stub for insertText used by the editor
     document.execCommand = jest.fn((command, _ui, value) => {
       if (command !== 'insertText') return false;
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return false;
+
       const range = selection.getRangeAt(0);
       range.deleteContents();
       const textNode = document.createTextNode(value);
       range.insertNode(textNode);
+
       range.setStart(textNode, textNode.length);
       range.collapse(true);
       selection.removeAllRanges();
       selection.addRange(range);
+
       return true;
     });
+
+    details = document.getElementById('detailsInput');
+    hidden = document.getElementById('detailsField');
+    saveSpy = jest.fn();
+
+    // initialise listeners once per test
+    editor = initTaskDetailsEditor(details, hidden, saveSpy);
   });
 
   test('normalizes newlines and syncs hidden field', () => {
-    const details = document.getElementById('detailsInput');
-    const hidden = document.getElementById('detailsField');
-    const saveSpy = jest.fn();
-    const editor = initTaskDetailsEditor(details, hidden, saveSpy);
-
     details.innerText = 'line1\r\nline2\rline3';
+
     editor.updateDetails();
 
     expect(hidden.value).toBe('line1\nline2\nline3');
@@ -55,16 +67,18 @@ describe('task details editor behaviors', () => {
   });
 
   test('tab key inserts tab character and schedules save', () => {
-    const details = document.getElementById('detailsInput');
-    const hidden = document.getElementById('detailsField');
-    const saveSpy = jest.fn();
-    initTaskDetailsEditor(details, hidden, saveSpy);
-
     details.textContent = 'task';
     setCaretAtEnd(details.firstChild);
 
-    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
     details.dispatchEvent(event);
+
+    // ensure hidden field is synced after key handling
+    editor.updateDetails();
 
     expect(details.textContent).toBe('task\t');
     expect(hidden.value).toBe('task\t');
@@ -72,16 +86,17 @@ describe('task details editor behaviors', () => {
   });
 
   test('double space turns into a tab', () => {
-    const details = document.getElementById('detailsInput');
-    const hidden = document.getElementById('detailsField');
-    const saveSpy = jest.fn();
-    initTaskDetailsEditor(details, hidden, saveSpy);
-
     details.textContent = 'do ';
     setCaret(details.firstChild, 3);
 
-    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
+    const event = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
     details.dispatchEvent(event);
+
+    editor.updateDetails();
 
     expect(details.textContent).toBe('do\t');
     expect(hidden.value).toBe('do\t');
@@ -89,16 +104,17 @@ describe('task details editor behaviors', () => {
   });
 
   test('enter key preserves indentation on new line', () => {
-    const details = document.getElementById('detailsInput');
-    const hidden = document.getElementById('detailsField');
-    const saveSpy = jest.fn();
-    initTaskDetailsEditor(details, hidden, saveSpy);
-
     details.textContent = '    indented';
     setCaretAtEnd(details.firstChild);
 
-    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
     details.dispatchEvent(event);
+
+    editor.updateDetails();
 
     expect(details.textContent).toBe('    indented\n    ');
     expect(hidden.value).toBe('    indented\n    ');
@@ -106,19 +122,16 @@ describe('task details editor behaviors', () => {
   });
 
   test('paste inserts plain text and triggers save', () => {
-    const details = document.getElementById('detailsInput');
-    const hidden = document.getElementById('detailsField');
-    const saveSpy = jest.fn();
-    initTaskDetailsEditor(details, hidden, saveSpy);
-
     details.textContent = 'start';
     setCaretAtEnd(details.firstChild);
 
-    const pasteEvent = new Event('paste', { bubbles: true });
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
     pasteEvent.clipboardData = {
-      getData: jest.fn(() => ' paste')
+      getData: jest.fn(() => ' paste'),
     };
     details.dispatchEvent(pasteEvent);
+
+    editor.updateDetails();
 
     expect(details.textContent).toBe('start paste');
     expect(hidden.value).toBe('start paste');
