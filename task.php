@@ -149,9 +149,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
         .prism-editor__preview code {
             display: block;
             color: #212529;
+            line-height: inherit;
         }
         .prism-editor .code-line {
             display: block;
+            line-height: inherit;
         }
         .prism-editor .code-line-task {
             color: #0d6efd;

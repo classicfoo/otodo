@@ -79,6 +79,22 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('rendered preview lines stay aligned with textarea lines', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'This\nThat';
+    const preview = details.querySelector('code');
+
+    // Trigger render
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(preview.innerHTML).toContain('</div><div');
+    expect(preview.innerHTML).not.toContain('</div>\n<div');
+  });
+
   test('paste inserts plain text and triggers save', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

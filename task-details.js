@@ -33,7 +33,7 @@
       }
       const content = line === '' ? '&#8203;' : line;
       return '<div class="' + classes.join(' ') + '">' + content + '</div>';
-    }).join('\n');
+    }).join('');
   }
 
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
@@ -83,6 +83,11 @@
     textarea.addEventListener('input', function() {
       syncDetails();
       queueSave();
+    });
+
+    textarea.addEventListener('scroll', function() {
+      preview.parentElement.scrollTop = textarea.scrollTop;
+      preview.parentElement.scrollLeft = textarea.scrollLeft;
     });
 
     textarea.addEventListener('paste', function(e) {
