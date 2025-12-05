@@ -960,6 +960,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
+  const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
   let isFallbackSubmit = false;
   if (form && listGroup) {
     form.addEventListener('submit', function(e){
@@ -968,6 +969,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const data = new FormData(form);
       const description = (data.get('description') || '').toString().trim();
       if (!description) return;
+
+      if (descriptionInput) descriptionInput.value = '';
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
@@ -1024,8 +1027,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       })
       .catch(() => {
         tempItem.remove();
-        const descInput = form.querySelector('input[name="description"]');
-        if (descInput) descInput.value = description;
+        if (descriptionInput) descriptionInput.value = description;
         isFallbackSubmit = true;
         form.submit();
       })
