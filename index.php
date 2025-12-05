@@ -34,7 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <style>
         .task-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 300px;
+            grid-template-columns: minmax(0, 1fr) 240px;
             align-items: center;
             padding: 0.75rem 1rem;
             column-gap: 1rem;
