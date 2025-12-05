@@ -107,6 +107,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         #detailsInput {
             white-space: pre-wrap;
+            field-sizing: content;
             overflow-y: hidden;
             resize: none;
         }
@@ -193,7 +194,6 @@ if ($p < 0 || $p > 3) { $p = 0; }
 </div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sync-status.js"></script>
-<script src="autosize.js"></script>
 <script src="task-details.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -334,13 +334,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
     if (starredCheckbox && typeof pending.starred === 'boolean') {
       starredCheckbox.checked = pending.starred;
     }
-    if (detailsField && typeof pending.details === 'string') {
+        if (detailsField && typeof pending.details === 'string') {
       detailsField.value = pending.details;
       if (details && details !== detailsField) {
         details.innerText = pending.details;
-      }
-      if (window.maybeUpdateDetailsAutosize) {
-        window.maybeUpdateDetailsAutosize(detailsField);
       }
     }
   }
