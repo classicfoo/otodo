@@ -972,10 +972,71 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .finally(hideContextMenu);
     });
 
+    let quickEditPress = null;
+    const longPressDelay = 450;
+    const moveTolerance = 12;
+
+    function cancelQuickEditPress(pointerId, suppressReset = false) {
+      if (!quickEditPress) return;
+      if (pointerId && quickEditPress.pointerId !== pointerId) return;
+      clearTimeout(quickEditPress.timer);
+      if (!suppressReset) quickEditPress = null;
+    }
+
+    document.addEventListener('pointerdown', function(e){
+      if (!isTouchQuickMode()) return;
+      if (e.pointerType === 'mouse') return;
+      const quickTarget = e.target.closest('.due-date-badge, .priority-text');
+      if (!quickTarget) return;
+      const taskEl = quickTarget.closest('.task-row');
+      if (!taskEl) return;
+
+      const rect = quickTarget.getBoundingClientRect();
+      const anchorRect = taskEl.getBoundingClientRect();
+      quickEditPress = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        taskEl,
+        quickTarget,
+        anchorRect,
+        triggered: false,
+        timer: setTimeout(() => {
+          if (!quickEditPress) return;
+          quickEditPress.triggered = true;
+          const mode = quickTarget.classList.contains('due-date-badge') ? 'due' : 'priority';
+          const x = rect.left + rect.width / 2;
+          const y = rect.bottom + 12;
+          showContextMenu(taskEl, x, y, mode, { touch: true, preferBottom: true, anchorRect });
+        }, longPressDelay)
+      };
+    }, true);
+
+    document.addEventListener('pointermove', function(e){
+      if (!quickEditPress || quickEditPress.pointerId !== e.pointerId) return;
+      const dx = e.clientX - quickEditPress.startX;
+      const dy = e.clientY - quickEditPress.startY;
+      if (Math.hypot(dx, dy) > moveTolerance) {
+        cancelQuickEditPress(e.pointerId);
+      }
+    }, true);
+
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => {
+      document.addEventListener(type, function(e){
+        if (!quickEditPress || quickEditPress.pointerId !== e.pointerId) return;
+        const triggered = quickEditPress.triggered;
+        cancelQuickEditPress(e.pointerId);
+        if (triggered) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
+    });
+
     document.addEventListener('click', function(e){
       const quickTarget = e.target.closest('.due-date-badge, .priority-text');
       if (!quickTarget) return;
-      if (!isTouchQuickMode()) return;
+      if (isTouchQuickMode()) return;
 
       const taskEl = e.target.closest('.task-row');
       if (!taskEl) return;
