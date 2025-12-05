@@ -34,7 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <style>
         .task-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 240px;
+            grid-template-columns: minmax(0, 1fr) 300px;
             align-items: center;
             padding: 0.75rem 1rem;
             column-gap: 1rem;
@@ -49,15 +49,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             column-gap: 0.5rem;
             align-items: center;
             justify-items: center;
+            justify-content: end;
         }
         .due-date-badge {
-            width: auto;
-            min-width: 0;
+            width: 100%;
             text-align: center;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            justify-self: start;
         }
         .priority-text { width: 100%; text-align: center; }
         .star-toggle {
