@@ -110,7 +110,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             display: grid;
             border: 1px solid #ced4da;
             border-radius: 0.375rem;
-            background-color: #f8f9fa;
+            background-color: #ffffff;
             font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
             cursor: text;
         }
@@ -158,10 +158,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
             line-height: inherit;
         }
         .prism-editor .code-line-task {
-            color: #0a2a66;
+            color: #1d4ed8;
         }
         .prism-editor .code-line-note {
-            color: #0f3d2e;
+            color: #1e7a3e;
         }
         .prism-editor .code-line-milestone {
             color: #800000;
