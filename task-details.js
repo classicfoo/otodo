@@ -108,12 +108,20 @@
         const caret = textarea.selectionStart;
         const value = textarea.value || '';
         const lineStart = value.lastIndexOf('\n', caret - 1) + 1;
+        const lineEnd = value.indexOf('\n', lineStart);
+        const endIndex = lineEnd === -1 ? value.length : lineEnd;
+        let firstVisible = lineStart;
+        while (firstVisible < endIndex && (value[firstVisible] === ' ' || value[firstVisible] === '\t')) {
+          firstVisible += 1;
+        }
+        const target = caret !== firstVisible ? firstVisible : lineStart;
+
         if (e.shiftKey) {
-          const focus = textarea.selectionEnd;
-          textarea.selectionStart = lineStart;
-          textarea.selectionEnd = focus;
+          const anchor = textarea.selectionEnd;
+          textarea.selectionStart = Math.min(anchor, target);
+          textarea.selectionEnd = Math.max(anchor, target);
         } else {
-          textarea.selectionStart = textarea.selectionEnd = lineStart;
+          textarea.selectionStart = textarea.selectionEnd = target;
         }
       } else if (e.key === ' ') {
         const start = textarea.selectionStart;

@@ -61,7 +61,7 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
-  test('home key jumps to start of the current line', () => {
+  test('home key jumps to start of visible text first', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
     const hidden = document.getElementById('detailsField');
@@ -74,25 +74,49 @@ describe('task details editor behaviors', () => {
     const event = new KeyboardEvent('keydown', { key: 'Home', bubbles: true });
     textarea.dispatchEvent(event);
 
-    expect(textarea.selectionStart).toBe(0);
-    expect(textarea.selectionEnd).toBe(0);
+    expect(textarea.selectionStart).toBe(4);
+    expect(textarea.selectionEnd).toBe(4);
     expect(saveSpy).not.toHaveBeenCalled();
   });
 
-  test('shift+home selects back to the start of the line', () => {
+  test('shift+home selects back to the start of visible text first', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
     const hidden = document.getElementById('detailsField');
     initTaskDetailsEditor(details, hidden, jest.fn());
 
-    textarea.value = 'abcd efgh';
-    textarea.selectionStart = textarea.selectionEnd = 7;
+    textarea.value = '\t  abcd efgh';
+    textarea.selectionStart = textarea.selectionEnd = 11;
 
     const event = new KeyboardEvent('keydown', { key: 'Home', shiftKey: true, bubbles: true });
     textarea.dispatchEvent(event);
 
+    expect(textarea.selectionStart).toBe(3);
+    expect(textarea.selectionEnd).toBe(11);
+  });
+
+  test('home toggles between visible text start and line start', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = '    abcd';
+    textarea.selectionStart = textarea.selectionEnd = 4;
+
+    const firstPress = new KeyboardEvent('keydown', { key: 'Home', bubbles: true });
+    textarea.dispatchEvent(firstPress);
+
     expect(textarea.selectionStart).toBe(0);
-    expect(textarea.selectionEnd).toBe(7);
+    expect(textarea.selectionEnd).toBe(0);
+
+    textarea.selectionStart = textarea.selectionEnd = 0;
+
+    const secondPress = new KeyboardEvent('keydown', { key: 'Home', bubbles: true });
+    textarea.dispatchEvent(secondPress);
+
+    expect(textarea.selectionStart).toBe(4);
+    expect(textarea.selectionEnd).toBe(4);
   });
 
   test('enter key preserves indentation on new line', () => {
