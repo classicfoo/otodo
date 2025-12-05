@@ -135,7 +135,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             outline: 2px solid #0a2a66;
             outline-offset: 2px;
         }
-        .search-toggle svg { width: 1.35rem; height: 1.35rem; display: block; transform: translateX(0.1rem); }
+        .search-toggle svg { width: 1.6rem; height: 1.6rem; display: block; transform: translateX(0.1rem); flex-shrink: 0; }
+        .search-toggle svg path { fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
         .search-input {
             flex: 1 1 auto;
             border: 0;
@@ -205,7 +206,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <div class="task-search" id="task-search" aria-expanded="false">
                 <button class="search-toggle" type="button" id="task-search-toggle" aria-label="Search tasks">
                     <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                        <path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14z" />
+                        <path d="m15.75 15.75 4.25 4.25" />
                     </svg>
                 </button>
                 <input type="text" id="task-search-input" class="search-input" placeholder="Search tasks…" aria-label="Search tasks" tabindex="-1" inputmode="search">
