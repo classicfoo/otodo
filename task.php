@@ -105,10 +105,21 @@ $details_color_attr = htmlspecialchars($details_color);
             color: var(--bs-danger-text-emphasis) !important;
 
         }
-        #prioritySelect:hover,
-        #prioritySelect:focus {
-            background-color: inherit !important;
-            color: inherit !important;
+        #prioritySelect.bg-secondary-subtle:focus {
+            background-color: var(--bs-secondary-bg-subtle) !important;
+            color: var(--bs-secondary-text-emphasis) !important;
+        }
+        #prioritySelect.bg-success-subtle:focus {
+            background-color: var(--bs-success-bg-subtle) !important;
+            color: var(--bs-success-text-emphasis) !important;
+        }
+        #prioritySelect.bg-warning-subtle:focus {
+            background-color: var(--bs-warning-bg-subtle) !important;
+            color: var(--bs-warning-text-emphasis) !important;
+        }
+        #prioritySelect.bg-danger-subtle:focus {
+            background-color: var(--bs-danger-bg-subtle) !important;
+            color: var(--bs-danger-text-emphasis) !important;
         }
         .prism-editor {
             position: relative;
@@ -277,15 +288,27 @@ $details_color_attr = htmlspecialchars($details_color);
 (function(){
   const select = document.querySelector('select[name="priority"]');
   const badge = document.getElementById('priorityBadge');
-  if (select && badge) {
+  if (select) {
     const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
     const classes = {0: 'bg-secondary-subtle text-secondary', 1: 'bg-success-subtle text-success', 2: 'bg-warning-subtle text-warning', 3: 'bg-danger-subtle text-danger'};
-    function updateBadge() {
+    const focusColors = {
+      0: 'var(--bs-secondary-text-emphasis)',
+      1: 'var(--bs-success-text-emphasis)',
+      2: 'var(--bs-warning-text-emphasis)',
+      3: 'var(--bs-danger-text-emphasis)'
+    };
+    function applyPriorityStyles() {
       const val = parseInt(select.value, 10);
-      badge.textContent = labels[val] || 'None';
-      badge.className = 'badge ' + (classes[val] || classes[0]);
+      select.className = 'form-select ' + (classes[val] || classes[0]);
+      const focusColor = focusColors[val] || focusColors[0];
+      select.style.setProperty('color', focusColor);
+      if (badge) {
+        badge.textContent = labels[val] || 'None';
+        badge.className = 'badge ' + (classes[val] || classes[0]);
+      }
     }
-    select.addEventListener('change', updateBadge);
+    applyPriorityStyles();
+    select.addEventListener('change', applyPriorityStyles);
   }
 
   const backLink = document.getElementById('backToList');
