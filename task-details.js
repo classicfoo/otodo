@@ -33,6 +33,10 @@
         classes.push('code-line-note');
       } else if (trimmed.startsWith('M ')) {
         classes.push('code-line-milestone');
+      } else if (trimmed.startsWith('# ')) {
+        classes.push('code-line-heading');
+      } else if (trimmed.startsWith('X ')) {
+        classes.push('code-line-done');
       }
       const content = line === '' ? '&#8203;' : line;
       return '<div class="' + classes.join(' ') + '">' + content + '</div>';

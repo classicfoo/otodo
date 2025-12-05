@@ -166,6 +166,12 @@ if ($p < 0 || $p > 3) { $p = 0; }
         .prism-editor .code-line-milestone {
             color: #800000;
         }
+        .prism-editor .code-line-heading {
+            font-weight: 700;
+        }
+        .prism-editor .code-line-done {
+            color: #6c757d;
+        }
         .prism-editor .token.tag,
         .prism-editor .token.tag-name {
             color: #d63384;
