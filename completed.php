@@ -34,6 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <title>Completed Tasks</title>
     <style>
         .empty-state { color: #6c757d; }
+        .navbar-toggler { border: 1px solid #e9ecef; }
     </style>
     </head>
 <body class="bg-light">
