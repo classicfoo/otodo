@@ -199,18 +199,21 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             .task-row {
                 grid-template-columns: minmax(0, 1fr) auto;
                 column-gap: 0.5rem;
+                padding-right: 0.5rem;
             }
             .task-meta {
                 justify-content: flex-end;
-                gap: 0.25rem;
+                gap: 0.15rem;
             }
             .due-date-badge, .priority-text { width: auto; }
             .due-date-badge {
-                min-width: 60px;
-                padding-left: 0.35rem;
-                padding-right: 0.35rem;
+                min-width: 56px;
+                padding-left: 0.3rem;
+                padding-right: 0.3rem;
             }
-            .priority-text { min-width: 48px; }
+            .priority-text { min-width: 44px; }
+            .star-toggle { min-width: 40px; }
+            .task-star { padding: 0.15rem 0.35rem; }
             .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
