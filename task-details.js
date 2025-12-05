@@ -103,6 +103,26 @@
         insertAtSelection('\t');
         syncDetails();
         queueSave();
+      } else if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const caret = textarea.selectionStart;
+        const value = textarea.value || '';
+        const lineStart = value.lastIndexOf('\n', caret - 1) + 1;
+        const lineEnd = value.indexOf('\n', lineStart);
+        const endIndex = lineEnd === -1 ? value.length : lineEnd;
+        let firstVisible = lineStart;
+        while (firstVisible < endIndex && (value[firstVisible] === ' ' || value[firstVisible] === '\t')) {
+          firstVisible += 1;
+        }
+        const target = caret !== firstVisible ? firstVisible : lineStart;
+
+        if (e.shiftKey) {
+          const anchor = textarea.selectionEnd;
+          textarea.selectionStart = Math.min(anchor, target);
+          textarea.selectionEnd = Math.max(anchor, target);
+        } else {
+          textarea.selectionStart = textarea.selectionEnd = target;
+        }
       } else if (e.key === ' ') {
         const start = textarea.selectionStart;
         if (start > 0 && textarea.selectionStart === textarea.selectionEnd && textarea.value[start - 1] === ' ') {
