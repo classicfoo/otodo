@@ -44,23 +44,23 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             word-break: break-word;
         }
         .task-meta {
-            display: grid;
-            grid-template-columns: minmax(120px, 1fr) minmax(80px, auto) 52px;
-            column-gap: 0.5rem;
+            display: inline-flex;
             align-items: center;
-            justify-items: center;
-            justify-content: end;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            width: 100%;
         }
         .due-date-badge {
-            width: 100%;
             text-align: center;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            min-width: 80px;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
         }
-        .priority-text { width: 100%; text-align: center; }
+        .priority-text { text-align: center; min-width: 70px; }
         .star-toggle {
-            width: 100%;
             min-width: 44px;
             display: inline-flex;
             justify-content: center;
@@ -200,11 +200,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 column-gap: 0.5rem;
             }
             .task-meta {
-                grid-template-columns: minmax(90px, 1fr) minmax(70px, auto) 48px;
-                justify-content: end;
-                justify-items: end;
+                justify-content: flex-end;
             }
-            .due-date-badge, .priority-text { width: auto; min-width: 0; }
+            .due-date-badge, .priority-text { width: auto; }
             .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
