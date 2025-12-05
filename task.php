@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'line_rules.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -67,6 +68,10 @@ $priority_classes = [
 ];
 $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
+$line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
+$details_color = normalize_editor_color($_SESSION['details_color'] ?? '#212529');
+$line_rules_json = htmlspecialchars(json_encode($line_rules));
+$details_color_attr = htmlspecialchars($details_color);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -132,7 +137,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             padding: 0.75rem;
             background: transparent;
             color: transparent;
-            caret-color: var(--bs-body-color);
+            caret-color: var(--details-text-color, var(--bs-body-color));
             overflow: hidden;
             white-space: pre-wrap;
             overflow-wrap: break-word;
@@ -152,7 +157,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         .prism-editor__preview code {
             display: block;
-            color: #212529;
+            color: var(--details-text-color, #212529);
             line-height: inherit;
         }
         .prism-editor .code-line {
@@ -251,7 +256,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html">
+            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
                 <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
                 <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
             </div>
@@ -316,7 +321,19 @@ if ($p < 0 || $p > 3) { $p = 0; }
   const details = document.getElementById('detailsInput');
   const detailsField = document.getElementById('detailsField');
   if (details && detailsField && window.initTaskDetailsEditor) {
-    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave);
+    let rules = [];
+    try {
+      rules = JSON.parse(details.dataset.lineRules || '[]');
+      if (!Array.isArray(rules)) {
+        rules = [];
+      }
+    } catch (err) {
+      rules = [];
+    }
+    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
+      lineRules: rules,
+      textColor: details.dataset.textColor
+    });
     if (editor && typeof editor.updateDetails === 'function') {
       updateDetails = editor.updateDetails;
     }

@@ -213,4 +213,24 @@ describe('task details editor behaviors', () => {
     expect(hidden.value).toBe('start paste');
     expect(saveSpy).toHaveBeenCalled();
   });
+
+  test('custom rules and text color settings are applied', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const rules = [{ prefix: '!', label: 'Important', color: '#FF0000', className: 'custom-important', weight: '700' }];
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn(), {
+      lineRules: rules,
+      textColor: '#123456'
+    });
+
+    textarea.value = '! urgent note';
+    editor.updateDetails();
+
+    const previewLine = details.querySelector('.code-line');
+    expect(previewLine.classList.contains('custom-important')).toBe(true);
+    expect(previewLine.style.getPropertyValue('color')).toBe('rgb(255, 0, 0)');
+    expect(previewLine.style.getPropertyValue('font-weight')).toBe('700');
+    expect(details.style.getPropertyValue('--details-text-color')).toBe('#123456');
+  });
 });

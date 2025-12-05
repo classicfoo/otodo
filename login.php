@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'line_rules.php';
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -13,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields';
     } else {
-        $stmt = get_db()->prepare('SELECT id, password, location, default_priority FROM users WHERE username = :username');
+        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user && password_verify($password, $user['password'])) {
@@ -21,6 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['username'] = $username;
             $_SESSION['location'] = $user['location'] ?? 'UTC';
             $_SESSION['default_priority'] = (int)($user['default_priority'] ?? 0);
+            $_SESSION['line_rules'] = decode_line_rules_from_storage($user['line_rules'] ?? '');
+            $_SESSION['details_color'] = normalize_editor_color($user['details_color'] ?? '#212529');
             header('Location: index.php');
             exit();
         } else {

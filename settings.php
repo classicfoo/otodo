@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'line_rules.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -12,6 +13,8 @@ $error = '';
 $username = $_SESSION['username'] ?? '';
 $location = $_SESSION['location'] ?? '';
 $default_priority = (int)($_SESSION['default_priority'] ?? 0);
+$details_color = $_SESSION['details_color'] ?? '#212529';
+$line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,32 +26,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $default_priority = 0;
     }
 
+    $line_rules_json = $_POST['line_rules_json'] ?? '[]';
+    $decoded_rules = json_decode($line_rules_json, true);
+    $line_rules = sanitize_line_rules($decoded_rules);
+    if (empty($line_rules)) {
+        $line_rules = get_default_line_rules();
+    }
+    $details_color = normalize_editor_color($_POST['details_color'] ?? $details_color);
+
     if ($username === '') {
         $error = 'Username cannot be empty';
     } else {
         try {
             if ($password !== '') {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':password' => $hash,
                     ':loc' => $location !== '' ? $location : null,
                     ':pri' => $default_priority,
+                    ':rules' => encode_line_rules_for_storage($line_rules),
+                    ':color' => $details_color,
                     ':id' => $_SESSION['user_id'],
                 ]);
             } else {
-                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':loc' => $location !== '' ? $location : null,
                     ':pri' => $default_priority,
+                    ':rules' => encode_line_rules_for_storage($line_rules),
+                    ':color' => $details_color,
                     ':id' => $_SESSION['user_id'],
                 ]);
             }
             $_SESSION['username'] = $username;
             $_SESSION['location'] = $location !== '' ? $location : 'UTC';
             $_SESSION['default_priority'] = $default_priority;
+            $_SESSION['line_rules'] = $line_rules;
+            $_SESSION['details_color'] = $details_color;
             $message = 'Settings saved';
         } catch (PDOException $e) {
             $error = 'Username already taken';
@@ -125,6 +142,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <option value="0" <?php if ($default_priority == 0) echo 'selected'; ?>>None</option>
             </select>
         </div>
+        <div class="mb-3">
+            <label class="form-label" for="details_color">Task description text color</label>
+            <input type="color" name="details_color" id="details_color" class="form-control form-control-color" value="<?=htmlspecialchars($details_color ?? '#212529')?>" title="Pick a color for the task description editor">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Custom line rules</label>
+            <p class="text-muted small">Define how lines starting with specific prefixes should be highlighted in the task description editor.</p>
+            <div id="lineRulesContainer" class="d-flex flex-column gap-2"></div>
+            <div class="mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="addRuleBtn">Add rule</button>
+            </div>
+            <input type="hidden" name="line_rules_json" id="line_rules_json" value="<?=htmlspecialchars(json_encode($line_rules))?>">
+        </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
@@ -145,6 +175,110 @@ detectBtn.addEventListener('click', setBrowserTz);
 if (!input.value) {
     setBrowserTz();
 }
+
+const lineRulesContainer = document.getElementById('lineRulesContainer');
+const addRuleBtn = document.getElementById('addRuleBtn');
+const lineRulesInput = document.getElementById('line_rules_json');
+
+function readRules() {
+    try {
+        const parsed = JSON.parse(lineRulesInput.value || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+function writeRules(rules) {
+    lineRulesInput.value = JSON.stringify(rules);
+}
+
+function buildRuleRow(rule, idx) {
+    const row = document.createElement('div');
+    row.className = 'border rounded p-2 d-flex flex-column flex-md-row gap-2 align-items-md-center';
+
+    const persistentClassName = rule.className || '';
+    const persistentWeight = rule.weight || '';
+
+    const prefix = document.createElement('input');
+    prefix.type = 'text';
+    prefix.className = 'form-control';
+    prefix.placeholder = 'Prefix (e.g. T )';
+    prefix.value = rule.prefix || '';
+    prefix.setAttribute('aria-label', 'Line prefix');
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'form-control';
+    label.placeholder = 'Label (optional)';
+    label.value = rule.label || '';
+    label.setAttribute('aria-label', 'Rule label');
+
+    const color = document.createElement('input');
+    color.type = 'color';
+    color.className = 'form-control form-control-color';
+    color.value = rule.color || '#1D4ED8';
+    color.setAttribute('aria-label', 'Rule color');
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-outline-danger btn-sm';
+    removeBtn.textContent = 'Remove';
+
+    function updateRule() {
+        const rules = readRules();
+        const nextRule = {
+            prefix: prefix.value,
+            label: label.value,
+            color: color.value
+        };
+        if (persistentClassName) {
+            nextRule.className = persistentClassName;
+        }
+        if (persistentWeight) {
+            nextRule.weight = persistentWeight;
+        }
+        rules[idx] = nextRule;
+        writeRules(rules);
+    }
+
+    prefix.addEventListener('input', updateRule);
+    label.addEventListener('input', updateRule);
+    color.addEventListener('input', updateRule);
+    removeBtn.addEventListener('click', function() {
+        const rules = readRules();
+        rules.splice(idx, 1);
+        writeRules(rules);
+        renderRules();
+    });
+
+    const rowTop = document.createElement('div');
+    rowTop.className = 'd-flex flex-column flex-md-row gap-2 flex-grow-1';
+    rowTop.append(prefix, label, color);
+    row.append(rowTop, removeBtn);
+    return row;
+}
+
+function renderRules() {
+    const rules = readRules();
+    if (!rules.length) {
+        rules.push({ prefix: 'T ', label: 'Task', color: '#1D4ED8', className: 'code-line-task' });
+        writeRules(rules);
+    }
+    lineRulesContainer.innerHTML = '';
+    rules.forEach(function(rule, idx) {
+        lineRulesContainer.appendChild(buildRuleRow(rule, idx));
+    });
+}
+
+addRuleBtn.addEventListener('click', function() {
+    const rules = readRules();
+    rules.push({ prefix: '', label: '', color: '#1D4ED8' });
+    writeRules(rules);
+    renderRules();
+});
+
+renderRules();
 </script>
 </body>
 </html>
