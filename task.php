@@ -105,10 +105,21 @@ $details_color_attr = htmlspecialchars($details_color);
             color: var(--bs-danger-text-emphasis) !important;
 
         }
-        #prioritySelect:hover,
-        #prioritySelect:focus {
-            background-color: inherit !important;
-            color: inherit !important;
+        #prioritySelect.bg-secondary-subtle:focus {
+            background-color: var(--bs-secondary-bg-subtle) !important;
+            color: var(--bs-secondary-text-emphasis) !important;
+        }
+        #prioritySelect.bg-success-subtle:focus {
+            background-color: var(--bs-success-bg-subtle) !important;
+            color: var(--bs-success-text-emphasis) !important;
+        }
+        #prioritySelect.bg-warning-subtle:focus {
+            background-color: var(--bs-warning-bg-subtle) !important;
+            color: var(--bs-warning-text-emphasis) !important;
+        }
+        #prioritySelect.bg-danger-subtle:focus {
+            background-color: var(--bs-danger-bg-subtle) !important;
+            color: var(--bs-danger-text-emphasis) !important;
         }
         .prism-editor {
             position: relative;
