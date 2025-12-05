@@ -288,15 +288,19 @@ $details_color_attr = htmlspecialchars($details_color);
 (function(){
   const select = document.querySelector('select[name="priority"]');
   const badge = document.getElementById('priorityBadge');
-  if (select && badge) {
+  if (select) {
     const labels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
     const classes = {0: 'bg-secondary-subtle text-secondary', 1: 'bg-success-subtle text-success', 2: 'bg-warning-subtle text-warning', 3: 'bg-danger-subtle text-danger'};
-    function updateBadge() {
+    function applyPriorityStyles() {
       const val = parseInt(select.value, 10);
-      badge.textContent = labels[val] || 'None';
-      badge.className = 'badge ' + (classes[val] || classes[0]);
+      select.className = 'form-select ' + (classes[val] || classes[0]);
+      if (badge) {
+        badge.textContent = labels[val] || 'None';
+        badge.className = 'badge ' + (classes[val] || classes[0]);
+      }
     }
-    select.addEventListener('change', updateBadge);
+    applyPriorityStyles();
+    select.addEventListener('change', applyPriorityStyles);
   }
 
   const backLink = document.getElementById('backToList');
