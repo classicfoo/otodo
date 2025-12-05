@@ -202,11 +202,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             }
             .task-meta {
                 justify-content: flex-end;
-                gap: 0.4rem;
+                gap: 0.25rem;
             }
             .due-date-badge, .priority-text { width: auto; }
-            .due-date-badge { min-width: 64px; }
-            .priority-text { min-width: 52px; }
+            .due-date-badge {
+                min-width: 60px;
+                padding-left: 0.35rem;
+                padding-right: 0.35rem;
+            }
+            .priority-text { min-width: 48px; }
             .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
