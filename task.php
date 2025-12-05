@@ -158,10 +158,13 @@ if ($p < 0 || $p > 3) { $p = 0; }
             line-height: inherit;
         }
         .prism-editor .code-line-task {
-            color: #0d6efd;
+            color: #0a2a66;
         }
         .prism-editor .code-line-note {
-            color: #198754;
+            color: #0f3d2e;
+        }
+        .prism-editor .code-line-milestone {
+            color: #800000;
         }
         .prism-editor .token.tag,
         .prism-editor .token.tag-name {

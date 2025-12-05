@@ -26,10 +26,13 @@
     return highlightedLines.map(function(line, index) {
       const raw = rawLines[index] || '';
       const classes = ['code-line'];
-      if (raw.startsWith('T ')) {
+      const trimmed = raw.replace(/^[\t ]+/, '');
+      if (trimmed.startsWith('T ')) {
         classes.push('code-line-task');
-      } else if (raw.startsWith('N ')) {
+      } else if (trimmed.startsWith('N ')) {
         classes.push('code-line-note');
+      } else if (trimmed.startsWith('M ')) {
+        classes.push('code-line-milestone');
       }
       const content = line === '' ? '&#8203;' : line;
       return '<div class="' + classes.join(' ') + '">' + content + '</div>';

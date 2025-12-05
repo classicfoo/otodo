@@ -95,6 +95,24 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).not.toContain('</div>\n<div');
   });
 
+  test('line coloring ignores leading whitespace and supports milestone lines', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = '  T first task\n\tN note line\n    M milestone\nplain';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    const lines = Array.from(preview.querySelectorAll('.code-line'));
+
+    expect(lines[0].classList.contains('code-line-task')).toBe(true);
+    expect(lines[1].classList.contains('code-line-note')).toBe(true);
+    expect(lines[2].classList.contains('code-line-milestone')).toBe(true);
+    expect(lines[3].classList.length).toBe(1);
+  });
+
   test('syncing details does not force inline heights', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
