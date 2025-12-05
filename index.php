@@ -65,12 +65,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             min-width: 44px;
             display: inline-flex;
             justify-content: center;
+            margin: 0;
         }
         .task-star {
             border: none;
             border-radius: 4px;
             padding: 0.2rem 0.6rem;
             background: transparent;
+            margin: 0;
             cursor: pointer;
         }
         .task-star:focus-visible { outline: 2px solid #0a2a66; outline-offset: 2px; }
