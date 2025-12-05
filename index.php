@@ -45,12 +45,20 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .task-meta {
             display: grid;
-            grid-template-columns: minmax(120px, 1fr) minmax(80px, auto) 52px;
+            grid-template-columns: max-content minmax(80px, max-content) 52px;
             column-gap: 0.5rem;
             align-items: center;
             justify-items: center;
         }
-        .due-date-badge { width: 100%; text-align: center; }
+        .due-date-badge {
+            width: auto;
+            min-width: 0;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            justify-self: start;
+        }
         .priority-text {
             width: fit-content;
             max-width: 100%;
@@ -205,7 +213,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 column-gap: 0.5rem;
             }
             .task-meta {
-                grid-template-columns: minmax(90px, 1fr) max-content 48px;
+                grid-template-columns: max-content max-content 48px;
                 justify-content: end;
                 justify-items: end;
             }
