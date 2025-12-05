@@ -61,6 +61,40 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('home key jumps to start of the current line', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    textarea.value = '    spaced line';
+    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+    const event = new KeyboardEvent('keydown', { key: 'Home', bubbles: true });
+    textarea.dispatchEvent(event);
+
+    expect(textarea.selectionStart).toBe(0);
+    expect(textarea.selectionEnd).toBe(0);
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
+  test('shift+home selects back to the start of the line', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'abcd efgh';
+    textarea.selectionStart = textarea.selectionEnd = 7;
+
+    const event = new KeyboardEvent('keydown', { key: 'Home', shiftKey: true, bubbles: true });
+    textarea.dispatchEvent(event);
+
+    expect(textarea.selectionStart).toBe(0);
+    expect(textarea.selectionEnd).toBe(7);
+  });
+
   test('enter key preserves indentation on new line', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

@@ -103,6 +103,18 @@
         insertAtSelection('\t');
         syncDetails();
         queueSave();
+      } else if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const caret = textarea.selectionStart;
+        const value = textarea.value || '';
+        const lineStart = value.lastIndexOf('\n', caret - 1) + 1;
+        if (e.shiftKey) {
+          const focus = textarea.selectionEnd;
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = focus;
+        } else {
+          textarea.selectionStart = textarea.selectionEnd = lineStart;
+        }
       } else if (e.key === ' ') {
         const start = textarea.selectionStart;
         if (start > 0 && textarea.selectionStart === textarea.selectionEnd && textarea.value[start - 1] === ' ') {
