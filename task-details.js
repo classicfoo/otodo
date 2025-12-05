@@ -3,93 +3,128 @@
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-  function insertTextAtSelection(text) {
-    if (!text) return;
-    if (typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, text);
-      return;
-    }
-    const sel = window.getSelection && window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    const textNode = document.createTextNode(text);
-    range.insertNode(textNode);
-    range.setStart(textNode, textNode.length);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
+  function escapeHtml(text = '') {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function highlightHtml(text = '') {
+    const escaped = escapeHtml(text);
+    return escaped.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
+      const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
+      return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
+    });
+  }
+
+  function wrapLinesWithColors(highlightedHtml, rawText) {
+    const highlightedLines = highlightedHtml.split('\n');
+    const rawLines = rawText.split('\n');
+
+    return highlightedLines.map(function(line, index) {
+      const raw = rawLines[index] || '';
+      const classes = ['code-line'];
+      if (raw.startsWith('T ')) {
+        classes.push('code-line-task');
+      } else if (raw.startsWith('N ')) {
+        classes.push('code-line-note');
+      }
+      const content = line === '' ? '&#8203;' : line;
+      return '<div class="' + classes.join(' ') + '">' + content + '</div>';
+    }).join('\n');
   }
 
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
     if (!details || !detailsField) {
-      return { updateDetails: function() {} };
+      return { updateDetails: function() { return ''; } };
+    }
+
+    const textarea = details.querySelector('textarea');
+    const preview = details.querySelector('code');
+    if (!textarea || !preview) {
+      return { updateDetails: function() { return ''; } };
     }
 
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
 
-    const updateDetails = function() {
-      const source = details.textContent !== undefined ? details.textContent : details.innerText;
-      const text = normalizeNewlines(source || '');
-      detailsField.value = text;
-      return text;
-    };
+    function renderPreview(text) {
+      const highlighted = highlightHtml(text);
+      preview.innerHTML = wrapLinesWithColors(highlighted, text);
+    }
 
-    details.addEventListener('input', function() {
-      updateDetails();
+    function resizeTextarea() {
+      textarea.style.height = 'auto';
+      const previewHeight = details.querySelector('.prism-editor__preview');
+      const desired = previewHeight ? previewHeight.scrollHeight : textarea.scrollHeight;
+      textarea.style.height = desired + 'px';
+    }
+
+    function syncDetails() {
+      const text = normalizeNewlines(textarea.value || '');
+      detailsField.value = text;
+      renderPreview(text);
+      resizeTextarea();
+      return text;
+    }
+
+    function insertAtSelection(text) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value || '';
+      const nextValue = value.slice(0, start) + text + value.slice(end);
+      textarea.value = nextValue;
+      const nextPos = start + text.length;
+      textarea.selectionStart = textarea.selectionEnd = nextPos;
+      return nextValue;
+    }
+
+    textarea.addEventListener('input', function() {
+      syncDetails();
       queueSave();
     });
 
-    details.addEventListener('paste', function(e) {
+    textarea.addEventListener('paste', function(e) {
       e.preventDefault();
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-      insertTextAtSelection(text);
-      updateDetails();
+      insertAtSelection(text);
+      syncDetails();
       queueSave();
     });
 
-    details.addEventListener('keydown', function(e) {
+    textarea.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
-        insertTextAtSelection('\t');
-        updateDetails();
+        insertAtSelection('\t');
+        syncDetails();
         queueSave();
       } else if (e.key === ' ') {
-        const sel = window.getSelection ? window.getSelection() : null;
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const node = range.startContainer;
-          const offset = range.startOffset;
-          if (node.nodeType === Node.TEXT_NODE && offset > 0 && node.textContent[offset - 1] === ' ') {
-            e.preventDefault();
-            range.setStart(node, offset - 1);
-            range.deleteContents();
-            insertTextAtSelection('\t');
-            updateDetails();
-            queueSave();
-          }
+        const start = textarea.selectionStart;
+        if (start > 0 && textarea.selectionStart === textarea.selectionEnd && textarea.value[start - 1] === ' ') {
+          e.preventDefault();
+          textarea.selectionStart = start - 1;
+          textarea.selectionEnd = start;
+          insertAtSelection('\t');
+          syncDetails();
+          queueSave();
         }
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const sel = window.getSelection ? window.getSelection() : null;
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const preRange = range.cloneRange();
-          preRange.setStart(details, 0);
-          const textBefore = preRange.toString();
-          const lineStart = textBefore.lastIndexOf('\n') + 1;
-          const currentLine = textBefore.slice(lineStart);
-          const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-          insertTextAtSelection('\n' + leading);
-          updateDetails();
-          queueSave();
-        }
+        const start = textarea.selectionStart;
+        const value = textarea.value || '';
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const currentLine = value.slice(lineStart, start);
+        const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
+        insertAtSelection('\n' + leading);
+        syncDetails();
+        queueSave();
       }
     });
 
-    updateDetails();
+    syncDetails();
 
-    return { updateDetails: updateDetails };
+    return { updateDetails: syncDetails };
   }
 
   const api = { initTaskDetailsEditor: initTaskDetailsEditor, normalizeNewlines: normalizeNewlines };

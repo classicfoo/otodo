@@ -105,13 +105,69 @@ if ($p < 0 || $p > 3) { $p = 0; }
             background-color: inherit !important;
             color: inherit !important;
         }
-        #detailsInput {
-            white-space: pre-wrap;
+        .prism-editor {
+            position: relative;
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            background-color: #f8f9fa;
+            min-height: 16rem;
+            font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
-        @media (min-width: 992px) {
-            #detailsInput {
-                min-height: 30rem;
-            }
+        .prism-editor__textarea,
+        .prism-editor__preview {
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            tab-size: 4;
+        }
+        .prism-editor__textarea {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            resize: none;
+            border: none;
+            padding: 0.75rem;
+            background: transparent;
+            color: transparent;
+            caret-color: var(--bs-body-color);
+            overflow: auto;
+            white-space: pre;
+            outline: none;
+            z-index: 1;
+        }
+        .prism-editor__preview {
+            position: relative;
+            margin: 0;
+            pointer-events: none;
+            white-space: pre;
+            overflow: auto;
+            padding: 0.75rem;
+            min-height: 100%;
+            z-index: 0;
+        }
+        .prism-editor__preview code {
+            display: block;
+            color: #212529;
+        }
+        .prism-editor .code-line {
+            display: block;
+        }
+        .prism-editor .code-line-task {
+            color: #0d6efd;
+        }
+        .prism-editor .code-line-note {
+            color: #198754;
+        }
+        .prism-editor .token.tag,
+        .prism-editor .token.tag-name {
+            color: #d63384;
+        }
+        .prism-editor .token.attr-name {
+            color: #6f42c1;
+        }
+        .prism-editor .token.attr-value {
+            color: #0d6efd;
         }
     </style>
     <title>Task Details</title>
@@ -180,7 +236,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
+            <div id="detailsInput" class="prism-editor" data-language="html">
+                <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+            </div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
