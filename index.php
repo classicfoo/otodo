@@ -135,7 +135,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             outline: 2px solid #0a2a66;
             outline-offset: 2px;
         }
-        .search-toggle svg { width: 1rem; height: 1rem; }
+        .search-toggle svg { width: 1.1rem; height: 1.1rem; display: block; }
         .search-input {
             flex: 1 1 auto;
             border: 0;
