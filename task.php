@@ -111,14 +111,14 @@ if ($p < 0 || $p > 3) { $p = 0; }
             border: 1px solid #ced4da;
             border-radius: 0.375rem;
             background-color: #ffffff;
-            font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-family: monospace;
             cursor: text;
         }
         .prism-editor__textarea,
         .prism-editor__preview {
             grid-area: 1 / 1 / 2 / 2;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             line-height: 1.5;
             tab-size: 4;
         }
