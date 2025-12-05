@@ -273,28 +273,23 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 if ($p < 0 || $p > 3) { $p = 0; }
                 $rawDue = $task['due_date'] ?? '';
                 $due = $rawDue;
-                $dueShort = '';
                 $dueClass = 'bg-secondary-subtle text-secondary';
                 if ($due !== '') {
                     try {
                         $dueDate = new DateTime($due, $tzObj);
                         if ($dueDate < $today) {
                             $due = 'Overdue';
-                            $dueShort = 'Ovd';
                             $dueClass = 'bg-danger-subtle text-danger';
                         } else {
                             $dueFmt = $dueDate->format('Y-m-d');
                             if ($dueFmt === $todayFmt) {
                                 $due = 'Today';
-                                $dueShort = 'Tdy';
                                 $dueClass = 'bg-success-subtle text-success';
                             } elseif ($dueFmt === $tomorrowFmt) {
                                 $due = 'Tomorrow';
-                                $dueShort = 'Tmr';
                                 $dueClass = 'bg-primary-subtle text-primary';
                             } else {
                                 $due = 'Later';
-                                $dueShort = 'Ltr';
                                 $dueClass = 'bg-primary-subtle text-primary';
 
                             }
@@ -302,7 +297,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     } catch (Exception $e) {
                         // leave $due unchanged if parsing fails
                     }
-                    if ($dueShort === '') { $dueShort = $due; }
                 }
             ?>
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
@@ -310,8 +304,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>" aria-label="<?=htmlspecialchars($due)?>">
-                            <span class="d-none d-md-inline"><?=htmlspecialchars($due)?></span>
-                            <span class="d-inline d-md-none"><?=htmlspecialchars($dueShort)?></span>
+                            <?=htmlspecialchars($due)?>
                         </span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
@@ -719,7 +712,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
-  const dueLabelsShort = { 'Today': 'Tdy', 'Tomorrow': 'Tmr', 'Overdue': 'Ovd', 'Later': 'Ltr' };
 
   function renderDueBadge(badge, label, className = '') {
     if (!badge) return;
@@ -729,8 +721,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       badge.removeAttribute('aria-label');
       return;
     }
-    const shortLabel = dueLabelsShort[label] || label;
-    badge.innerHTML = `<span class="d-none d-md-inline">${label}</span><span class="d-inline d-md-none">${shortLabel}</span>`;
+    badge.textContent = label;
     badge.className = `badge due-date-badge ${className || ''}`.trim();
     badge.setAttribute('aria-label', label);
   }
