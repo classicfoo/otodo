@@ -26,6 +26,19 @@
     }
   }
 
+  function maybeUpdateAutosize(target) {
+    if (!target) return;
+    const autosizeFn = (typeof global !== 'undefined' ? global.autosize : null) || (typeof window !== 'undefined' ? window.autosize : null);
+    if (!autosizeFn) return;
+    if (typeof autosizeFn.update === 'function') {
+      autosizeFn.update(target);
+      return;
+    }
+    if (typeof autosizeFn === 'function') {
+      autosizeFn(target);
+    }
+  }
+
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
     if (!details) {
       return { updateDetails: function() {} };
@@ -38,6 +51,7 @@
       const source = getDetailsText(details);
       const text = normalizeNewlines(source || '');
       setDetailsText(targetField, text);
+      maybeUpdateAutosize(details);
       return text;
     };
 
@@ -45,6 +59,11 @@
       updateDetails();
       queueSave();
     });
+
+    const autosizeFn = (typeof global !== 'undefined' ? global.autosize : null) || (typeof window !== 'undefined' ? window.autosize : null);
+    if (autosizeFn && typeof autosizeFn === 'function') {
+      autosizeFn(details);
+    }
 
     details.addEventListener('keydown', function(event) {
       if (event.key !== 'Tab') return;
@@ -80,12 +99,13 @@
     return { updateDetails: updateDetails };
   }
 
-  const api = { initTaskDetailsEditor: initTaskDetailsEditor, normalizeNewlines: normalizeNewlines };
+  const api = { initTaskDetailsEditor: initTaskDetailsEditor, normalizeNewlines: normalizeNewlines, maybeUpdateAutosize: maybeUpdateAutosize };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }
   if (global) {
     global.initTaskDetailsEditor = initTaskDetailsEditor;
     global.normalizeDetailsNewlines = normalizeNewlines;
+    global.maybeUpdateDetailsAutosize = maybeUpdateAutosize;
   }
 })(typeof window !== 'undefined' ? window : globalThis);
