@@ -56,9 +56,18 @@
 
     function resizeTextarea() {
       textarea.style.height = 'auto';
-      const previewHeight = details.querySelector('.prism-editor__preview');
-      const desired = previewHeight ? previewHeight.scrollHeight : textarea.scrollHeight;
+      const previewWrapper = preview.parentElement;
+      const style = typeof getComputedStyle === 'function' ? getComputedStyle(textarea) : null;
+      const lineHeight = style && !Number.isNaN(parseFloat(style.lineHeight)) ? parseFloat(style.lineHeight) : 16;
+      const padding = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) : 0;
+      const minHeight = lineHeight + padding;
+      const measured = previewWrapper ? previewWrapper.scrollHeight : textarea.scrollHeight;
+      const desired = Math.max(measured, minHeight);
       textarea.style.height = desired + 'px';
+      if (previewWrapper) {
+        previewWrapper.style.height = desired + 'px';
+      }
+      details.style.height = desired + 'px';
     }
 
     function syncDetails() {

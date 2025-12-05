@@ -110,8 +110,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
             border: 1px solid #ced4da;
             border-radius: 0.375rem;
             background-color: #f8f9fa;
-            min-height: 16rem;
             font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            cursor: text;
         }
         .prism-editor__textarea,
         .prism-editor__preview {
@@ -135,6 +135,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             white-space: pre;
             outline: none;
             z-index: 1;
+            cursor: text;
         }
         .prism-editor__preview {
             position: relative;
@@ -143,7 +144,6 @@ if ($p < 0 || $p > 3) { $p = 0; }
             white-space: pre;
             overflow: auto;
             padding: 0.75rem;
-            min-height: 100%;
             z-index: 0;
         }
         .prism-editor__preview code {
