@@ -51,7 +51,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             justify-items: center;
         }
         .due-date-badge { width: 100%; text-align: center; }
-        .priority-text { width: 100%; text-align: center; }
+        .priority-text {
+            width: auto;
+            min-width: 0;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.1rem 0.4rem;
+            border-radius: 999px;
+            background-color: rgba(0, 0, 0, 0.03);
+        }
         .star-toggle {
             width: 100%;
             min-width: 44px;
