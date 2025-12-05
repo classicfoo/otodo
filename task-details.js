@@ -46,6 +46,28 @@
       queueSave();
     });
 
+    details.addEventListener('keydown', function(event) {
+      if (event.key !== 'Tab') return;
+      if (typeof details.selectionStart !== 'number' || typeof details.selectionEnd !== 'number') return;
+
+      event.preventDefault();
+
+      const value = details.value || '';
+      const start = details.selectionStart;
+      const end = details.selectionEnd;
+      const updated = value.slice(0, start) + '\t' + value.slice(end);
+
+      details.value = updated;
+
+      const cursor = start + 1;
+      if (typeof details.setSelectionRange === 'function') {
+        details.setSelectionRange(cursor, cursor);
+      }
+
+      updateDetails();
+      queueSave();
+    });
+
     details.addEventListener('paste', function() {
       setTimeout(function() {
         updateDetails();

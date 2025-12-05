@@ -47,4 +47,21 @@ describe('task details editor behaviors', () => {
     expect(hidden.value).toBe('line1\nline2');
     expect(saveSpy).toHaveBeenCalled();
   });
+
+  test('tab key inserts a tab character and keeps focus in the textarea', () => {
+    const details = document.getElementById('detailsInput');
+    const hidden = document.getElementById('detailsInput');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    details.value = 'hello';
+    details.focus();
+    details.setSelectionRange(5, 5);
+    details.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+
+    expect(details.value).toBe('hello\t');
+    expect(hidden.value).toBe('hello\t');
+    expect(document.activeElement).toBe(details);
+    expect(saveSpy).toHaveBeenCalled();
+  });
 });
