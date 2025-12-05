@@ -105,13 +105,82 @@ if ($p < 0 || $p > 3) { $p = 0; }
             background-color: inherit !important;
             color: inherit !important;
         }
-        #detailsInput {
-            white-space: pre-wrap;
+        .prism-editor {
+            position: relative;
+            display: grid;
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            background-color: #ffffff;
+            font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            cursor: text;
         }
-        @media (min-width: 992px) {
-            #detailsInput {
-                min-height: 30rem;
-            }
+        .prism-editor__textarea,
+        .prism-editor__preview {
+            grid-area: 1 / 1 / 2 / 2;
+            font-family: inherit;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            tab-size: 4;
+        }
+        .prism-editor__textarea {
+            width: 100%;
+            min-height: calc(1lh + 1.5rem);
+            height: auto;
+            field-sizing: content;
+            resize: none;
+            border: none;
+            padding: 0.75rem;
+            background: transparent;
+            color: transparent;
+            caret-color: var(--bs-body-color);
+            overflow: hidden;
+            white-space: pre;
+            outline: none;
+            z-index: 1;
+            cursor: text;
+        }
+        .prism-editor__preview {
+            position: relative;
+            margin: 0;
+            pointer-events: none;
+            white-space: pre;
+            overflow: hidden;
+            padding: 0.75rem;
+            z-index: 0;
+        }
+        .prism-editor__preview code {
+            display: block;
+            color: #212529;
+            line-height: inherit;
+        }
+        .prism-editor .code-line {
+            display: block;
+            line-height: inherit;
+        }
+        .prism-editor .code-line-task {
+            color: #1d4ed8;
+        }
+        .prism-editor .code-line-note {
+            color: #1e7a3e;
+        }
+        .prism-editor .code-line-milestone {
+            color: #800000;
+        }
+        .prism-editor .code-line-heading {
+            font-weight: 700;
+        }
+        .prism-editor .code-line-done {
+            color: #6c757d;
+        }
+        .prism-editor .token.tag,
+        .prism-editor .token.tag-name {
+            color: #d63384;
+        }
+        .prism-editor .token.attr-name {
+            color: #6f42c1;
+        }
+        .prism-editor .token.attr-value {
+            color: #0d6efd;
         }
     </style>
     <title>Task Details</title>
@@ -180,7 +249,10 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
+            <div id="detailsInput" class="prism-editor" data-language="html">
+                <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+            </div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -289,6 +361,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
 
     recordPendingUpdate({
@@ -334,8 +407,14 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
     if (detailsField && typeof pending.details === 'string') {
       detailsField.value = pending.details;
-      if (details) {
-        details.innerText = pending.details;
+      if (detailsWrapper) {
+        const detailsTextarea = detailsWrapper.querySelector('textarea');
+        if (detailsTextarea) {
+          detailsTextarea.value = pending.details;
+        }
+        if (typeof updateDetails === 'function') {
+          updateDetails();
+        }
       }
     }
   }
