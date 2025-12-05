@@ -12,6 +12,7 @@ $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority,
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
 $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
 
 $tz = $_SESSION['location'] ?? 'UTC';
@@ -196,13 +197,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         @media (max-width: 768px) {
             .task-row {
-                grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
+                grid-template-columns: minmax(0, 1fr) auto;
                 column-gap: 0.5rem;
             }
             .task-meta {
                 justify-content: flex-end;
+                gap: 0.4rem;
             }
             .due-date-badge, .priority-text { width: auto; }
+            .due-date-badge { min-width: 64px; }
+            .priority-text { min-width: 52px; }
             .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
@@ -260,23 +264,28 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 if ($p < 0 || $p > 3) { $p = 0; }
                 $rawDue = $task['due_date'] ?? '';
                 $due = $rawDue;
+                $dueShort = '';
                 $dueClass = 'bg-secondary-subtle text-secondary';
                 if ($due !== '') {
                     try {
                         $dueDate = new DateTime($due, $tzObj);
                         if ($dueDate < $today) {
                             $due = 'Overdue';
+                            $dueShort = 'Ovd';
                             $dueClass = 'bg-danger-subtle text-danger';
                         } else {
                             $dueFmt = $dueDate->format('Y-m-d');
                             if ($dueFmt === $todayFmt) {
                                 $due = 'Today';
+                                $dueShort = 'Tdy';
                                 $dueClass = 'bg-success-subtle text-success';
                             } elseif ($dueFmt === $tomorrowFmt) {
                                 $due = 'Tomorrow';
+                                $dueShort = 'Tmr';
                                 $dueClass = 'bg-primary-subtle text-primary';
                             } else {
                                 $due = 'Later';
+                                $dueShort = 'Ltr';
                                 $dueClass = 'bg-primary-subtle text-primary';
 
                             }
@@ -284,17 +293,24 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     } catch (Exception $e) {
                         // leave $due unchanged if parsing fails
                     }
+                    if ($dueShort === '') { $dueShort = $due; }
                 }
             ?>
             <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
                 <div class="task-main task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
-                        <span class="badge due-date-badge <?=$dueClass?>"><?=htmlspecialchars($due)?></span>
+                        <span class="badge due-date-badge <?=$dueClass?>" aria-label="<?=htmlspecialchars($due)?>">
+                            <span class="d-none d-md-inline"><?=htmlspecialchars($due)?></span>
+                            <span class="d-inline d-md-none"><?=htmlspecialchars($dueShort)?></span>
+                        </span>
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
-                    <span class="small priority-text <?=$priority_classes[$p]?>"><?=$priority_labels[$p]?></span>
+                    <span class="small priority-text <?=$priority_classes[$p]?>" aria-label="<?=htmlspecialchars($priority_labels[$p])?>">
+                        <span class="d-none d-md-inline"><?=$priority_labels[$p]?></span>
+                        <span class="d-inline d-md-none"><?=$priority_labels_short[$p]?></span>
+                    </span>
                     <button type="button" class="task-star star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
                         <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
                         <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
