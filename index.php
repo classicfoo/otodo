@@ -112,11 +112,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button.active { background-color: #e7f1ff; }
         .quick-editable { cursor: pointer; }
         .task-context-menu.touch-mode {
-            width: calc(100% - 1rem);
-            left: 0.5rem !important;
-            right: 0.5rem;
-            top: auto !important;
-            bottom: 0.75rem;
+            width: min(420px, calc(100% - 1.25rem));
+            left: auto;
+            right: auto;
+            top: auto;
+            bottom: auto;
             transform: translateY(0);
         }
         .header-actions { gap: 0.5rem; }
@@ -226,7 +226,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             .star-toggle { min-width: 40px; }
             .task-star { padding: 0; }
             .task-search.expanded { width: min(280px, 70vw); }
-            .task-context-menu.touch-mode { width: calc(100% - 1.5rem); left: 0.75rem !important; right: 0.75rem; bottom: 1rem; }
+            .task-context-menu.touch-mode { width: min(420px, calc(100% - 1.5rem)); left: auto; right: auto; bottom: auto; }
         }
     </style>
     <title>Todo List</title>
@@ -910,9 +910,25 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const maxLeft = window.innerWidth - width - padding;
       const maxTop = window.innerHeight - height - padding;
       const centerLeft = Math.max(padding, (window.innerWidth - width) / 2);
-      const left = isTouchMode ? Math.min(centerLeft, Math.max(padding, maxLeft)) : Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
-      const desiredTop = options.preferBottom ? window.innerHeight - height - padding : y;
-      const top = Math.min(Math.max(padding, desiredTop), Math.max(padding, maxTop));
+      let left;
+      let top;
+
+      if (isTouchMode && options.anchorRect) {
+        const anchor = options.anchorRect;
+        const desiredLeft = anchor.left + (anchor.width - width) / 2;
+        left = Math.min(Math.max(padding, desiredLeft), Math.max(padding, maxLeft));
+
+        const gap = 8;
+        const belowTop = anchor.bottom + gap;
+        const fitsBelow = belowTop + height + padding <= window.innerHeight;
+        const aboveTop = anchor.top - height - gap;
+        top = fitsBelow ? belowTop : Math.min(Math.max(padding, aboveTop), Math.max(padding, maxTop));
+      } else {
+        left = isTouchMode ? Math.min(centerLeft, Math.max(padding, maxLeft)) : Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
+        const desiredTop = options.preferBottom ? window.innerHeight - height - padding : y;
+        top = Math.min(Math.max(padding, desiredTop), Math.max(padding, maxTop));
+      }
+
       contextMenu.style.left = `${left}px`;
       contextMenu.style.top = `${top}px`;
     }
@@ -971,7 +987,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       e.preventDefault();
       e.stopPropagation();
-      showContextMenu(taskEl, x, y, mode, { touch: true, preferBottom: true });
+      showContextMenu(taskEl, x, y, mode, { touch: true, preferBottom: true, anchorRect: taskEl.getBoundingClientRect() });
     }, true);
 
     document.addEventListener('contextmenu', function(e){
