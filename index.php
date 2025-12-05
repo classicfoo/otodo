@@ -966,6 +966,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const longPressDelay = 450;
     const moveTolerance = 12;
 
+    const quickSelectors = '.due-date-badge, .priority-text';
+
+    ['pointerdown', 'touchstart', 'click', 'contextmenu'].forEach(evt => {
+      document.addEventListener(evt, function(e){
+        const quickTarget = e.target.closest(quickSelectors);
+        if (!quickTarget) return;
+        if (!quickTarget.closest('.task-row')) return;
+        e.preventDefault();
+      }, true);
+    });
+
     function cancelQuickEditPress(pointerId, suppressReset = false) {
       if (!quickEditPress) return;
       if (pointerId && quickEditPress.pointerId !== pointerId) return;
