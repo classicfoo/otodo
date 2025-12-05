@@ -110,6 +110,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button:focus-visible { outline: 2px solid #0a2a66; outline-offset: -2px; }
         .task-context-menu button .badge { float: right; }
         .task-context-menu button.active { background-color: #e7f1ff; }
+        .quick-editable { cursor: pointer; }
+        .task-context-menu.touch-mode {
+            width: calc(100% - 1rem);
+            left: 0.5rem !important;
+            right: 0.5rem;
+            top: auto !important;
+            bottom: 0.75rem;
+            transform: translateY(0);
+        }
         .header-actions { gap: 0.5rem; }
         .task-search {
             display: inline-flex;
@@ -217,6 +226,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             .star-toggle { min-width: 40px; }
             .task-star { padding: 0; }
             .task-search.expanded { width: min(280px, 70vw); }
+            .task-context-menu.touch-mode { width: calc(100% - 1.5rem); left: 0.75rem !important; right: 0.75rem; bottom: 1rem; }
         }
     </style>
     <title>Todo List</title>
@@ -309,14 +319,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 <div class="task-main task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
-                        <span class="badge due-date-badge <?=$dueClass?>" aria-label="<?=htmlspecialchars($due)?>">
+                        <span class="badge due-date-badge quick-editable <?=$dueClass?>" aria-label="<?=htmlspecialchars($due)?>" role="button">
                             <span class="d-none d-md-inline"><?=htmlspecialchars($due)?></span>
                             <span class="d-inline d-md-none"><?=htmlspecialchars($dueShort)?></span>
                         </span>
                     <?php else: ?>
-                        <span class="due-date-badge"></span>
+                        <span class="due-date-badge quick-editable" role="button"></span>
                     <?php endif; ?>
-                    <span class="small priority-text <?=$priority_classes[$p]?>" aria-label="<?=htmlspecialchars($priority_labels[$p])?>">
+                    <span class="small priority-text quick-editable <?=$priority_classes[$p]?>" aria-label="<?=htmlspecialchars($priority_labels[$p])?>" role="button">
                         <span class="d-none d-md-inline"><?=$priority_labels[$p]?></span>
                         <span class="d-inline d-md-none"><?=$priority_labels_short[$p]?></span>
                     </span>
@@ -630,17 +640,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (badge) {
       if (payload.due_label) {
         badge.textContent = payload.due_label;
-        badge.className = 'badge due-date-badge ' + (payload.due_class || '');
+        badge.className = 'badge due-date-badge quick-editable ' + (payload.due_class || '');
       } else {
         badge.textContent = '';
-        badge.className = 'due-date-badge';
+        badge.className = 'due-date-badge quick-editable';
       }
     }
 
     const priorityEl = taskEl.querySelector('.priority-text');
     if (priorityEl) {
       priorityEl.textContent = payload.priority_label || '';
-      priorityEl.className = 'small priority-text ' + (payload.priority_class || '');
+      priorityEl.className = 'small priority-text quick-editable ' + (payload.priority_class || '');
     }
   }
 
@@ -745,7 +755,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         const priorityEl = row.querySelector('.priority-text');
         if (priorityEl) {
           priorityEl.textContent = priorityLabels[update.priority] || priorityLabels[0];
-          priorityEl.className = `small priority-text ${priorityClasses[update.priority] || priorityClasses[0]}`;
+          priorityEl.className = `small priority-text quick-editable ${priorityClasses[update.priority] || priorityClasses[0]}`;
         }
       }
       if (typeof update.starred === 'boolean') {
@@ -766,7 +776,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (badge) {
           const formatted = formatDue(update.due_date);
           badge.textContent = formatted.label;
-          badge.className = `badge due-date-badge ${formatted.className}`.trim();
+          badge.className = `badge due-date-badge quick-editable ${formatted.className}`.trim();
         }
       }
       delete remaining[taskId];
@@ -839,6 +849,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   document.body.appendChild(contextMenu);
 
   let contextTask = null;
+  const coarsePointerQuery = window.matchMedia('(pointer: coarse)');
+
+  function isTouchQuickMode() {
+    return coarsePointerQuery.matches || window.innerWidth <= 768;
+  }
 
   function setActiveOption(group, value) {
     contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
@@ -866,6 +881,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
     function hideContextMenu() {
       contextMenu.classList.add('d-none');
+      contextMenu.classList.remove('touch-mode');
       contextTask = null;
     }
 
@@ -880,19 +896,23 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       });
     }
 
-    function showContextMenu(taskEl, x, y, mode) {
+    function showContextMenu(taskEl, x, y, mode, options = {}) {
       contextTask = taskEl;
       setContextMode(mode);
       updateActiveOptions(taskEl);
+      const isTouchMode = !!options.touch;
+      contextMenu.classList.toggle('touch-mode', isTouchMode);
       contextMenu.classList.remove('d-none');
       contextMenu.style.left = '0px';
       contextMenu.style.top = '0px';
       const { width, height } = contextMenu.getBoundingClientRect();
-      const padding = 8;
+      const padding = isTouchMode ? 12 : 8;
       const maxLeft = window.innerWidth - width - padding;
       const maxTop = window.innerHeight - height - padding;
-      const left = Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
-      const top = Math.min(Math.max(padding, y), Math.max(padding, maxTop));
+      const centerLeft = Math.max(padding, (window.innerWidth - width) / 2);
+      const left = isTouchMode ? Math.min(centerLeft, Math.max(padding, maxLeft)) : Math.min(Math.max(padding, x), Math.max(padding, maxLeft));
+      const desiredTop = options.preferBottom ? window.innerHeight - height - padding : y;
+      const top = Math.min(Math.max(padding, desiredTop), Math.max(padding, maxTop));
       contextMenu.style.left = `${left}px`;
       contextMenu.style.top = `${top}px`;
     }
@@ -936,6 +956,24 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .finally(hideContextMenu);
     });
 
+    document.addEventListener('click', function(e){
+      const quickTarget = e.target.closest('.due-date-badge, .priority-text');
+      if (!quickTarget) return;
+      if (!isTouchQuickMode()) return;
+
+      const taskEl = e.target.closest('.task-row');
+      if (!taskEl) return;
+
+      const mode = quickTarget.classList.contains('due-date-badge') ? 'due' : 'priority';
+      const rect = quickTarget.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.bottom + 12;
+
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(taskEl, x, y, mode, { touch: true, preferBottom: true });
+    }, true);
+
     document.addEventListener('contextmenu', function(e){
       const targetDue = e.target.closest('.due-date-badge');
       const targetPriority = e.target.closest('.priority-text');
@@ -971,7 +1009,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
-      tempItem.innerHTML = `<div class="task-main task-title">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      tempItem.innerHTML = `<div class="task-main task-title">${description}</div><div class="task-meta"><span class="badge due-date-badge quick-editable bg-primary-subtle text-primary" role="button">Today</span><span class="small priority-text quick-editable text-secondary" role="button">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       if (window.applyTaskSearchFilter) {
@@ -1003,12 +1041,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           badge.textContent = json.due_label || '';
-          badge.className = `badge due-date-badge ${json.due_class || ''}`;
+          badge.className = `badge due-date-badge quick-editable ${json.due_class || ''}`;
         }
         const priority = tempItem.querySelector('.priority-text');
         if (priority) {
           priority.textContent = json.priority_label || '';
-          priority.className = `small priority-text ${json.priority_class || ''}`;
+          priority.className = `small priority-text quick-editable ${json.priority_class || ''}`;
         }
         const star = tempItem.querySelector('.star-toggle');
         if (star) {
