@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'line_rules.php';
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -15,8 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority) VALUES (:username, :password, 0)');
-            $stmt->execute([':username' => $username, ':password' => $hash]);
+            $defaultRules = encode_line_rules_for_storage(get_default_line_rules());
+            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority, line_rules, details_color) VALUES (:username, :password, 0, :rules, :color)');
+            $stmt->execute([
+                ':username' => $username,
+                ':password' => $hash,
+                ':rules' => $defaultRules,
+                ':color' => '#212529',
+            ]);
             header('Location: login.php');
             exit();
         } catch (PDOException $e) {

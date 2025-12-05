@@ -24,7 +24,9 @@ function get_db() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             location TEXT,
-            default_priority INTEGER NOT NULL DEFAULT 0
+            default_priority INTEGER NOT NULL DEFAULT 0,
+            line_rules TEXT,
+            details_color TEXT
         )");
 
         $db->exec("CREATE TABLE IF NOT EXISTS tasks (
@@ -61,6 +63,12 @@ function get_db() {
         }
         if (!in_array('default_priority', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN default_priority INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!in_array('line_rules', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN line_rules TEXT');
+        }
+        if (!in_array('details_color', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN details_color TEXT');
         }
 
         if (PHP_OS_FAMILY === 'Windows' && file_exists($databaseFile)) {

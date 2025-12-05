@@ -1,4 +1,12 @@
 (function(global){
+  const DEFAULT_RULES = [
+    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8' },
+    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E' },
+    { prefix: 'M ', className: 'code-line-milestone', color: '#800000' },
+    { prefix: '# ', className: 'code-line-heading', color: '#212529', weight: '700' },
+    { prefix: 'X ', className: 'code-line-done', color: '#6C757D' }
+  ];
+
   function normalizeNewlines(text = '') {
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
@@ -19,31 +27,45 @@
     });
   }
 
-  function wrapLinesWithColors(highlightedHtml, rawText) {
+  function pickRules(lineRules) {
+    if (Array.isArray(lineRules) && lineRules.length) {
+      return lineRules;
+    }
+    return DEFAULT_RULES;
+  }
+
+  function wrapLinesWithColors(highlightedHtml, rawText, lineRules) {
+    const rulesToUse = pickRules(lineRules);
     const highlightedLines = highlightedHtml.split('\n');
     const rawLines = rawText.split('\n');
 
     return highlightedLines.map(function(line, index) {
       const raw = rawLines[index] || '';
       const classes = ['code-line'];
+      const styles = [];
       const trimmed = raw.replace(/^[\t ]+/, '');
-      if (trimmed.startsWith('T ')) {
-        classes.push('code-line-task');
-      } else if (trimmed.startsWith('N ')) {
-        classes.push('code-line-note');
-      } else if (trimmed.startsWith('M ')) {
-        classes.push('code-line-milestone');
-      } else if (trimmed.startsWith('# ')) {
-        classes.push('code-line-heading');
-      } else if (trimmed.startsWith('X ')) {
-        classes.push('code-line-done');
+      const matchedRule = rulesToUse.find(function(rule) {
+        return rule && typeof rule.prefix === 'string' && trimmed.startsWith(rule.prefix);
+      });
+
+      if (matchedRule) {
+        if (matchedRule.className) {
+          classes.push(matchedRule.className);
+        }
+        if (matchedRule.color) {
+          styles.push('color: ' + matchedRule.color + ';');
+        }
+        if (matchedRule.weight) {
+          styles.push('font-weight: ' + matchedRule.weight + ';');
+        }
       }
       const content = line === '' ? '&#8203;' : line;
-      return '<div class="' + classes.join(' ') + '">' + content + '</div>';
+      const styleAttr = styles.length ? ' style="' + styles.join(' ') + '"' : '';
+      return '<div class="' + classes.join(' ') + '"' + styleAttr + '>' + content + '</div>';
     }).join('');
   }
 
-  function initTaskDetailsEditor(details, detailsField, scheduleSave) {
+  function initTaskDetailsEditor(details, detailsField, scheduleSave, options = {}) {
     if (!details || !detailsField) {
       return { updateDetails: function() { return ''; } };
     }
@@ -55,10 +77,15 @@
     }
 
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
+    const lineRules = pickRules(options.lineRules);
+
+    if (options.textColor) {
+      details.style.setProperty('--details-text-color', options.textColor);
+    }
 
     function renderPreview(text) {
       const highlighted = highlightHtml(text);
-      preview.innerHTML = wrapLinesWithColors(highlighted, text);
+      preview.innerHTML = wrapLinesWithColors(highlighted, text, lineRules);
     }
 
     function syncDetails() {
