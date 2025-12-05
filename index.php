@@ -855,28 +855,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     return coarsePointerQuery.matches || window.innerWidth <= 768;
   }
 
-  function setActiveOption(group, value) {
-    contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.value === value);
-    });
+  function clearActiveOptions(group) {
+    const selector = group ? `.context-group[data-group="${group}"] button` : 'button[data-action]';
+    contextMenu.querySelectorAll(selector).forEach(btn => btn.classList.remove('active'));
   }
 
-  function updateActiveOptions(taskEl) {
-    const priorityVal = taskEl.dataset.priority || '0';
-    setActiveOption('priority', priorityVal);
-
-    const dueDate = (taskEl.dataset.dueDate || '').slice(0, 10);
-    let dueChoice = '';
-    if (!dueDate) {
-      dueChoice = 'clear';
-    } else if (dueDate === isoDateFromToday(0)) {
-      dueChoice = 'today';
-    } else if (dueDate === isoDateFromToday(1)) {
-      dueChoice = 'tomorrow';
-    } else if (dueDate === isoDateFromToday(7)) {
-      dueChoice = 'next-week';
-    }
-    setActiveOption('due', dueChoice);
+  function setActiveOption(group, value) {
+    clearActiveOptions(group);
+    if (!value) return;
+    contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
+      if (btn.dataset.value === value) btn.classList.add('active');
+    });
   }
 
     function hideContextMenu() {
@@ -899,7 +888,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     function showContextMenu(taskEl, x, y, mode, options = {}) {
       contextTask = taskEl;
       setContextMode(mode);
-      updateActiveOptions(taskEl);
+      clearActiveOptions();
       const isTouchMode = !!options.touch;
       contextMenu.classList.toggle('touch-mode', isTouchMode);
       contextMenu.classList.remove('d-none');
@@ -942,6 +931,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         hideContextMenu();
         return;
       }
+      setActiveOption(btn.dataset.action, btn.dataset.value);
       const data = new FormData();
       data.append('id', taskId);
       if (btn.dataset.action === 'priority') {
