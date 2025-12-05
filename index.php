@@ -45,7 +45,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
         .task-meta {
             display: grid;
-            grid-template-columns: max-content minmax(80px, max-content) 52px;
+            grid-template-columns: minmax(120px, 1fr) minmax(80px, auto) 52px;
             column-gap: 0.5rem;
             align-items: center;
             justify-items: center;
@@ -59,19 +59,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             justify-content: center;
             justify-self: start;
         }
-        .priority-text {
-            width: fit-content;
-            max-width: 100%;
-            min-width: 0;
-            text-align: center;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.1rem 0.4rem;
-            border-radius: 999px;
-            background-color: rgba(0, 0, 0, 0.03);
-            justify-self: start;
-        }
+        .priority-text { width: 100%; text-align: center; }
         .star-toggle {
             width: 100%;
             min-width: 44px;
@@ -213,7 +201,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 column-gap: 0.5rem;
             }
             .task-meta {
-                grid-template-columns: max-content max-content 48px;
+                grid-template-columns: minmax(90px, 1fr) minmax(70px, auto) 48px;
                 justify-content: end;
                 justify-items: end;
             }
