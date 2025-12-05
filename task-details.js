@@ -54,38 +54,10 @@
       preview.innerHTML = wrapLinesWithColors(highlighted, text);
     }
 
-    function resizeTextarea() {
-      textarea.style.height = 'auto';
-      const previewWrapper = preview.parentElement;
-      const style = typeof getComputedStyle === 'function' ? getComputedStyle(textarea) : null;
-      const lineHeight = style && !Number.isNaN(parseFloat(style.lineHeight)) ? parseFloat(style.lineHeight) : 16;
-      const padding = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) : 0;
-      const minHeight = lineHeight + padding;
-      const measuredCandidates = [];
-
-      if (previewWrapper && Number.isFinite(previewWrapper.scrollHeight)) {
-        measuredCandidates.push(previewWrapper.scrollHeight);
-      }
-      if (Number.isFinite(textarea.scrollHeight)) {
-        measuredCandidates.push(textarea.scrollHeight);
-      }
-
-      const measured = measuredCandidates.length ? Math.max.apply(null, measuredCandidates) : 0;
-      const desired = Math.max(measured, minHeight);
-      const desiredPx = desired + 'px';
-
-      textarea.style.height = desiredPx;
-      if (previewWrapper) {
-        previewWrapper.style.height = desiredPx;
-      }
-      details.style.height = desiredPx;
-    }
-
     function syncDetails() {
       const text = normalizeNewlines(textarea.value || '');
       detailsField.value = text;
       renderPreview(text);
-      resizeTextarea();
       return text;
     }
 

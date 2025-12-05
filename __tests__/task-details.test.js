@@ -95,30 +95,24 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).not.toContain('</div>\n<div');
   });
 
-  test('textarea height follows preview content and respects a single-line minimum', () => {
+  test('syncing details does not force inline heights', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
     const preview = details.querySelector('.prism-editor__preview');
     const hidden = document.getElementById('detailsField');
 
-    let mockHeight = 12;
-    Object.defineProperty(preview, 'scrollHeight', {
-      get: () => mockHeight,
-    });
-
     const editor = initTaskDetailsEditor(details, hidden, jest.fn());
 
-    expect(textarea.style.height).toBe('16px');
-    expect(preview.style.height).toBe('16px');
-    expect(details.style.height).toBe('16px');
+    expect(textarea.style.height).toBe('');
+    expect(preview.style.height).toBe('');
+    expect(details.style.height).toBe('');
 
     textarea.value = 'line one\nline two';
-    mockHeight = 48;
     editor.updateDetails();
 
-    expect(textarea.style.height).toBe('48px');
-    expect(preview.style.height).toBe('48px');
-    expect(details.style.height).toBe('48px');
+    expect(textarea.style.height).toBe('');
+    expect(preview.style.height).toBe('');
+    expect(details.style.height).toBe('');
   });
 
   test('paste inserts plain text and triggers save', () => {

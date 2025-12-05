@@ -107,6 +107,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         .prism-editor {
             position: relative;
+            display: grid;
             border: 1px solid #ced4da;
             border-radius: 0.375rem;
             background-color: #f8f9fa;
@@ -115,23 +116,24 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         .prism-editor__textarea,
         .prism-editor__preview {
+            grid-area: 1 / 1 / 2 / 2;
             font-family: inherit;
             font-size: 0.95rem;
             line-height: 1.5;
             tab-size: 4;
         }
         .prism-editor__textarea {
-            position: absolute;
-            inset: 0;
             width: 100%;
-            height: 100%;
+            min-height: calc(1lh + 1.5rem);
+            height: auto;
+            field-sizing: content;
             resize: none;
             border: none;
             padding: 0.75rem;
             background: transparent;
             color: transparent;
             caret-color: var(--bs-body-color);
-            overflow: auto;
+            overflow: hidden;
             white-space: pre;
             outline: none;
             z-index: 1;
@@ -142,7 +144,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
             margin: 0;
             pointer-events: none;
             white-space: pre;
-            overflow: auto;
+            overflow: hidden;
             padding: 0.75rem;
             z-index: 0;
         }
