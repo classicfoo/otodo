@@ -350,6 +350,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
 
     recordPendingUpdate({
@@ -395,8 +396,14 @@ if ($p < 0 || $p > 3) { $p = 0; }
     }
     if (detailsField && typeof pending.details === 'string') {
       detailsField.value = pending.details;
-      if (details) {
-        details.innerText = pending.details;
+      if (detailsWrapper) {
+        const detailsTextarea = detailsWrapper.querySelector('textarea');
+        if (detailsTextarea) {
+          detailsTextarea.value = pending.details;
+        }
+        if (typeof updateDetails === 'function') {
+          updateDetails();
+        }
       }
     }
   }

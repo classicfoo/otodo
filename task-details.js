@@ -61,13 +61,24 @@
       const lineHeight = style && !Number.isNaN(parseFloat(style.lineHeight)) ? parseFloat(style.lineHeight) : 16;
       const padding = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) : 0;
       const minHeight = lineHeight + padding;
-      const measured = previewWrapper ? previewWrapper.scrollHeight : textarea.scrollHeight;
-      const desired = Math.max(measured, minHeight);
-      textarea.style.height = desired + 'px';
-      if (previewWrapper) {
-        previewWrapper.style.height = desired + 'px';
+      const measuredCandidates = [];
+
+      if (previewWrapper && Number.isFinite(previewWrapper.scrollHeight)) {
+        measuredCandidates.push(previewWrapper.scrollHeight);
       }
-      details.style.height = desired + 'px';
+      if (Number.isFinite(textarea.scrollHeight)) {
+        measuredCandidates.push(textarea.scrollHeight);
+      }
+
+      const measured = measuredCandidates.length ? Math.max.apply(null, measuredCandidates) : 0;
+      const desired = Math.max(measured, minHeight);
+      const desiredPx = desired + 'px';
+
+      textarea.style.height = desiredPx;
+      if (previewWrapper) {
+        previewWrapper.style.height = desiredPx;
+      }
+      details.style.height = desiredPx;
     }
 
     function syncDetails() {
