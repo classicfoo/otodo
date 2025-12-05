@@ -134,7 +134,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
             color: transparent;
             caret-color: var(--bs-body-color);
             overflow: hidden;
-            white-space: pre;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
             outline: none;
             z-index: 1;
             cursor: text;
@@ -143,7 +144,8 @@ if ($p < 0 || $p > 3) { $p = 0; }
             position: relative;
             margin: 0;
             pointer-events: none;
-            white-space: pre;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
             overflow: hidden;
             padding: 0.75rem;
             z-index: 0;
