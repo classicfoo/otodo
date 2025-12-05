@@ -628,19 +628,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
     const badge = taskEl.querySelector('.due-date-badge');
     if (badge) {
-      if (payload.due_label) {
-        badge.textContent = payload.due_label;
-        badge.className = 'badge due-date-badge ' + (payload.due_class || '');
-      } else {
-        badge.textContent = '';
-        badge.className = 'due-date-badge';
-      }
+      renderDueBadge(badge, payload.due_label, payload.due_class);
     }
 
     const priorityEl = taskEl.querySelector('.priority-text');
     if (priorityEl) {
-      priorityEl.textContent = payload.priority_label || '';
-      priorityEl.className = 'small priority-text ' + (payload.priority_class || '');
+      const priorityVal = typeof payload.priority === 'number'
+        ? payload.priority
+        : Number(taskEl.dataset.priority || 0);
+      renderPriorityText(priorityEl, priorityVal, payload.priority_label, payload.priority_class);
     }
   }
 
@@ -722,6 +718,32 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
+  const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
+  const dueLabelsShort = { 'Today': 'Tdy', 'Tomorrow': 'Tmr', 'Overdue': 'Ovd', 'Later': 'Ltr' };
+
+  function renderDueBadge(badge, label, className = '') {
+    if (!badge) return;
+    if (!label) {
+      badge.innerHTML = '';
+      badge.className = 'due-date-badge';
+      badge.removeAttribute('aria-label');
+      return;
+    }
+    const shortLabel = dueLabelsShort[label] || label;
+    badge.innerHTML = `<span class="d-none d-md-inline">${label}</span><span class="d-inline d-md-none">${shortLabel}</span>`;
+    badge.className = `badge due-date-badge ${className || ''}`.trim();
+    badge.setAttribute('aria-label', label);
+  }
+
+  function renderPriorityText(el, priorityValue, label, className = '') {
+    if (!el) return;
+    const numericPriority = typeof priorityValue === 'number' ? priorityValue : Number(priorityValue || 0);
+    const fullLabel = label || priorityLabels[numericPriority] || priorityLabels[0];
+    const shortLabel = priorityLabelsShort[numericPriority] || fullLabel;
+    el.innerHTML = `<span class="d-none d-md-inline">${fullLabel}</span><span class="d-inline d-md-none">${shortLabel}</span>`;
+    el.className = `small priority-text ${className || priorityClasses[numericPriority] || priorityClasses[0]}`.trim();
+    el.setAttribute('aria-label', fullLabel);
+  }
 
   function applyPendingTaskUpdates() {
     const updates = readPendingUpdates();
@@ -744,8 +766,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         row.dataset.priority = String(update.priority);
         const priorityEl = row.querySelector('.priority-text');
         if (priorityEl) {
-          priorityEl.textContent = priorityLabels[update.priority] || priorityLabels[0];
-          priorityEl.className = `small priority-text ${priorityClasses[update.priority] || priorityClasses[0]}`;
+          renderPriorityText(priorityEl, update.priority);
         }
       }
       if (typeof update.starred === 'boolean') {
@@ -765,8 +786,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         const badge = row.querySelector('.due-date-badge');
         if (badge) {
           const formatted = formatDue(update.due_date);
-          badge.textContent = formatted.label;
-          badge.className = `badge due-date-badge ${formatted.className}`.trim();
+          renderDueBadge(badge, formatted.label, formatted.className);
         }
       }
       delete remaining[taskId];
@@ -1005,13 +1025,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
-          badge.textContent = json.due_label || '';
-          badge.className = `badge due-date-badge ${json.due_class || ''}`;
+          renderDueBadge(badge, json.due_label, json.due_class);
         }
         const priority = tempItem.querySelector('.priority-text');
         if (priority) {
-          priority.textContent = json.priority_label || '';
-          priority.className = `small priority-text ${json.priority_class || ''}`;
+          renderPriorityText(priority, json.priority, json.priority_label, json.priority_class);
         }
         const star = tempItem.querySelector('.star-toggle');
         if (star) {
