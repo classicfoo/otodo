@@ -118,7 +118,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         .prism-editor__preview {
             grid-area: 1 / 1 / 2 / 2;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             line-height: 1.5;
             tab-size: 4;
         }
