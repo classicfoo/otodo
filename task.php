@@ -107,6 +107,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
         }
         #detailsInput {
             white-space: pre-wrap;
+            field-sizing: content;
+            overflow-y: hidden;
+            resize: none;
         }
         @media (min-width: 992px) {
             #detailsInput {
@@ -180,8 +183,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="form-control" contenteditable="true"><?=htmlspecialchars($task['details'] ?? '')?></div>
-            <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
+            <textarea id="detailsInput" name="details" class="form-control" rows="6"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
         </div>
         <div class="d-flex align-items-center gap-2">
             <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
@@ -240,7 +242,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
 
   let updateDetails;
   const details = document.getElementById('detailsInput');
-  const detailsField = document.getElementById('detailsField');
+  const detailsField = document.getElementById('detailsInput');
   if (details && detailsField && window.initTaskDetailsEditor) {
     const editor = initTaskDetailsEditor(details, detailsField, scheduleSave);
     if (editor && typeof editor.updateDetails === 'function') {
@@ -289,7 +291,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
-    const detailsField = form.querySelector('input[name="details"]');
+    const detailsField = form.querySelector('[name="details"]');
 
     recordPendingUpdate({
       description: titleInput ? titleInput.value.trim() : undefined,
@@ -311,7 +313,7 @@ if ($p < 0 || $p > 3) { $p = 0; }
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
-    const detailsField = form.querySelector('input[name="details"]');
+    const detailsField = form.querySelector('[name="details"]');
 
     if (titleInput && typeof pending.description === 'string') {
       titleInput.value = pending.description;
@@ -332,9 +334,9 @@ if ($p < 0 || $p > 3) { $p = 0; }
     if (starredCheckbox && typeof pending.starred === 'boolean') {
       starredCheckbox.checked = pending.starred;
     }
-    if (detailsField && typeof pending.details === 'string') {
+        if (detailsField && typeof pending.details === 'string') {
       detailsField.value = pending.details;
-      if (details) {
+      if (details && details !== detailsField) {
         details.innerText = pending.details;
       }
     }

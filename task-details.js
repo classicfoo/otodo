@@ -3,35 +3,41 @@
     return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   }
 
-  function insertTextAtSelection(text) {
-    if (!text) return;
-    if (typeof document.execCommand === 'function') {
-      document.execCommand('insertText', false, text);
+  function getDetailsText(details) {
+    if (!details) return '';
+    if ('value' in details) return details.value;
+    if (details.textContent !== undefined) return details.textContent;
+    if (details.innerText !== undefined) return details.innerText;
+    return '';
+  }
+
+  function setDetailsText(details, text) {
+    if (!details) return;
+    if ('value' in details) {
+      details.value = text;
       return;
     }
-    const sel = window.getSelection && window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    const textNode = document.createTextNode(text);
-    range.insertNode(textNode);
-    range.setStart(textNode, textNode.length);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
+    if (details.textContent !== undefined) {
+      details.textContent = text;
+      return;
+    }
+    if (details.innerText !== undefined) {
+      details.innerText = text;
+    }
   }
 
   function initTaskDetailsEditor(details, detailsField, scheduleSave) {
-    if (!details || !detailsField) {
+    if (!details) {
       return { updateDetails: function() {} };
     }
 
+    const targetField = detailsField || details;
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
 
     const updateDetails = function() {
-      const source = details.textContent !== undefined ? details.textContent : details.innerText;
+      const source = getDetailsText(details);
       const text = normalizeNewlines(source || '');
-      detailsField.value = text;
+      setDetailsText(targetField, text);
       return text;
     };
 
@@ -40,51 +46,33 @@
       queueSave();
     });
 
-    details.addEventListener('paste', function(e) {
-      e.preventDefault();
-      const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-      insertTextAtSelection(text);
+    details.addEventListener('keydown', function(event) {
+      if (event.key !== 'Tab') return;
+      if (typeof details.selectionStart !== 'number' || typeof details.selectionEnd !== 'number') return;
+
+      event.preventDefault();
+
+      const value = details.value || '';
+      const start = details.selectionStart;
+      const end = details.selectionEnd;
+      const updated = value.slice(0, start) + '\t' + value.slice(end);
+
+      details.value = updated;
+
+      const cursor = start + 1;
+      if (typeof details.setSelectionRange === 'function') {
+        details.setSelectionRange(cursor, cursor);
+      }
+
       updateDetails();
       queueSave();
     });
 
-    details.addEventListener('keydown', function(e) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        insertTextAtSelection('\t');
+    details.addEventListener('paste', function() {
+      setTimeout(function() {
         updateDetails();
         queueSave();
-      } else if (e.key === ' ') {
-        const sel = window.getSelection ? window.getSelection() : null;
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const node = range.startContainer;
-          const offset = range.startOffset;
-          if (node.nodeType === Node.TEXT_NODE && offset > 0 && node.textContent[offset - 1] === ' ') {
-            e.preventDefault();
-            range.setStart(node, offset - 1);
-            range.deleteContents();
-            insertTextAtSelection('\t');
-            updateDetails();
-            queueSave();
-          }
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const sel = window.getSelection ? window.getSelection() : null;
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          const preRange = range.cloneRange();
-          preRange.setStart(details, 0);
-          const textBefore = preRange.toString();
-          const lineStart = textBefore.lastIndexOf('\n') + 1;
-          const currentLine = textBefore.slice(lineStart);
-          const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-          insertTextAtSelection('\n' + leading);
-          updateDetails();
-          queueSave();
-        }
-      }
+      }, 0);
     });
 
     updateDetails();
