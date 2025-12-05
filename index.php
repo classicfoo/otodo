@@ -70,7 +70,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-star {
             border: none;
             border-radius: 4px;
-            padding: 0.2rem 0.6rem;
+            padding: 0;
             background: transparent;
             margin: 0;
             cursor: pointer;
@@ -215,7 +215,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             }
             .priority-text { min-width: 44px; }
             .star-toggle { min-width: 40px; }
-            .task-star { padding: 0.15rem 0.35rem; }
+            .task-star { padding: 0; }
             .task-search.expanded { width: min(280px, 70vw); }
         }
     </style>
