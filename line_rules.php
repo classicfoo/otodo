@@ -28,10 +28,11 @@ function sanitize_line_rules($rules) {
         if (!is_array($rule)) {
             continue;
         }
-        $prefix = isset($rule['prefix']) ? trim((string)$rule['prefix']) : '';
-        if ($prefix === '') {
+        $rawPrefix = isset($rule['prefix']) ? (string)$rule['prefix'] : '';
+        if (trim($rawPrefix) === '') {
             continue;
         }
+        $prefix = $rawPrefix;
         $color = isset($rule['color']) ? strtoupper(trim((string)$rule['color'])) : null;
         if ($color && !preg_match('/^#[0-9A-F]{6}$/', $color)) {
             $color = null;
