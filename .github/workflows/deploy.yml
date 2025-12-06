@@ -35,7 +35,6 @@ jobs:
 
           lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<EOF
           set sftp:auto-confirm yes
-          set ssl:verify-certificate no
           set ftp:passive-mode on
           set xfer:clobber on
           lcd $LOCAL_PATH
