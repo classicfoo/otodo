@@ -80,6 +80,9 @@ $details_color_attr = htmlspecialchars($details_color);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        .navbar-brand::after {
+            content: none;
+        }
         #prioritySelect option.bg-secondary-subtle:hover,
         #prioritySelect option.bg-secondary-subtle:focus,
         #prioritySelect option.bg-secondary-subtle:active {
