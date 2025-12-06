@@ -81,6 +81,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Settings</title>
     <style>
+        .navbar-brand::after {
+            content: none;
+        }
         .navbar-toggler {
             border: 1px solid #e9ecef;
         }
