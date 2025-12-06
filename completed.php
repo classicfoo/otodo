@@ -40,7 +40,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
-        <a href="index.php" class="navbar-brand">Otodo</a>
+        <a href="index.php" class="navbar-brand">Otodo <span aria-hidden="true">🙂</span></a>
         <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
             <span class="navbar-toggler-icon"></span>
         </button>
