@@ -33,9 +33,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Completed Tasks</title>
     <style>
-        .navbar-brand::after {
-            content: none;
-        }
         .empty-state { color: #6c757d; }
         .navbar-toggler { border: 1px solid #e9ecef; }
     </style>
