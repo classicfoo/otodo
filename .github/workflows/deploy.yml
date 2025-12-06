@@ -1,0 +1,53 @@
+name: Deploy via lftp
+
+on:
+  push:
+    branches: ["prod"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy with lftp
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          REMOTE_PATH: ${{ secrets.FTP_REMOTE_PATH }}
+        run: |
+          set -euo pipefail
+
+          : "${FTP_HOST:?FTP_HOST secret must be set}"
+          : "${FTP_USER:?FTP_USER secret must be set}"
+          : "${FTP_PASS:?FTP_PASS secret must be set}"
+
+          LOCAL_PATH="${GITHUB_WORKSPACE}"
+          REMOTE_PATH="${REMOTE_PATH:-/var/www/html}"
+
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<EOF
+          set sftp:auto-confirm yes
+          set ftp:passive-mode on
+          set xfer:clobber on
+          lcd $LOCAL_PATH
+          cd $REMOTE_PATH
+          mirror -R \
+            --verbose \
+            --exclude-glob .git/* \
+            --exclude-glob .github/* \
+            --exclude-glob node_modules/* \
+            --exclude-glob __tests__/* \
+            --exclude-glob '*.log' \
+            --exclude-glob '*.md' \
+            --exclude .env \
+            .
+          bye
+          EOF
