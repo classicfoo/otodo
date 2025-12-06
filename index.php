@@ -62,7 +62,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             padding-left: 0.5rem;
             padding-right: 0.5rem;
         }
-        .priority-text { text-align: center; min-width: 70px; }
+        .priority-text {
+            text-align: center;
+            min-width: 70px;
+            max-width: 70px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .star-toggle {
             min-width: 44px;
             display: inline-flex;
@@ -215,7 +222,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 padding-left: 0.3rem;
                 padding-right: 0.3rem;
             }
-            .priority-text { min-width: 44px; }
+            .priority-text {
+                min-width: 44px;
+                max-width: 44px;
+            }
             .star-toggle { min-width: 40px; }
             .task-star { padding: 0; }
             .task-search.expanded { width: min(280px, 70vw); }
