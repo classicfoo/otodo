@@ -207,7 +207,7 @@ $details_color_attr = htmlspecialchars($details_color);
 <nav class="navbar navbar-light bg-white mb-4">
 
     <div class="container d-flex justify-content-between align-items-center">
-        <a href="index.php" class="navbar-brand">Otodo <span aria-hidden="true">🙂</span></a>
+        <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
             <div class="dropdown">
                 <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
