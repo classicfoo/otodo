@@ -35,12 +35,17 @@ jobs:
 
           lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<EOF
           set sftp:auto-confirm yes
+          set ssl:verify-certificate no
           set ftp:passive-mode on
           set xfer:clobber on
           lcd $LOCAL_PATH
           cd $REMOTE_PATH
           mirror -R \
             --verbose \
+            --only-newer \
+            --ignore-time \
+            --parallel=4 \
+            --no-perms \
             --exclude-glob .git/* \
             --exclude-glob .github/* \
             --exclude-glob node_modules/* \
@@ -48,6 +53,6 @@ jobs:
             --exclude-glob '*.log' \
             --exclude-glob '*.md' \
             --exclude .env \
-            .
+          ;
           bye
           EOF
