@@ -227,7 +227,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
-        <span class="navbar-brand mb-0 h1">Otodo</span>
+        <span class="navbar-brand mb-0 h1">Otodo <span aria-hidden="true">🙂</span></span>
         <div class="d-flex align-items-center header-actions ms-auto">
             <div class="task-search" id="task-search" aria-expanded="false">
                 <button class="search-toggle" type="button" id="task-search-toggle" aria-label="Search tasks">
