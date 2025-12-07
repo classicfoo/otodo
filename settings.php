@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" role="switch" id="capitalize_sentences" name="capitalize_sentences" <?=$capitalize_sentences ? 'checked' : ''?>>
             <label class="form-check-label" for="capitalize_sentences">Capitalize the first letter of each line while typing</label>
-            <div class="form-text">Applies to all lines in the task description editor regardless of color rules.</div>
+            <div class="form-text">Applies to every line in the task description editor, including lines that satisfy your custom line rules.</div>
         </div>
         <div class="mb-3">
             <label class="form-label">Custom line rules</label>

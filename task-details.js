@@ -75,16 +75,23 @@
       const leadingMatch = line.match(/^[\t ]*/);
       const leading = leadingMatch ? leadingMatch[0] : '';
       const trimmed = line.slice(leading.length);
-      let updated = trimmed.replace(/([A-Za-z])/, function(match) {
-        return match.toUpperCase();
-      });
+      let updated = trimmed;
 
-      if (trimmed.length > 1 && trimmed[1] === ' ') {
-        const afterPrefix = updated.slice(2);
+      const firstLetterIndex = updated.search(/[A-Za-z]/);
+      if (firstLetterIndex !== -1) {
+        updated =
+          updated.slice(0, firstLetterIndex) +
+          updated[firstLetterIndex].toUpperCase() +
+          updated.slice(firstLetterIndex + 1);
+      }
+
+      const prefixSpaceIndex = updated.indexOf(' ');
+      if (prefixSpaceIndex !== -1) {
+        const afterPrefix = updated.slice(prefixSpaceIndex + 1);
         const contentLetterIndex = afterPrefix.search(/[A-Za-z]/);
 
         if (contentLetterIndex !== -1) {
-          const absoluteIndex = 2 + contentLetterIndex;
+          const absoluteIndex = prefixSpaceIndex + 1 + contentLetterIndex;
           updated =
             updated.slice(0, absoluteIndex) +
             updated[absoluteIndex].toUpperCase() +
