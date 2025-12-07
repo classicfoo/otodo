@@ -65,29 +65,34 @@
     }).join('');
   }
 
-  function applyCapitalization(text, lineRules) {
-    const rulesToUse = pickRules(lineRules);
+  function applyCapitalization(text, shouldCapitalize) {
+    if (!shouldCapitalize) {
+      return text;
+    }
     const lines = text.split('\n');
 
     const updatedLines = lines.map(function(line) {
       const leadingMatch = line.match(/^[\t ]*/);
       const leading = leadingMatch ? leadingMatch[0] : '';
       const trimmed = line.slice(leading.length);
-      const matchedRule = rulesToUse.find(function(rule) {
-        return rule && rule.capitalize && typeof rule.prefix === 'string' && trimmed.startsWith(rule.prefix);
-      });
-
-      if (!matchedRule) {
-        return line;
-      }
-
-      const prefixLength = matchedRule.prefix.length;
-      const remainder = trimmed.slice(prefixLength);
-      const updatedRemainder = remainder.replace(/([A-Za-z])/, function(match) {
+      let updated = trimmed.replace(/([A-Za-z])/, function(match) {
         return match.toUpperCase();
       });
 
-      return leading + matchedRule.prefix + updatedRemainder;
+      if (trimmed.length > 1 && trimmed[1] === ' ') {
+        const afterPrefix = updated.slice(2);
+        const contentLetterIndex = afterPrefix.search(/[A-Za-z]/);
+
+        if (contentLetterIndex !== -1) {
+          const absoluteIndex = 2 + contentLetterIndex;
+          updated =
+            updated.slice(0, absoluteIndex) +
+            updated[absoluteIndex].toUpperCase() +
+            updated.slice(absoluteIndex + 1);
+        }
+      }
+
+      return leading + updated;
     });
 
     return updatedLines.join('\n');
@@ -106,6 +111,7 @@
 
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
     const lineRules = pickRules(options.lineRules);
+    const capitalizeSentences = !!options.capitalizeSentences;
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
@@ -120,7 +126,7 @@
       const selectionStart = textarea.selectionStart;
       const selectionEnd = textarea.selectionEnd;
       const text = normalizeNewlines(textarea.value || '');
-      const capitalized = applyCapitalization(text, lineRules);
+      const capitalized = applyCapitalization(text, capitalizeSentences);
 
       if (capitalized !== text) {
         textarea.value = capitalized;
