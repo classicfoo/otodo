@@ -1,7 +1,7 @@
 (function(global){
   const DEFAULT_RULES = [
-    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8' },
-    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E' },
+    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8', capitalize: true },
+    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E', capitalize: true },
     { prefix: 'M ', className: 'code-line-milestone', color: '#800000' },
     { prefix: '# ', className: 'code-line-heading', color: '#212529', weight: '700' },
     { prefix: 'X ', className: 'code-line-done', color: '#6C757D' }
@@ -65,6 +65,57 @@
     }).join('');
   }
 
+  function applyCapitalization(text, shouldCapitalize, lineRules) {
+    if (!shouldCapitalize) {
+      return text;
+    }
+
+    const rulesToUse = pickRules(lineRules);
+    const lines = text.split('\n');
+
+    const updatedLines = lines.map(function(line) {
+      const trimmed = line.replace(/^[\t ]+/, '');
+      const matchesRule = rulesToUse.some(function(rule) {
+        return rule && typeof rule.prefix === 'string' && trimmed.startsWith(rule.prefix);
+      });
+
+      if (!matchesRule) {
+        return line;
+      }
+
+      const leadingMatch = line.match(/^[\t ]*/);
+      const leading = leadingMatch ? leadingMatch[0] : '';
+      const content = line.slice(leading.length);
+      let updated = content;
+
+      const firstLetterIndex = updated.search(/[A-Za-z]/);
+      if (firstLetterIndex !== -1) {
+        updated =
+          updated.slice(0, firstLetterIndex) +
+          updated[firstLetterIndex].toUpperCase() +
+          updated.slice(firstLetterIndex + 1);
+      }
+
+      const prefixSpaceIndex = updated.indexOf(' ');
+      if (prefixSpaceIndex !== -1) {
+        const afterPrefix = updated.slice(prefixSpaceIndex + 1);
+        const contentLetterIndex = afterPrefix.search(/[A-Za-z]/);
+
+        if (contentLetterIndex !== -1) {
+          const absoluteIndex = prefixSpaceIndex + 1 + contentLetterIndex;
+          updated =
+            updated.slice(0, absoluteIndex) +
+            updated[absoluteIndex].toUpperCase() +
+            updated.slice(absoluteIndex + 1);
+        }
+      }
+
+      return leading + updated;
+    });
+
+    return updatedLines.join('\n');
+  }
+
   function initTaskDetailsEditor(details, detailsField, scheduleSave, options = {}) {
     if (!details || !detailsField) {
       return { updateDetails: function() { return ''; } };
@@ -78,6 +129,7 @@
 
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
     const lineRules = pickRules(options.lineRules);
+    const capitalizeSentences = !!options.capitalizeSentences;
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
@@ -89,10 +141,22 @@
     }
 
     function syncDetails() {
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
       const text = normalizeNewlines(textarea.value || '');
-      detailsField.value = text;
-      renderPreview(text);
-      return text;
+      const capitalized = applyCapitalization(text, capitalizeSentences, lineRules);
+
+      if (capitalized !== text) {
+        textarea.value = capitalized;
+        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+          textarea.selectionStart = selectionStart;
+          textarea.selectionEnd = selectionEnd;
+        }
+      }
+
+      detailsField.value = capitalized;
+      renderPreview(capitalized);
+      return capitalized;
     }
 
     function insertAtSelection(text) {
