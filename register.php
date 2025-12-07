@@ -17,12 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $defaultRules = encode_line_rules_for_storage(get_default_line_rules());
-            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority, line_rules, details_color) VALUES (:username, :password, 0, :rules, :color)');
+            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority, line_rules, details_color, capitalize_sentences) VALUES (:username, :password, 0, :rules, :color, :capitalize)');
             $stmt->execute([
                 ':username' => $username,
                 ':password' => $hash,
                 ':rules' => $defaultRules,
                 ':color' => '#212529',
+                ':capitalize' => 1,
             ]);
             header('Location: login.php');
             exit();
