@@ -15,6 +15,7 @@ $location = $_SESSION['location'] ?? '';
 $default_priority = (int)($_SESSION['default_priority'] ?? 0);
 $details_color = $_SESSION['details_color'] ?? '#212529';
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
+$capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
 $timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $line_rules = get_default_line_rules();
     }
     $details_color = normalize_editor_color($_POST['details_color'] ?? $details_color);
+    $capitalize_sentences = isset($_POST['capitalize_sentences']);
 
     if ($username === '') {
         $error = 'Username cannot be empty';
@@ -40,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($password !== '') {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, capitalize_sentences = :capitalize WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':password' => $hash,
@@ -48,16 +50,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':pri' => $default_priority,
                     ':rules' => encode_line_rules_for_storage($line_rules),
                     ':color' => $details_color,
+                    ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':id' => $_SESSION['user_id'],
                 ]);
             } else {
-                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, capitalize_sentences = :capitalize WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':loc' => $location !== '' ? $location : null,
                     ':pri' => $default_priority,
                     ':rules' => encode_line_rules_for_storage($line_rules),
                     ':color' => $details_color,
+                    ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':id' => $_SESSION['user_id'],
                 ]);
             }
@@ -66,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['default_priority'] = $default_priority;
             $_SESSION['line_rules'] = $line_rules;
             $_SESSION['details_color'] = $details_color;
+            $_SESSION['capitalize_sentences'] = $capitalize_sentences ? 1 : 0;
             $message = 'Settings saved';
         } catch (PDOException $e) {
             $error = 'Username already taken';
@@ -151,9 +156,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label class="form-label" for="details_color">Task description text color</label>
             <input type="color" name="details_color" id="details_color" class="form-control form-control-color" value="<?=htmlspecialchars($details_color ?? '#212529')?>" title="Pick a color for the task description editor">
         </div>
+        <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="capitalize_sentences" name="capitalize_sentences" <?=$capitalize_sentences ? 'checked' : ''?>>
+            <label class="form-check-label" for="capitalize_sentences">Capitalize the first letter of each line while typing</label>
+            <div class="form-text">Applies to every line in the task description editor, including lines that satisfy your custom line rules.</div>
+        </div>
         <div class="mb-3">
             <label class="form-label">Custom line rules</label>
-            <p class="text-muted small">Define how lines starting with specific prefixes should be highlighted in the task description editor.</p>
+            <p class="text-muted small">Define how lines starting with specific prefixes should be highlighted in the task description editor. Capitalization is controlled by the toggle above and does not need per-rule options.</p>
             <div id="lineRulesContainer" class="d-flex flex-column gap-2"></div>
             <div class="mt-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="addRuleBtn">Add rule</button>
@@ -227,7 +237,7 @@ function buildRuleRow(rule, idx) {
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
-    removeBtn.className = 'btn btn-outline-danger btn-sm';
+    removeBtn.className = 'btn btn-outline-danger btn-sm w-100 w-md-auto';
     removeBtn.textContent = 'Remove';
 
     function updateRule() {
@@ -258,9 +268,26 @@ function buildRuleRow(rule, idx) {
     });
 
     const rowTop = document.createElement('div');
-    rowTop.className = 'd-flex flex-column flex-md-row gap-2 flex-grow-1';
-    rowTop.append(prefix, label, color);
-    row.append(rowTop, removeBtn);
+    rowTop.className = 'row g-2 flex-grow-1 align-items-center';
+
+    const prefixCol = document.createElement('div');
+    prefixCol.className = 'col-12 col-md-3';
+    prefixCol.append(prefix);
+
+    const labelCol = document.createElement('div');
+    labelCol.className = 'col-12 col-md-3';
+    labelCol.append(label);
+
+    const colorCol = document.createElement('div');
+    colorCol.className = 'col-6 col-md-2';
+    colorCol.append(color);
+
+    const removeCol = document.createElement('div');
+    removeCol.className = 'col-12 col-md-auto';
+    removeCol.append(removeBtn);
+
+    rowTop.append(prefixCol, labelCol, colorCol, removeCol);
+    row.append(rowTop);
     return row;
 }
 

@@ -70,8 +70,10 @@ $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $details_color = normalize_editor_color($_SESSION['details_color'] ?? '#212529');
+$capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
 $line_rules_json = htmlspecialchars(json_encode($line_rules));
 $details_color_attr = htmlspecialchars($details_color);
+$capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -267,7 +269,7 @@ $details_color_attr = htmlspecialchars($details_color);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
                 <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
                 <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
             </div>
@@ -345,6 +347,7 @@ $details_color_attr = htmlspecialchars($details_color);
   const detailsField = document.getElementById('detailsField');
   if (details && detailsField && window.initTaskDetailsEditor) {
     let rules = [];
+    const capitalizeSentences = details.dataset.capitalizeSentences === 'true';
     try {
       rules = JSON.parse(details.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
@@ -355,7 +358,8 @@ $details_color_attr = htmlspecialchars($details_color);
     }
     const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
       lineRules: rules,
-      textColor: details.dataset.textColor
+      textColor: details.dataset.textColor,
+      capitalizeSentences: capitalizeSentences
     });
     if (editor && typeof editor.updateDetails === 'function') {
       updateDetails = editor.updateDetails;
