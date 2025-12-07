@@ -1,7 +1,7 @@
 (function(global){
   const DEFAULT_RULES = [
-    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8' },
-    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E' },
+    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8', capitalize: true },
+    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E', capitalize: true },
     { prefix: 'M ', className: 'code-line-milestone', color: '#800000' },
     { prefix: '# ', className: 'code-line-heading', color: '#212529', weight: '700' },
     { prefix: 'X ', className: 'code-line-done', color: '#6C757D' }
@@ -65,6 +65,34 @@
     }).join('');
   }
 
+  function applyCapitalization(text, lineRules) {
+    const rulesToUse = pickRules(lineRules);
+    const lines = text.split('\n');
+
+    const updatedLines = lines.map(function(line) {
+      const leadingMatch = line.match(/^[\t ]*/);
+      const leading = leadingMatch ? leadingMatch[0] : '';
+      const trimmed = line.slice(leading.length);
+      const matchedRule = rulesToUse.find(function(rule) {
+        return rule && rule.capitalize && typeof rule.prefix === 'string' && trimmed.startsWith(rule.prefix);
+      });
+
+      if (!matchedRule) {
+        return line;
+      }
+
+      const prefixLength = matchedRule.prefix.length;
+      const remainder = trimmed.slice(prefixLength);
+      const updatedRemainder = remainder.replace(/([A-Za-z])/, function(match) {
+        return match.toUpperCase();
+      });
+
+      return leading + matchedRule.prefix + updatedRemainder;
+    });
+
+    return updatedLines.join('\n');
+  }
+
   function initTaskDetailsEditor(details, detailsField, scheduleSave, options = {}) {
     if (!details || !detailsField) {
       return { updateDetails: function() { return ''; } };
@@ -89,10 +117,22 @@
     }
 
     function syncDetails() {
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
       const text = normalizeNewlines(textarea.value || '');
-      detailsField.value = text;
-      renderPreview(text);
-      return text;
+      const capitalized = applyCapitalization(text, lineRules);
+
+      if (capitalized !== text) {
+        textarea.value = capitalized;
+        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+          textarea.selectionStart = selectionStart;
+          textarea.selectionEnd = selectionEnd;
+        }
+      }
+
+      detailsField.value = capitalized;
+      renderPreview(capitalized);
+      return capitalized;
     }
 
     function insertAtSelection(text) {
