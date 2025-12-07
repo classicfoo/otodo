@@ -65,6 +65,39 @@
     }).join('');
   }
 
+  function applyCapitalization(text, shouldCapitalize) {
+    if (!shouldCapitalize) {
+      return text;
+    }
+    const lines = text.split('\n');
+
+    const updatedLines = lines.map(function(line) {
+      const leadingMatch = line.match(/^[\t ]*/);
+      const leading = leadingMatch ? leadingMatch[0] : '';
+      const trimmed = line.slice(leading.length);
+      let updated = trimmed.replace(/([A-Za-z])/, function(match) {
+        return match.toUpperCase();
+      });
+
+      if (trimmed.length > 1 && trimmed[1] === ' ') {
+        const afterPrefix = updated.slice(2);
+        const contentLetterIndex = afterPrefix.search(/[A-Za-z]/);
+
+        if (contentLetterIndex !== -1) {
+          const absoluteIndex = 2 + contentLetterIndex;
+          updated =
+            updated.slice(0, absoluteIndex) +
+            updated[absoluteIndex].toUpperCase() +
+            updated.slice(absoluteIndex + 1);
+        }
+      }
+
+      return leading + updated;
+    });
+
+    return updatedLines.join('\n');
+  }
+
   function initTaskDetailsEditor(details, detailsField, scheduleSave, options = {}) {
     if (!details || !detailsField) {
       return { updateDetails: function() { return ''; } };
@@ -78,6 +111,7 @@
 
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
     const lineRules = pickRules(options.lineRules);
+    const capitalizeSentences = !!options.capitalizeSentences;
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
@@ -89,10 +123,22 @@
     }
 
     function syncDetails() {
+      const selectionStart = textarea.selectionStart;
+      const selectionEnd = textarea.selectionEnd;
       const text = normalizeNewlines(textarea.value || '');
-      detailsField.value = text;
-      renderPreview(text);
-      return text;
+      const capitalized = applyCapitalization(text, capitalizeSentences);
+
+      if (capitalized !== text) {
+        textarea.value = capitalized;
+        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+          textarea.selectionStart = selectionStart;
+          textarea.selectionEnd = selectionEnd;
+        }
+      }
+
+      detailsField.value = capitalized;
+      renderPreview(capitalized);
+      return capitalized;
     }
 
     function insertAtSelection(text) {
