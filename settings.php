@@ -158,8 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" role="switch" id="capitalize_sentences" name="capitalize_sentences" <?=$capitalize_sentences ? 'checked' : ''?>>
-            <label class="form-check-label" for="capitalize_sentences">Capitalize the first letter of each line while typing</label>
-            <div class="form-text">Applies to lines in the task description editor that satisfy your custom line rules.</div>
+            <label class="form-check-label" for="capitalize_sentences">Capitalize matching lines while typing</label>
+            <div class="form-text">Uppercases the first letter (and the first word after a prefix) on lines that use your custom prefixes; other lines stay unchanged.</div>
         </div>
         <div class="mb-3">
             <label class="form-label">Custom line rules</label>
