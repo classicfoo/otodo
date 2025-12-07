@@ -234,17 +234,17 @@ describe('task details editor behaviors', () => {
     expect(details.style.getPropertyValue('--details-text-color')).toBe('#123456');
   });
 
-  test('capitalization toggle uppercases the first letter on each line when enabled', () => {
+  test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
     const hidden = document.getElementById('detailsField');
 
     const editor = initTaskDetailsEditor(details, hidden, jest.fn(), { capitalizeSentences: true });
 
-    textarea.value = '  t task\nn note';
+    textarea.value = '  T task\nnote only\nN note';
     editor.updateDetails();
 
-    expect(textarea.value).toBe('  T Task\nN Note');
-    expect(hidden.value).toBe('  T Task\nN Note');
+    expect(textarea.value).toBe('  T Task\nnote only\nN Note');
+    expect(hidden.value).toBe('  T Task\nnote only\nN Note');
   });
 });

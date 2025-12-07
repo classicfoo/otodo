@@ -65,17 +65,28 @@
     }).join('');
   }
 
-  function applyCapitalization(text, shouldCapitalize) {
+  function applyCapitalization(text, shouldCapitalize, lineRules) {
     if (!shouldCapitalize) {
       return text;
     }
+
+    const rulesToUse = pickRules(lineRules);
     const lines = text.split('\n');
 
     const updatedLines = lines.map(function(line) {
+      const trimmed = line.replace(/^[\t ]+/, '');
+      const matchesRule = rulesToUse.some(function(rule) {
+        return rule && typeof rule.prefix === 'string' && trimmed.startsWith(rule.prefix);
+      });
+
+      if (!matchesRule) {
+        return line;
+      }
+
       const leadingMatch = line.match(/^[\t ]*/);
       const leading = leadingMatch ? leadingMatch[0] : '';
-      const trimmed = line.slice(leading.length);
-      let updated = trimmed;
+      const content = line.slice(leading.length);
+      let updated = content;
 
       const firstLetterIndex = updated.search(/[A-Za-z]/);
       if (firstLetterIndex !== -1) {
@@ -133,7 +144,7 @@
       const selectionStart = textarea.selectionStart;
       const selectionEnd = textarea.selectionEnd;
       const text = normalizeNewlines(textarea.value || '');
-      const capitalized = applyCapitalization(text, capitalizeSentences);
+      const capitalized = applyCapitalization(text, capitalizeSentences, lineRules);
 
       if (capitalized !== text) {
         textarea.value = capitalized;
