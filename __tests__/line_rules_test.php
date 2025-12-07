@@ -11,11 +11,11 @@ function assert_equal($expected, $actual, $message) {
 $rulesWithSpace = [['prefix' => 'T ', 'label' => 'Task', 'color' => '#123456', 'capitalize' => true]];
 $sanitized = sanitize_line_rules($rulesWithSpace);
 assert_equal('T ', $sanitized[0]['prefix'], 'sanitize_line_rules should preserve trailing whitespace');
-assert_equal(false, isset($sanitized[0]['capitalize']), 'sanitize_line_rules should ignore capitalization flags');
+assert_equal(true, $sanitized[0]['capitalize'], 'sanitize_line_rules should keep capitalization flag');
 
 $encoded = encode_line_rules_for_storage($rulesWithSpace);
 $decoded = decode_line_rules_from_storage($encoded);
 assert_equal('T ', $decoded[0]['prefix'], 'round trip through encode/decode should keep trailing whitespace');
-assert_equal(false, isset($decoded[0]['capitalize']), 'round trip through encode/decode should ignore capitalization flag');
+assert_equal(true, $decoded[0]['capitalize'], 'round trip through encode/decode should keep capitalization flag');
 
 echo "All PHP line rule tests passed\n";
