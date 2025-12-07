@@ -915,9 +915,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const btn = e.target.closest('button[data-action]');
       if (!btn || !contextTask) return;
       e.preventDefault();
-      const taskId = contextTask.dataset.taskId;
+
+      const taskEl = contextTask;
+      const taskId = taskEl.dataset.taskId;
+      hideContextMenu();
+
       if (!taskId) {
-        hideContextMenu();
         return;
       }
       const data = new FormData();
@@ -941,13 +944,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
         .then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
-          updateTaskRowUI(contextTask, json);
+          updateTaskRowUI(taskEl, json);
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
         })
         .catch(() => {
           if (window.updateSyncStatus) window.updateSyncStatus('error', 'Could not update task');
-        })
-        .finally(hideContextMenu);
+        });
     });
 
     document.addEventListener('contextmenu', function(e){
