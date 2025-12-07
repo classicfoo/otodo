@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="mb-3">
             <label class="form-label">Custom line rules</label>
-            <p class="text-muted small">Define how lines starting with specific prefixes should be highlighted in the task description editor.</p>
+            <p class="text-muted small">Define how lines starting with specific prefixes should be highlighted in the task description editor. Capitalization is controlled by the toggle above and does not need per-rule options.</p>
             <div id="lineRulesContainer" class="d-flex flex-column gap-2"></div>
             <div class="mt-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="addRuleBtn">Add rule</button>
@@ -284,9 +284,26 @@ function buildRuleRow(rule, idx) {
     });
 
     const rowTop = document.createElement('div');
-    rowTop.className = 'd-flex flex-column flex-md-row gap-2 flex-grow-1';
-    rowTop.append(prefix, label, color, capitalizeWrapper);
-    row.append(rowTop, removeBtn);
+    rowTop.className = 'row g-2 flex-grow-1 align-items-center';
+
+    const prefixCol = document.createElement('div');
+    prefixCol.className = 'col-12 col-md-3';
+    prefixCol.append(prefix);
+
+    const labelCol = document.createElement('div');
+    labelCol.className = 'col-12 col-md-3';
+    labelCol.append(label);
+
+    const colorCol = document.createElement('div');
+    colorCol.className = 'col-6 col-md-2';
+    colorCol.append(color);
+
+    const removeCol = document.createElement('div');
+    removeCol.className = 'col-12 col-md-auto';
+    removeCol.append(removeBtn);
+
+    rowTop.append(prefixCol, labelCol, colorCol, removeCol);
+    row.append(rowTop);
     return row;
 }
 
