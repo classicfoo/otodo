@@ -42,6 +42,22 @@ function get_db() {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )");
 
+        $db->exec("CREATE TABLE IF NOT EXISTS hashtags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            UNIQUE(user_id, name),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS task_hashtags (
+            task_id INTEGER NOT NULL,
+            hashtag_id INTEGER NOT NULL,
+            PRIMARY KEY (task_id, hashtag_id),
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+            FOREIGN KEY(hashtag_id) REFERENCES hashtags(id) ON DELETE CASCADE
+        )");
+
         // Ensure new columns exist for older databases
         $columns = $db->query('PRAGMA table_info(tasks)')->fetchAll(PDO::FETCH_COLUMN, 1);
         if (!in_array('due_date', $columns, true)) {

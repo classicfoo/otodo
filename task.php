@@ -1,6 +1,7 @@
 <?php
 require_once 'db.php';
 require_once 'line_rules.php';
+require_once 'hashtags.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -16,6 +17,9 @@ if (!$task) {
     header('Location: index.php');
     exit();
 }
+
+$task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
+$user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
 $ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
 $ordered_stmt->execute([':uid' => $_SESSION['user_id']]);
@@ -55,8 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
+    $hashtags = collect_hashtags_from_texts($description, $details);
+    sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'ok']);
+    echo json_encode(['status' => 'ok', 'hashtags' => $hashtags]);
     exit();
 }
 
@@ -74,6 +80,8 @@ $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSI
 $line_rules_json = htmlspecialchars(json_encode($line_rules));
 $details_color_attr = htmlspecialchars($details_color);
 $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
+$task_hashtags_json = json_encode($task_hashtags);
+$user_hashtags_json = json_encode($user_hashtags);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -122,6 +130,37 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
         #prioritySelect.bg-danger-subtle:focus {
             background-color: var(--bs-danger-bg-subtle) !important;
             color: var(--bs-danger-text-emphasis) !important;
+        }
+        .hashtag-badge {
+            background-color: #f3e8ff;
+            color: #6f42c1;
+            border: 1px solid #e5d4ff;
+        }
+        .hashtag-row-empty {
+            color: #6c757d;
+        }
+        .hashtag-suggestions {
+            margin-top: 0.5rem;
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 0.75rem 1.5rem rgba(0,0,0,0.08);
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+        .hashtag-suggestions button {
+            border: 1px solid #e5d4ff;
+            background: #faf5ff;
+            color: #6f42c1;
+            border-radius: 999px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.9rem;
+        }
+        .hashtag-suggestions button:hover,
+        .hashtag-suggestions button:focus {
+            background: #f1e4ff;
         }
         .prism-editor {
             position: relative;
@@ -244,6 +283,14 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
             <label class="form-label">Title</label>
             <input type="text" name="description" class="form-control" value="<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?>" required autocapitalize="none">
         </div>
+        <div class="mb-3">
+            <label class="form-label">Hashtags</label>
+            <div class="d-flex flex-wrap gap-2 align-items-center" id="hashtagBadges" aria-live="polite">
+                <span class="small hashtag-row-empty">No hashtags yet</span>
+            </div>
+            <div id="hashtagSuggestions" class="hashtag-suggestions d-none" aria-live="polite"></div>
+            <div class="form-text">Type # in the title or description to add hashtags.</div>
+        </div>
         <div class="mb-3 d-flex align-items-end gap-3">
             <div>
                 <label class="form-label">Due Date</label>
@@ -321,6 +368,152 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
   if (!form) return;
   let timer;
 
+  const hashtagBadges = document.getElementById('hashtagBadges');
+  const hashtagSuggestions = document.getElementById('hashtagSuggestions');
+  const titleInputEl = form.querySelector('input[name="description"]');
+  const detailsFieldHidden = document.getElementById('detailsField');
+  const detailsTextarea = document.querySelector('#detailsInput textarea');
+  const taskHashtags = <?= $task_hashtags_json ?: '[]' ?>;
+  const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
+  const allHashtags = new Set([...taskHashtags, ...userHashtags]);
+  let activeHashtagTarget = null;
+
+  function normalizeHashtag(tag) {
+    return (tag || '').replace(/^#+/, '').trim().toLowerCase();
+  }
+
+  function extractHashtags(text) {
+    if (!text) return [];
+    const matches = text.match(/#([\p{L}\p{N}_-]+)/gu) || [];
+    const set = new Set();
+    matches.forEach(match => {
+      const normalized = normalizeHashtag(match);
+      if (normalized) set.add(normalized);
+    });
+    return Array.from(set);
+  }
+
+  function currentHashtags() {
+    const tags = new Set();
+    if (titleInputEl) {
+      extractHashtags(titleInputEl.value).forEach(tag => tags.add(tag));
+    }
+    const detailsValue = detailsFieldHidden ? detailsFieldHidden.value : (detailsTextarea ? detailsTextarea.value : '');
+    extractHashtags(detailsValue).forEach(tag => tags.add(tag));
+    return Array.from(tags);
+  }
+
+  function renderHashtagBadges() {
+    if (!hashtagBadges) return;
+    const tags = currentHashtags();
+    hashtagBadges.innerHTML = '';
+    if (!tags.length) {
+      const empty = document.createElement('span');
+      empty.className = 'small hashtag-row-empty';
+      empty.textContent = 'No hashtags yet';
+      hashtagBadges.appendChild(empty);
+    } else {
+      tags.forEach(tag => {
+        allHashtags.add(tag);
+        const badge = document.createElement('span');
+        badge.className = 'badge hashtag-badge';
+        badge.textContent = '#' + tag;
+        hashtagBadges.appendChild(badge);
+      });
+    }
+  }
+
+  function hideHashtagSuggestions() {
+    if (!hashtagSuggestions) return;
+    hashtagSuggestions.classList.add('d-none');
+    hashtagSuggestions.innerHTML = '';
+    activeHashtagTarget = null;
+  }
+
+  function detectActiveHashtag(target) {
+    if (!target || typeof target.selectionStart !== 'number') return null;
+    const value = target.value || '';
+    const caret = target.selectionStart;
+    const hashIndex = value.lastIndexOf('#', caret - 1);
+    if (hashIndex === -1) return null;
+    const beforeChar = hashIndex === 0 ? ' ' : value[hashIndex - 1];
+    if (!/\s|\n|\r/.test(beforeChar)) return null;
+    const partial = value.slice(hashIndex, caret);
+    const match = partial.match(/^#([\p{L}\p{N}_-]*)$/u);
+    if (!match) return null;
+    return { start: hashIndex, end: caret, query: match[1] || '' };
+  }
+
+  function showHashtagSuggestions(target) {
+    if (!hashtagSuggestions || !target) return;
+    const active = detectActiveHashtag(target);
+    if (!active || active.query === undefined) {
+      hideHashtagSuggestions();
+      return;
+    }
+    const query = normalizeHashtag(active.query);
+    if (query === '') {
+      hideHashtagSuggestions();
+      return;
+    }
+    const matches = Array.from(allHashtags).filter(tag => tag.startsWith(query) && tag !== query);
+    if (!matches.length) {
+      hideHashtagSuggestions();
+      return;
+    }
+    hashtagSuggestions.innerHTML = '';
+    matches.slice(0, 8).forEach(tag => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '#' + tag;
+      btn.addEventListener('click', () => insertHashtagSuggestion(tag));
+      hashtagSuggestions.appendChild(btn);
+    });
+    hashtagSuggestions.classList.remove('d-none');
+    activeHashtagTarget = { target, start: active.start, end: active.end };
+  }
+
+  function insertHashtagSuggestion(tag) {
+    if (!activeHashtagTarget || !tag) return;
+    const { target, start, end } = activeHashtagTarget;
+    const value = target.value || '';
+    const insertion = '#' + tag + ' ';
+    const nextValue = value.slice(0, start) + insertion + value.slice(end);
+    target.value = nextValue;
+    const nextPos = start + insertion.length;
+    if (typeof target.setSelectionRange === 'function') {
+      target.setSelectionRange(nextPos, nextPos);
+    }
+    target.focus({ preventScroll: true });
+    const evt = new Event('input', { bubbles: true });
+    target.dispatchEvent(evt);
+    hideHashtagSuggestions();
+  }
+
+  renderHashtagBadges();
+
+  function bindHashtagListeners(el) {
+    if (!el) return;
+    const refresh = () => {
+      renderHashtagBadges();
+      showHashtagSuggestions(el);
+    };
+    el.addEventListener('input', refresh);
+    el.addEventListener('click', () => showHashtagSuggestions(el));
+    el.addEventListener('keyup', () => showHashtagSuggestions(el));
+  }
+
+  bindHashtagListeners(titleInputEl);
+  bindHashtagListeners(detailsTextarea);
+
+  document.addEventListener('click', (event) => {
+    if (!hashtagSuggestions || hashtagSuggestions.classList.contains('d-none')) return;
+    if (hashtagSuggestions.contains(event.target)) return;
+    if (titleInputEl && titleInputEl === event.target) return;
+    if (detailsTextarea && detailsTextarea === event.target) return;
+    hideHashtagSuggestions();
+  });
+
   const nextTaskId = <?= $next_task_id !== null ? (int)$next_task_id : 'null' ?>;
   const nextButton = document.getElementById('nextTaskBtn');
   const nextMessage = document.getElementById('nextTaskMessage');
@@ -362,7 +555,12 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
       capitalizeSentences: capitalizeSentences
     });
     if (editor && typeof editor.updateDetails === 'function') {
-      updateDetails = editor.updateDetails;
+      const baseUpdate = editor.updateDetails;
+      updateDetails = function() {
+        const val = baseUpdate();
+        renderHashtagBadges();
+        return val;
+      };
     }
   }
 
@@ -416,7 +614,8 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
       done: doneCheckbox ? doneCheckbox.checked : undefined,
       priority: prioritySelect ? Number(prioritySelect.value) : undefined,
       starred: starredCheckbox ? starredCheckbox.checked : undefined,
-      details: detailsField ? detailsField.value : undefined
+      details: detailsField ? detailsField.value : undefined,
+      hashtags: currentHashtags()
     });
   }
 
@@ -463,6 +662,8 @@ $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
         }
       }
     }
+
+    renderHashtagBadges();
   }
 
   function scheduleSave() {

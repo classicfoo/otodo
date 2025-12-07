@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'hashtags.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -14,6 +15,8 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
 $priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
 $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
+$task_ids = array_column($tasks, 'id');
+$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
 
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
@@ -82,6 +85,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-star:active { background: transparent; }
         .star-icon { font-size: 2rem; line-height: 1; color:rgba(108, 117, 125, 0.51); }
         .starred .star-icon { color: #f4ca4c }
+        .task-hashtags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+        .hashtag-badge { background-color: #f3e8ff; color: #6f42c1; border: 1px solid #e5d4ff; }
+        .task-hashtags .placeholder { color: #6c757d; font-size: 0.9rem; }
         .task-context-menu {
             position: fixed;
             background: #fff;
@@ -302,8 +308,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>">
-                <div class="task-main task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+            <?php $hashtags = $task_hashtags[$task['id']] ?? []; $hashtag_text = implode(' ', array_map(function($tag){ return '#'.$tag; }, $hashtags)); ?>
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
+                <div class="task-main">
+                    <div class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                    <div class="task-hashtags">
+                        <?php foreach ($hashtags as $tag): ?>
+                            <span class="badge hashtag-badge">#<?=htmlspecialchars($tag)?></span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
                 <div class="task-meta">
                     <?php if ($due !== ''): ?>
                         <span class="badge due-date-badge <?=$dueClass?>" aria-label="<?=htmlspecialchars($due)?>">
@@ -353,7 +367,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             rows.forEach((row) => {
                 const title = row.querySelector('.task-title');
                 const text = (title ? title.textContent : '').toLowerCase();
-                row.style.display = query === '' || text.includes(query) ? '' : 'none';
+                const tags = (row.dataset.hashtags || '').toLowerCase();
+                const combined = `${text} ${tags}`.trim();
+                row.style.display = query === '' || combined.includes(query) ? '' : 'none';
             });
         };
 
@@ -621,6 +637,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (payload.due_date !== undefined && payload.due_date !== null) {
       taskEl.dataset.dueDate = payload.due_date;
     }
+    if (Array.isArray(payload.hashtags)) {
+      taskEl.dataset.hashtags = payload.hashtags.map(tag => '#' + tag).join(' ');
+      const tagContainer = taskEl.querySelector('.task-hashtags');
+      renderHashtagRow(tagContainer, payload.hashtags);
+    }
 
     const badge = taskEl.querySelector('.due-date-badge');
     if (badge) {
@@ -739,6 +760,18 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     el.setAttribute('aria-label', fullLabel);
   }
 
+  function renderHashtagRow(container, hashtags) {
+    if (!container) return;
+    container.innerHTML = '';
+    if (!Array.isArray(hashtags) || !hashtags.length) return;
+    hashtags.forEach(tag => {
+      const badge = document.createElement('span');
+      badge.className = 'badge hashtag-badge';
+      badge.textContent = '#' + tag;
+      container.appendChild(badge);
+    });
+  }
+
   function applyPendingTaskUpdates() {
     const updates = readPendingUpdates();
     const remaining = { ...updates };
@@ -782,6 +815,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           const formatted = formatDue(update.due_date);
           renderDueBadge(badge, formatted.label, formatted.className);
         }
+      }
+      if (Array.isArray(update.hashtags)) {
+        row.dataset.hashtags = update.hashtags.map(tag => '#' + tag).join(' ');
+        const tags = row.querySelector('.task-hashtags');
+        renderHashtagRow(tags, update.hashtags);
       }
       delete remaining[taskId];
       changed = true;
@@ -990,7 +1028,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
-      tempItem.innerHTML = `<div class="task-main task-title">${description}</div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      tempItem.dataset.hashtags = '';
+      tempItem.innerHTML = `<div class="task-main"><div class="task-title">${description}</div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
 
       if (window.applyTaskSearchFilter) {
@@ -1027,6 +1066,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (priority) {
           renderPriorityText(priority, json.priority, json.priority_label, json.priority_class);
         }
+        const hashtagContainer = tempItem.querySelector('.task-hashtags');
+        tempItem.dataset.hashtags = (json.hashtags || []).map(tag => '#' + tag).join(' ');
+        renderHashtagRow(hashtagContainer, json.hashtags || []);
         const star = tempItem.querySelector('.star-toggle');
         if (star) {
           star.dataset.id = json.id;
