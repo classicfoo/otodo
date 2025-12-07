@@ -2,8 +2,8 @@
 
 function get_default_line_rules() {
     return [
-        ['prefix' => 'T ', 'label' => 'Task', 'color' => '#1D4ED8', 'className' => 'code-line-task'],
-        ['prefix' => 'N ', 'label' => 'Note', 'color' => '#1E7A3E', 'className' => 'code-line-note'],
+        ['prefix' => 'T ', 'label' => 'Task', 'color' => '#1D4ED8', 'className' => 'code-line-task', 'capitalize' => true],
+        ['prefix' => 'N ', 'label' => 'Note', 'color' => '#1E7A3E', 'className' => 'code-line-note', 'capitalize' => true],
         ['prefix' => 'M ', 'label' => 'Milestone', 'color' => '#800000', 'className' => 'code-line-milestone'],
         ['prefix' => '# ', 'label' => 'Heading', 'color' => '#212529', 'weight' => '700', 'className' => 'code-line-heading'],
         ['prefix' => 'X ', 'label' => 'Done', 'color' => '#6C757D', 'className' => 'code-line-done'],
@@ -37,6 +37,7 @@ function sanitize_line_rules($rules) {
         if ($color && !preg_match('/^#[0-9A-F]{6}$/', $color)) {
             $color = null;
         }
+        $capitalize = isset($rule['capitalize']) ? (bool)$rule['capitalize'] : false;
         $label = isset($rule['label']) ? trim((string)$rule['label']) : '';
         $weight = isset($rule['weight']) && in_array((string)$rule['weight'], ['400', '700'], true) ? (string)$rule['weight'] : null;
 
@@ -49,6 +50,7 @@ function sanitize_line_rules($rules) {
             'prefix' => $prefix,
             'label' => $label !== '' ? $label : null,
             'color' => $color,
+            'capitalize' => $capitalize,
             'weight' => $weight,
             'className' => $className !== '' ? $className : null,
         ], function ($value) {

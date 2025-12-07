@@ -204,6 +204,7 @@ function buildRuleRow(rule, idx) {
 
     const persistentClassName = rule.className || '';
     const persistentWeight = rule.weight || '';
+    const shouldCapitalize = !!rule.capitalize;
 
     const prefix = document.createElement('input');
     prefix.type = 'text';
@@ -225,6 +226,19 @@ function buildRuleRow(rule, idx) {
     color.value = rule.color || '#1D4ED8';
     color.setAttribute('aria-label', 'Rule color');
 
+    const capitalizeWrapper = document.createElement('div');
+    capitalizeWrapper.className = 'form-check mt-2 mt-md-0';
+    const capitalizeInput = document.createElement('input');
+    capitalizeInput.type = 'checkbox';
+    capitalizeInput.className = 'form-check-input';
+    capitalizeInput.id = `capitalize-${idx}`;
+    capitalizeInput.checked = shouldCapitalize;
+    const capitalizeLabel = document.createElement('label');
+    capitalizeLabel.className = 'form-check-label';
+    capitalizeLabel.setAttribute('for', capitalizeInput.id);
+    capitalizeLabel.textContent = 'Capitalize first letter';
+    capitalizeWrapper.append(capitalizeInput, capitalizeLabel);
+
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn btn-outline-danger btn-sm';
@@ -235,7 +249,8 @@ function buildRuleRow(rule, idx) {
         const nextRule = {
             prefix: prefix.value,
             label: label.value,
-            color: color.value
+            color: color.value,
+            capitalize: capitalizeInput.checked
         };
         if (persistentClassName) {
             nextRule.className = persistentClassName;
@@ -250,6 +265,7 @@ function buildRuleRow(rule, idx) {
     prefix.addEventListener('input', updateRule);
     label.addEventListener('input', updateRule);
     color.addEventListener('input', updateRule);
+    capitalizeInput.addEventListener('change', updateRule);
     removeBtn.addEventListener('click', function() {
         const rules = readRules();
         rules.splice(idx, 1);
@@ -259,7 +275,7 @@ function buildRuleRow(rule, idx) {
 
     const rowTop = document.createElement('div');
     rowTop.className = 'd-flex flex-column flex-md-row gap-2 flex-grow-1';
-    rowTop.append(prefix, label, color);
+    rowTop.append(prefix, label, color, capitalizeWrapper);
     row.append(rowTop, removeBtn);
     return row;
 }
@@ -267,7 +283,7 @@ function buildRuleRow(rule, idx) {
 function renderRules() {
     const rules = readRules();
     if (!rules.length) {
-        rules.push({ prefix: 'T ', label: 'Task', color: '#1D4ED8', className: 'code-line-task' });
+        rules.push({ prefix: 'T ', label: 'Task', color: '#1D4ED8', className: 'code-line-task', capitalize: true });
         writeRules(rules);
     }
     lineRulesContainer.innerHTML = '';
