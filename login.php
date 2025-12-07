@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields';
     } else {
-        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color FROM users WHERE username = :username');
+        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color, capitalize_sentences FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user && password_verify($password, $user['password'])) {
@@ -24,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['default_priority'] = (int)($user['default_priority'] ?? 0);
             $_SESSION['line_rules'] = decode_line_rules_from_storage($user['line_rules'] ?? '');
             $_SESSION['details_color'] = normalize_editor_color($user['details_color'] ?? '#212529');
+            $_SESSION['capitalize_sentences'] = isset($user['capitalize_sentences']) ? (int)$user['capitalize_sentences'] === 1 : true;
             header('Location: index.php');
             exit();
         } else {
