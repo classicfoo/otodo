@@ -1,7 +1,7 @@
 (function(global){
   const DEFAULT_RULES = [
-    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8' },
-    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E' },
+    { prefix: 'T ', className: 'code-line-task', color: '#1D4ED8', capitalize: true },
+    { prefix: 'N ', className: 'code-line-note', color: '#1E7A3E', capitalize: true },
     { prefix: 'M ', className: 'code-line-milestone', color: '#800000' },
     { prefix: '# ', className: 'code-line-heading', color: '#212529', weight: '700' },
     { prefix: 'X ', className: 'code-line-done', color: '#6C757D' }
