@@ -261,13 +261,14 @@ $user_hashtags_json = json_encode($user_hashtags);
             color: #0d6efd;
         }
         .inline-hashtag {
-            background: #f3e8ff;
+            position: relative;
             color: #6f42c1;
-            border: 1px solid #e5d4ff;
-            border-radius: 999px;
-            padding: 0.05rem 0.4rem;
             font-weight: 600;
             white-space: nowrap;
+            border-radius: 999px;
+            background: #f3e8ff;
+            box-shadow: 0 0 0 1px #e5d4ff, 0 0 0 6px #f3e8ff;
+            padding-inline: 0;
         }
     </style>
     <title>Task Details</title>
