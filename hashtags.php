@@ -45,19 +45,6 @@ function get_user_hashtags(PDO $db, $userId) {
     return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
 }
 
-function get_user_hashtags_with_counts(PDO $db, $userId) {
-    $stmt = $db->prepare('SELECT h.id, h.name, COUNT(th.task_id) as usage_count FROM hashtags h LEFT JOIN task_hashtags th ON th.hashtag_id = h.id WHERE h.user_id = :uid GROUP BY h.id, h.name ORDER BY h.name COLLATE NOCASE');
-    $stmt->execute([':uid' => $userId]);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    return array_map(function($row) {
-        return [
-            'id' => (int)$row['id'],
-            'name' => $row['name'],
-            'usage' => (int)$row['usage_count'],
-        ];
-    }, $rows);
-}
-
 function get_task_hashtags(PDO $db, $taskId, $userId) {
     $stmt = $db->prepare('SELECT h.name FROM task_hashtags th INNER JOIN hashtags h ON h.id = th.hashtag_id WHERE th.task_id = :tid AND h.user_id = :uid ORDER BY h.name COLLATE NOCASE');
     $stmt->execute([':tid' => $taskId, ':uid' => $userId]);
@@ -79,6 +66,13 @@ function get_hashtags_for_tasks(PDO $db, $userId, array $taskIds) {
         $map[$taskId][] = $row['name'];
     }
     return $map;
+}
+
+function prune_unused_hashtags(PDO $db, $userId) {
+    $delete = $db->prepare(
+        'DELETE FROM hashtags WHERE user_id = :uid AND NOT EXISTS (SELECT 1 FROM task_hashtags th WHERE th.hashtag_id = hashtags.id)'
+    );
+    $delete->execute([':uid' => $userId]);
 }
 
 function ensure_hashtag_ids(PDO $db, $userId, array $hashtags) {
@@ -129,6 +123,7 @@ function sync_task_hashtags(PDO $db, $taskId, $userId, array $hashtags) {
         if (empty($tags)) {
             $delete = $db->prepare('DELETE FROM task_hashtags WHERE task_id = :tid');
             $delete->execute([':tid' => $taskId]);
+            prune_unused_hashtags($db, $userId);
             $db->commit();
             return [];
         }
@@ -160,6 +155,8 @@ function sync_task_hashtags(PDO $db, $taskId, $userId, array $hashtags) {
                 }
             }
         }
+
+        prune_unused_hashtags($db, $userId);
 
         $db->commit();
         return $tags;
