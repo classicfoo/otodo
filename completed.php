@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'hashtags.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -13,6 +14,8 @@ $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
 $priority_classes = [0 => 'bg-secondary-subtle text-secondary', 1 => 'bg-success-subtle text-success', 2 => 'bg-warning-subtle text-warning', 3 => 'bg-danger-subtle text-danger'];
+$task_ids = array_column($tasks, 'id');
+$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
 
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
@@ -35,6 +38,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <style>
         .empty-state { color: #6c757d; }
         .navbar-toggler { border: 1px solid #e9ecef; }
+        .task-hashtags { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.25rem; }
+        .hashtag-badge { background-color: #f3e8ff; color: #6f42c1; border: 1px solid #e5d4ff; }
     </style>
     </head>
 <body class="bg-light">
@@ -106,8 +111,18 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     }
                 }
             ?>
+            <?php $hashtags = $task_hashtags[$task['id']] ?? []; ?>
             <div class="list-group-item d-flex align-items-start list-group-item-action" onclick="location.href='task.php?id=<?=$task['id']?>'" style="cursor: pointer;">
-                <span class="flex-grow-1 text-break text-decoration-line-through"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></span>
+                <div class="flex-grow-1 text-break">
+                    <div class="text-decoration-line-through"><?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
+                    <?php if (!empty($hashtags)): ?>
+                        <div class="task-hashtags mt-1">
+                            <?php foreach ($hashtags as $tag): ?>
+                                <span class="badge hashtag-badge">#<?=htmlspecialchars($tag)?></span>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
                 <span class="d-flex align-items-center gap-2 ms-3 flex-shrink-0 text-nowrap">
                     <?php if ($due !== ''): ?>
                         <span class="small <?=$dueClass?>"><?=htmlspecialchars($due)?></span>

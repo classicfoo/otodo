@@ -1,5 +1,6 @@
 <?php
 require_once 'db.php';
+require_once 'hashtags.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -38,8 +39,11 @@ if ($description !== '') {
         ':due_date' => $due_date,
     ]);
 
+    $id = (int)$db->lastInsertId();
+    $hashtags = collect_hashtags_from_texts($description);
+    sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
+
     if ($accepts_json) {
-        $id = (int)$db->lastInsertId();
         $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
         $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
 
@@ -93,6 +97,7 @@ if ($description !== '') {
             'priority_label' => $priority_labels[$priority] ?? 'None',
             'priority_class' => $priority_classes[$priority] ?? 'text-secondary',
             'starred' => 0,
+            'hashtags' => $hashtags,
         ]);
         exit();
     }
