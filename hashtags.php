@@ -15,7 +15,7 @@ function extract_hashtags_from_text($text) {
         return [];
     }
     $matches = [];
-    preg_match_all('/#([\p{L}\p{N}_-]+)/u', $text, $matches);
+    preg_match_all('/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/u', $text, $matches);
     if (empty($matches[1])) {
         return [];
     }
