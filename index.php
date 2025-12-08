@@ -120,6 +120,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         .task-context-menu button .badge { float: right; }
         .task-context-menu button.active { background-color: #e7f1ff; }
         .header-actions { gap: 0.5rem; }
+        #hashtagManagerModal .modal-content { border-radius: 1.1rem; }
+        #hashtagManagerModal .modal-header { border-bottom: none; padding-bottom: 0; }
+        .hashtag-manager-hero { background: linear-gradient(135deg, #f4edff 0%, #f7fbff 100%); border: 1px solid #ebe6ff; box-shadow: 0 0.75rem 1.5rem rgba(17, 24, 39, 0.07); }
+        .hashtag-manager-stats .badge { padding: 0.65rem 0.8rem; border: 1px solid rgba(99, 102, 241, 0.15); }
+        .hashtag-manager-list { margin-top: 0.25rem; }
+        .hashtag-manage-card { position: relative; border: 1px solid #edeaf7; border-radius: 1rem; padding: 1rem; box-shadow: 0 0.65rem 1.3rem rgba(31, 41, 55, 0.08); background: #fff; overflow: hidden; }
+        .hashtag-manage-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: linear-gradient(180deg, #7c3aed, #5b21b6); opacity: 0.18; }
+        .hashtag-chip { background-color: #f1eaff; color: #5a2ea6; border: 1px solid #e3d7ff; letter-spacing: 0.04em; font-weight: 700; }
+        .hashtag-usage-badge { background: #f6f7fb; color: #4b5563; border: 1px solid #e9ecf5; }
+        .hashtag-actions .btn { min-width: 96px; }
+        .hashtag-manager-empty { color: #6c757d; background: #f9fafb; border: 1px dashed #d9dfe7; border-radius: 0.85rem; }
+        .hashtag-edit-card { background: #f8f9ff; border: 1px solid #e3e3ff; border-radius: 0.85rem; padding: 0.75rem; }
+        .hashtag-edit-card input { max-width: 260px; }
         .task-search {
             display: inline-flex;
             align-items: center;
@@ -262,10 +275,47 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         <div class="list-group">
             <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
             <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <button type="button" class="list-group-item list-group-item-action text-start" data-bs-toggle="modal" data-bs-target="#hashtagManagerModal" id="openHashtagManager">Manage hashtags</button>
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
         <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
+    </div>
+</div>
+<div class="modal fade" id="hashtagManagerModal" tabindex="-1" aria-labelledby="hashtagManagerLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="hashtagManagerLabel">Manage hashtags</h5>
+                    <p class="mb-0 text-muted small">Curate your tags, keep naming consistent, and tidy up unused ones.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="hashtag-manager-hero d-flex flex-column flex-md-row align-items-md-center gap-3 mb-4 p-3 rounded-4">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold mb-1">Organize every hashtag in one place</div>
+                        <div class="text-muted small">Rename for consistency, prune unused tags, and create new ones without leaving your tasks.</div>
+                    </div>
+                    <div class="hashtag-manager-stats d-flex gap-2 flex-wrap">
+                        <span class="badge bg-primary-subtle text-primary">Total <span id="hashtagTotal">0</span></span>
+                        <span class="badge bg-success-subtle text-success">In use <span id="hashtagInUse">0</span></span>
+                    </div>
+                </div>
+                <form class="hashtag-add-form mb-3" id="newHashtagForm">
+                    <label for="newHashtagInput" class="form-label fw-semibold mb-2">Add a new hashtag</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted">#</span>
+                        <input type="text" id="newHashtagInput" class="form-control" placeholder="project-alpha" autocomplete="off">
+                        <button type="submit" class="btn btn-primary">Add hashtag</button>
+                    </div>
+                    <div class="form-text">Names are saved without the # symbol and automatically lowercased.</div>
+                </form>
+                <div class="hashtag-manager-list d-flex flex-column gap-3" id="hashtagManagerList" aria-live="polite"></div>
+                <div class="mt-3 small" id="hashtagManagerStatus"></div>
+            </div>
+        </div>
     </div>
 </div>
 <div class="container">
@@ -451,6 +501,244 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function() {
+    const modalEl = document.getElementById('hashtagManagerModal');
+    const listEl = document.getElementById('hashtagManagerList');
+    const statusEl = document.getElementById('hashtagManagerStatus');
+    const formEl = document.getElementById('newHashtagForm');
+    const inputEl = document.getElementById('newHashtagInput');
+    const totalEl = document.getElementById('hashtagTotal');
+    const inUseEl = document.getElementById('hashtagInUse');
+    if (!modalEl || !listEl) return;
+
+    let hashtags = [];
+    let isLoading = false;
+
+    const setStatus = (message, tone = 'muted') => {
+      if (!statusEl) return;
+      statusEl.className = `mt-3 small text-${tone}`;
+      statusEl.textContent = message || '';
+    };
+
+    const updateStats = () => {
+      if (totalEl) totalEl.textContent = hashtags.length;
+      if (inUseEl) {
+        const used = hashtags.filter(tag => Number(tag.usage) > 0).length;
+        inUseEl.textContent = used;
+      }
+    };
+
+    const renderList = () => {
+      listEl.innerHTML = '';
+      updateStats();
+      if (!hashtags.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-center py-4 px-3 hashtag-manager-empty';
+        empty.textContent = 'No hashtags yet. Add one to get started.';
+        listEl.appendChild(empty);
+        return;
+      }
+
+      hashtags.forEach(tag => {
+        const item = document.createElement('article');
+        item.className = 'hashtag-manage-card';
+
+        const viewRow = document.createElement('div');
+        viewRow.className = 'd-flex align-items-center gap-3 flex-wrap flex-md-nowrap';
+
+        const label = document.createElement('div');
+        label.className = 'd-flex align-items-center gap-3 flex-grow-1 flex-wrap';
+        const badge = document.createElement('span');
+        badge.className = 'badge rounded-pill hashtag-chip px-3 py-2 text-uppercase';
+        badge.textContent = '#' + tag.name;
+        const meta = document.createElement('div');
+        meta.className = 'd-flex align-items-center gap-2 text-muted small flex-wrap';
+        const usage = document.createElement('span');
+        usage.className = 'badge rounded-pill hashtag-usage-badge';
+        usage.textContent = `${tag.usage} use${tag.usage === 1 ? '' : 's'}`;
+        meta.appendChild(usage);
+        label.appendChild(badge);
+        label.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'hashtag-actions d-flex align-items-center gap-2 ms-md-auto';
+
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'btn btn-outline-primary btn-sm';
+        renameBtn.textContent = 'Rename';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'btn btn-outline-danger btn-sm';
+        deleteBtn.textContent = 'Delete';
+
+        const editForm = document.createElement('form');
+        editForm.className = 'hashtag-edit-card d-flex flex-column flex-md-row align-items-md-center gap-2';
+        editForm.hidden = true;
+
+        const editInput = document.createElement('input');
+        editInput.type = 'text';
+        editInput.required = true;
+        editInput.className = 'form-control';
+        editInput.value = tag.name;
+        editInput.setAttribute('aria-label', 'New hashtag name');
+
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'submit';
+        saveBtn.className = 'btn btn-primary';
+        saveBtn.textContent = 'Save changes';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn btn-light';
+        cancelBtn.textContent = 'Cancel';
+
+        editForm.appendChild(editInput);
+        editForm.appendChild(saveBtn);
+        editForm.appendChild(cancelBtn);
+
+        const toggleEdit = (open) => {
+          editForm.hidden = !open;
+          viewRow.hidden = open;
+          if (open) {
+            editInput.value = tag.name;
+            setTimeout(() => editInput.focus(), 50);
+          }
+        };
+
+        renameBtn.addEventListener('click', () => toggleEdit(true));
+        cancelBtn.addEventListener('click', () => toggleEdit(false));
+
+        const sendAction = async (params) => {
+          setStatus('Saving changes…', 'secondary');
+          const resp = await fetch('manage_hashtags.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+            body: new URLSearchParams(params),
+          });
+          const json = await resp.json().catch(() => null);
+          if (!resp.ok || !json || json.status !== 'ok') {
+            throw new Error(json && json.message ? json.message : 'Unable to save hashtag');
+          }
+          hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+          renderList();
+          setStatus('Saved', 'success');
+        };
+
+        editForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const next = editInput.value.trim();
+          if (!next) {
+            setStatus('Hashtag cannot be empty', 'danger');
+            return;
+          }
+          renameBtn.disabled = true;
+          deleteBtn.disabled = true;
+          saveBtn.disabled = true;
+          try {
+            await sendAction({ action: 'rename', id: tag.id, name: next });
+            toggleEdit(false);
+          } catch (err) {
+            setStatus(err.message || 'Rename failed', 'danger');
+          } finally {
+            renameBtn.disabled = false;
+            deleteBtn.disabled = false;
+            saveBtn.disabled = false;
+          }
+        });
+
+        deleteBtn.addEventListener('click', async () => {
+          if (!confirm('Delete #' + tag.name + '? Tasks will lose this hashtag.')) return;
+          renameBtn.disabled = true;
+          deleteBtn.disabled = true;
+          try {
+            await sendAction({ action: 'delete', id: tag.id });
+          } catch (err) {
+            setStatus(err.message || 'Delete failed', 'danger');
+          } finally {
+            renameBtn.disabled = false;
+            deleteBtn.disabled = false;
+          }
+        });
+
+        actions.appendChild(renameBtn);
+        actions.appendChild(deleteBtn);
+
+        viewRow.appendChild(label);
+        viewRow.appendChild(actions);
+        item.appendChild(viewRow);
+        item.appendChild(editForm);
+        listEl.appendChild(item);
+      });
+    };
+
+    const loadHashtags = async () => {
+      if (isLoading) return;
+      isLoading = true;
+      setStatus('Loading hashtags…', 'secondary');
+      try {
+        const resp = await fetch('manage_hashtags.php', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' } });
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || json.status !== 'ok') {
+          throw new Error(json && json.message ? json.message : 'Unable to load hashtags');
+        }
+        hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+        renderList();
+        setStatus(hashtags.length ? '' : 'Start by adding your first hashtag.', hashtags.length ? 'muted' : 'info');
+      } catch (err) {
+        setStatus(err.message || 'Unable to load hashtags', 'danger');
+      } finally {
+        isLoading = false;
+      }
+    };
+
+    if (formEl) {
+      formEl.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!inputEl) return;
+        const value = inputEl.value.trim();
+        if (!value) {
+          setStatus('Please enter a hashtag name', 'danger');
+          return;
+        }
+        inputEl.disabled = true;
+        try {
+          await (async () => {
+            const resp = await fetch('manage_hashtags.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+              body: new URLSearchParams({ action: 'create', name: value }),
+            });
+            const json = await resp.json().catch(() => null);
+            if (!resp.ok || !json || json.status !== 'ok') {
+              throw new Error(json && json.message ? json.message : 'Unable to add hashtag');
+            }
+            hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+            renderList();
+            setStatus('Added #' + value.replace(/^#+/, '').toLowerCase(), 'success');
+            inputEl.value = '';
+          })();
+        } catch (err) {
+          setStatus(err.message || 'Could not add hashtag', 'danger');
+        } finally {
+          inputEl.disabled = false;
+          inputEl.focus();
+        }
+      });
+    }
+
+    modalEl.addEventListener('show.bs.modal', () => {
+      setStatus('', 'muted');
+      loadHashtags();
+    });
+
+    modalEl.addEventListener('shown.bs.modal', () => {
+      if (inputEl) inputEl.focus();
+    });
+  })();
+</script>
 <script>
   const pendingStarKey = 'pendingStarToggles';
   const starOverrideKey = 'starStateOverrides';
