@@ -82,10 +82,22 @@ $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $details_color = normalize_editor_color($_SESSION['details_color'] ?? '#212529');
+$hashtag_color = normalize_hex_color($_SESSION['hashtag_color'] ?? '#6F42C1', '#6F42C1');
+$date_color = normalize_hex_color($_SESSION['date_color'] ?? '#FDA90D', '#FDA90D');
+$hashtag_background = hex_to_rgba($hashtag_color, 0.12);
+$hashtag_border = hex_to_rgba($hashtag_color, 0.25);
+$date_background = hex_to_rgba($date_color, 0.12);
+$date_border = hex_to_rgba($date_color, 0.25);
 $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
 $date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
 $line_rules_json = htmlspecialchars(json_encode($line_rules));
 $details_color_attr = htmlspecialchars($details_color);
+$hashtag_color_attr = htmlspecialchars($hashtag_color);
+$hashtag_background_attr = htmlspecialchars($hashtag_background);
+$hashtag_border_attr = htmlspecialchars($hashtag_border);
+$date_color_attr = htmlspecialchars($date_color);
+$date_background_attr = htmlspecialchars($date_background);
+$date_border_attr = htmlspecialchars($date_border);
 $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
 $date_formats_attr = htmlspecialchars(json_encode($date_formats));
 $task_hashtags_json = json_encode($task_hashtags);
@@ -98,6 +110,14 @@ $user_hashtags_json = json_encode($user_hashtags);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        :root {
+            --inline-hashtag-color: <?=$hashtag_color_attr?>;
+            --inline-hashtag-background: <?=$hashtag_background_attr?>;
+            --inline-hashtag-border: <?=$hashtag_border_attr?>;
+            --inline-date-color: <?=$date_color_attr?>;
+            --inline-date-background: <?=$date_background_attr?>;
+            --inline-date-border: <?=$date_border_attr?>;
+        }
         #prioritySelect option.bg-secondary-subtle:hover,
         #prioritySelect option.bg-secondary-subtle:focus,
         #prioritySelect option.bg-secondary-subtle:active {
@@ -269,22 +289,22 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
         .inline-hashtag {
             position: relative;
-            color: #6f42c1;
+            color: var(--inline-hashtag-color);
             font-weight: 600;
             white-space: nowrap;
             border-radius: 2px;
-            background: #f3e8ff;
-            box-shadow: 0 0 0 1px #e5d4ff;
+            background: var(--inline-hashtag-background);
+            box-shadow: 0 0 0 1px var(--inline-hashtag-border);
             padding-inline: 0;
         }
         .inline-date {
             position: relative;
-            color: #fda90d;
+            color: var(--inline-date-color);
             font-weight: 600;
             white-space: nowrap;
             border-radius: 2px;
-            background: #fff2e7;
-            box-shadow: 0 0 0 1px #ffead4;
+            background: var(--inline-date-background);
+            box-shadow: 0 0 0 1px var(--inline-date-border);
             padding: 0;
         }
     </style>

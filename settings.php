@@ -15,6 +15,8 @@ $username = $_SESSION['username'] ?? '';
 $location = $_SESSION['location'] ?? '';
 $default_priority = (int)($_SESSION['default_priority'] ?? 0);
 $details_color = $_SESSION['details_color'] ?? '#212529';
+$hashtag_color = normalize_hex_color($_SESSION['hashtag_color'] ?? '#6F42C1', '#6F42C1');
+$date_color = normalize_hex_color($_SESSION['date_color'] ?? '#FDA90D', '#FDA90D');
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
 $date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
@@ -36,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $line_rules = get_default_line_rules();
     }
     $details_color = normalize_editor_color($_POST['details_color'] ?? $details_color);
+    $hashtag_color = normalize_hex_color($_POST['hashtag_color'] ?? $hashtag_color, '#6F42C1');
+    $date_color = normalize_hex_color($_POST['date_color'] ?? $date_color, '#FDA90D');
     $capitalize_sentences = isset($_POST['capitalize_sentences']);
     $date_formats_input = $_POST['date_formats'] ?? '';
     $date_formats = sanitize_date_formats_input($date_formats_input);
@@ -46,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($password !== '') {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':password' => $hash,
@@ -54,18 +58,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':pri' => $default_priority,
                     ':rules' => encode_line_rules_for_storage($line_rules),
                     ':color' => $details_color,
+                    ':hashtag_color' => $hashtag_color,
+                    ':date_color' => $date_color,
                     ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':date_formats' => encode_date_formats_for_storage($date_formats),
                     ':id' => $_SESSION['user_id'],
                 ]);
             } else {
-                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':loc' => $location !== '' ? $location : null,
                     ':pri' => $default_priority,
                     ':rules' => encode_line_rules_for_storage($line_rules),
                     ':color' => $details_color,
+                    ':hashtag_color' => $hashtag_color,
+                    ':date_color' => $date_color,
                     ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':date_formats' => encode_date_formats_for_storage($date_formats),
                     ':id' => $_SESSION['user_id'],
@@ -76,6 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['default_priority'] = $default_priority;
             $_SESSION['line_rules'] = $line_rules;
             $_SESSION['details_color'] = $details_color;
+            $_SESSION['hashtag_color'] = $hashtag_color;
+            $_SESSION['date_color'] = $date_color;
             $_SESSION['capitalize_sentences'] = $capitalize_sentences ? 1 : 0;
             $_SESSION['date_formats'] = $date_formats;
             $message = 'Settings saved';
@@ -164,9 +174,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="color" name="details_color" id="details_color" class="form-control form-control-color" value="<?=htmlspecialchars($details_color ?? '#212529')?>" title="Pick a color for the task description editor">
         </div>
         <div class="mb-3">
+            <label class="form-label" for="hashtag_color">Hashtag highlight color</label>
+            <input type="color" name="hashtag_color" id="hashtag_color" class="form-control form-control-color" value="<?=htmlspecialchars($hashtag_color ?? '#6F42C1')?>" title="Pick a color for hashtags in the description preview">
+            <div class="form-text">Background and border shades will adapt to this color.</div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="date_color">Date highlight color</label>
+            <input type="color" name="date_color" id="date_color" class="form-control form-control-color" value="<?=htmlspecialchars($date_color ?? '#FDA90D')?>" title="Pick a color for highlighted dates">
+            <div class="form-text">Background and border shades will adapt to this color.</div>
+        </div>
+        <div class="mb-3">
             <label class="form-label" for="date_formats">Date formats to highlight</label>
             <textarea class="form-control" id="date_formats" name="date_formats" rows="3" placeholder="DD MMM YYYY&#10;YYYY-MM-DD"><?=htmlspecialchars(implode("\n", $date_formats))?></textarea>
-            <div class="form-text">One format per line. Supported tokens: D, DD, M, MM, MMM, MMMM, YY, YYYY. Default: DD MMM YYYY (for example, 31 Dec 2025).</div>
+            <div class="form-text">One format per line. Supported tokens: D, DD, M, MM, MMM, MMMM, YY, YYYY. Defaults include DD MMM YYYY and DD/MM/YYYY (for example, 31 Dec 2025).</div>
         </div>
         <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" role="switch" id="capitalize_sentences" name="capitalize_sentences" <?=$capitalize_sentences ? 'checked' : ''?>>
