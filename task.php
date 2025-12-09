@@ -62,7 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hashtags = collect_hashtags_from_texts($description, $details);
     sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'ok', 'hashtags' => $hashtags]);
+    $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
+    echo json_encode([
+        'status' => 'ok',
+        'hashtags' => $hashtags,
+        'user_hashtags' => $user_hashtags,
+    ]);
     exit();
 }
 
@@ -419,9 +424,13 @@ $user_hashtags_json = json_encode($user_hashtags);
     });
   }
 
+  function replaceHashtagAutocomplete(tags = []) {
+    allHashtags.clear();
+    mergeHashtagsIntoAutocomplete(tags);
+  }
+
   const allHashtags = new Set();
-  mergeHashtagsIntoAutocomplete(taskHashtags);
-  mergeHashtagsIntoAutocomplete(userHashtags);
+  replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || [])]);
 
   function extractHashtags(text) {
     if (!text) return [];
@@ -940,7 +949,10 @@ $user_hashtags_json = json_encode($user_hashtags);
         if (resp && resp.ok) {
           try {
             resp.clone().json().then((payload) => {
-              if (payload && Array.isArray(payload.hashtags)) {
+              if (!payload || typeof payload !== 'object') return;
+              if (Array.isArray(payload.user_hashtags)) {
+                replaceHashtagAutocomplete(payload.user_hashtags);
+              } else if (Array.isArray(payload.hashtags)) {
                 mergeHashtagsIntoAutocomplete(payload.hashtags);
               }
             }).catch(() => {});
