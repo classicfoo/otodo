@@ -19,10 +19,86 @@
       .replace(/"/g, '&quot;');
   }
 
-  function highlightHtml(text = '') {
+  function escapeRegex(text = '') {
+    return text.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  }
+
+  function buildDateRegexes(dateFormats = []) {
+    if (!Array.isArray(dateFormats)) {
+      return [];
+    }
+
+    const tokenMap = {
+      'DD': '(0?[1-9]|[12][0-9]|3[01])',
+      'D': '(0?[1-9]|[12][0-9]|3[01])',
+      'MMMM': '(January|February|March|April|May|June|July|August|September|October|November|December)',
+      'MMM': '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)',
+      'MM': '(0?[1-9]|1[0-2])',
+      'M': '(0?[1-9]|1[0-2])',
+      'YYYY': '\\d{4}',
+      'YY': '\\d{2}'
+    };
+
+    function toRegexString(format) {
+      if (typeof format !== 'string' || !format.trim()) {
+        return null;
+      }
+
+      const trimmed = format.trim();
+      const tokenPattern = /(DD|D|MMMM|MMM|MM|M|YYYY|YY)/g;
+      let lastIndex = 0;
+      let match;
+      const parts = [];
+
+      while ((match = tokenPattern.exec(trimmed))) {
+        const textBefore = trimmed.slice(lastIndex, match.index);
+        if (textBefore) {
+          parts.push(escapeRegex(textBefore));
+        }
+
+        const replacement = tokenMap[match[0]];
+        if (!replacement) {
+          return null;
+        }
+
+        parts.push(replacement);
+        lastIndex = tokenPattern.lastIndex;
+      }
+
+      const trailing = trimmed.slice(lastIndex);
+      if (trailing) {
+        parts.push(escapeRegex(trailing));
+      }
+
+      if (!parts.length) {
+        return null;
+      }
+
+      return '\\b' + parts.join('') + '\\b';
+    }
+
+    return dateFormats
+      .map(toRegexString)
+      .filter(Boolean)
+      .map(function(pattern) {
+        return new RegExp(pattern, 'giu');
+      });
+  }
+
+  function highlightHtml(text = '', dateRegexes = []) {
     const escaped = escapeHtml(text);
     const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
-    return withHashtags.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
+    const withDates = Array.isArray(dateRegexes) && dateRegexes.length
+      ? dateRegexes.reduce(function(prev, regex) {
+          if (!(regex instanceof RegExp)) {
+            return prev;
+          }
+          return prev.replace(regex, function(match) {
+            return '<span class="inline-date">' + match + '</span>';
+          });
+        }, withHashtags)
+      : withHashtags;
+    return withDates.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
       const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
       return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
     });
@@ -131,13 +207,14 @@
     const queueSave = typeof scheduleSave === 'function' ? scheduleSave : function() {};
     const lineRules = pickRules(options.lineRules);
     const capitalizeSentences = !!options.capitalizeSentences;
+    const dateRegexes = buildDateRegexes(options.dateFormats);
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
     }
 
     function renderPreview(text) {
-      const highlighted = highlightHtml(text);
+      const highlighted = highlightHtml(text, dateRegexes);
       preview.innerHTML = wrapLinesWithColors(highlighted, text, lineRules);
     }
 
@@ -289,7 +366,7 @@
     return { updateDetails: syncDetails };
   }
 
-  const api = { initTaskDetailsEditor: initTaskDetailsEditor, normalizeNewlines: normalizeNewlines };
+  const api = { initTaskDetailsEditor: initTaskDetailsEditor, normalizeNewlines: normalizeNewlines, buildDateRegexes: buildDateRegexes };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }

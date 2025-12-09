@@ -276,6 +276,21 @@ describe('task details editor behaviors', () => {
     expect(details.style.getPropertyValue('--details-text-color')).toBe('#123456');
   });
 
+  test('dates matching configured formats render as inline pills', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn(), { dateFormats: ['DD MMM YYYY'] });
+
+    textarea.value = 'Ship before 31 Dec 2025 and after 1 Jan 2026.';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    expect(preview.innerHTML).toContain('<span class="inline-date">31 Dec 2025</span>');
+    expect(preview.innerHTML).toContain('<span class="inline-date">1 Jan 2026</span>');
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
