@@ -403,13 +403,25 @@ $user_hashtags_json = json_encode($user_hashtags);
   const detailsTextarea = document.querySelector('#detailsInput textarea');
   const taskHashtags = <?= $task_hashtags_json ?: '[]' ?>;
   const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
-  const allHashtags = new Set([...taskHashtags, ...userHashtags]);
   let activeHashtagTarget = null;
   let lastSuggestionTarget = null;
 
   function normalizeHashtag(tag) {
     return (tag || '').replace(/^#+/, '').trim().toLowerCase();
   }
+
+  function mergeHashtagsIntoAutocomplete(tags = []) {
+    (tags || []).forEach((tag) => {
+      const normalized = normalizeHashtag(tag);
+      if (normalized) {
+        allHashtags.add(normalized);
+      }
+    });
+  }
+
+  const allHashtags = new Set();
+  mergeHashtagsIntoAutocomplete(taskHashtags);
+  mergeHashtagsIntoAutocomplete(userHashtags);
 
   function extractHashtags(text) {
     if (!text) return [];
@@ -443,7 +455,6 @@ $user_hashtags_json = json_encode($user_hashtags);
       hashtagBadges.appendChild(empty);
     } else {
       tags.forEach(tag => {
-        allHashtags.add(tag);
         const badge = document.createElement('span');
         badge.className = 'badge hashtag-badge';
         const label = document.createElement('span');
@@ -925,7 +936,18 @@ $user_hashtags_json = json_encode($user_hashtags);
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      const request = fetch(window.location.href, {method: 'POST', body: data});
+      const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
+        if (resp && resp.ok) {
+          try {
+            resp.clone().json().then((payload) => {
+              if (payload && Array.isArray(payload.hashtags)) {
+                mergeHashtagsIntoAutocomplete(payload.hashtags);
+              }
+            }).catch(() => {});
+          } catch (err) {}
+        }
+        return resp;
+      });
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
       }
