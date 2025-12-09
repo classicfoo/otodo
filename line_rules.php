@@ -10,12 +10,25 @@ function get_default_line_rules() {
     ];
 }
 
-function normalize_editor_color($color) {
+function normalize_hex_color($color, $default = '#212529') {
     $trimmed = strtoupper(trim($color ?? ''));
     if (!preg_match('/^#[0-9A-F]{6}$/', $trimmed)) {
-        return '#212529';
+        return $default;
     }
     return $trimmed;
+}
+
+function hex_to_rgba($hex, $alpha) {
+    $color = normalize_hex_color($hex, '#000000');
+    $alphaClamped = max(0, min(1, (float)$alpha));
+    $r = hexdec(substr($color, 1, 2));
+    $g = hexdec(substr($color, 3, 2));
+    $b = hexdec(substr($color, 5, 2));
+    return sprintf('rgba(%d, %d, %d, %.3f)', $r, $g, $b, $alphaClamped);
+}
+
+function normalize_editor_color($color) {
+    return normalize_hex_color($color, '#212529');
 }
 
 function sanitize_line_rules($rules) {

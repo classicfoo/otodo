@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields';
     } else {
-        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color, capitalize_sentences, date_formats FROM users WHERE username = :username');
+        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color, hashtag_color, date_color, capitalize_sentences, date_formats FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user && password_verify($password, $user['password'])) {
@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['default_priority'] = (int)($user['default_priority'] ?? 0);
             $_SESSION['line_rules'] = decode_line_rules_from_storage($user['line_rules'] ?? '');
             $_SESSION['details_color'] = normalize_editor_color($user['details_color'] ?? '#212529');
+            $_SESSION['hashtag_color'] = normalize_hex_color($user['hashtag_color'] ?? '#6F42C1', '#6F42C1');
+            $_SESSION['date_color'] = normalize_hex_color($user['date_color'] ?? '#FDA90D', '#FDA90D');
             $_SESSION['capitalize_sentences'] = isset($user['capitalize_sentences']) ? (int)$user['capitalize_sentences'] === 1 : true;
             $_SESSION['date_formats'] = decode_date_formats_from_storage($user['date_formats'] ?? '');
             header('Location: index.php');

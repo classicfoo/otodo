@@ -27,6 +27,8 @@ function get_db() {
             default_priority INTEGER NOT NULL DEFAULT 0,
             line_rules TEXT,
             details_color TEXT,
+            hashtag_color TEXT,
+            date_color TEXT,
             capitalize_sentences INTEGER NOT NULL DEFAULT 1,
             date_formats TEXT
         )");
@@ -87,6 +89,12 @@ function get_db() {
         }
         if (!in_array('details_color', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN details_color TEXT');
+        }
+        if (!in_array('hashtag_color', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN hashtag_color TEXT');
+        }
+        if (!in_array('date_color', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN date_color TEXT');
         }
         if (!in_array('capitalize_sentences', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN capitalize_sentences INTEGER NOT NULL DEFAULT 1');
