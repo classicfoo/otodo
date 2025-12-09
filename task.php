@@ -686,7 +686,7 @@ $user_hashtags_json = json_encode($user_hashtags);
           if (accepted) {
             event.preventDefault();
           }
-        } else if (event.key === 'Escape') {
+        } else if (event.key === 'Escape' || event.key === 'Esc') {
           hideHashtagSuggestions();
         }
       }
