@@ -85,6 +85,13 @@
       });
   }
 
+  function capitalizeMonths(text = '') {
+    const monthPattern = /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/gi;
+    return text.replace(monthPattern, function(match) {
+      return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+    });
+  }
+
   function highlightHtml(text = '', dateRegexes = []) {
     const escaped = escapeHtml(text);
     const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
@@ -94,7 +101,8 @@
             return prev;
           }
           return prev.replace(regex, function(match) {
-            return '<span class="inline-date">' + match + '</span>';
+            const normalized = capitalizeMonths(match);
+            return '<span class="inline-date">' + normalized + '</span>';
           });
         }, withHashtags)
       : withHashtags;
