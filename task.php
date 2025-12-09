@@ -719,7 +719,7 @@ $user_hashtags_json = json_encode($user_hashtags);
           event.preventDefault();
           const delta = event.key === 'ArrowDown' ? 1 : -1;
           setActiveSuggestion(activeSuggestionIndex + delta);
-        } else if (event.key === 'Enter') {
+        } else if (event.key === 'Enter' || event.key === 'Tab') {
           const accepted = acceptActiveSuggestion();
           if (accepted) {
             event.preventDefault();
