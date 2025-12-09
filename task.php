@@ -274,15 +274,17 @@ $user_hashtags_json = json_encode($user_hashtags);
             white-space: nowrap;
             border-radius: 2px;
             background: #f3e8ff;
+            box-shadow: 0 0 0 1px #e5d4ff;
             padding-inline: 0;
         }
         .inline-date {
             position: relative;
-            color: #0d6efd;
+            color: #fda90d;
             font-weight: 600;
             white-space: nowrap;
             border-radius: 2px;
             background: #fff2e7;
+            box-shadow: 0 0 0 1px #ffead4;
             padding: 0;
         }
     </style>
