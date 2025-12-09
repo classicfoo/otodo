@@ -15,7 +15,7 @@ function extract_hashtags_from_text($text) {
         return [];
     }
     $matches = [];
-    preg_match_all('/#([\p{L}\p{N}_-]+)/u', $text, $matches);
+    preg_match_all('/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/u', $text, $matches);
     if (empty($matches[1])) {
         return [];
     }
@@ -81,6 +81,13 @@ function get_hashtags_for_tasks(PDO $db, $userId, array $taskIds) {
     return $map;
 }
 
+function prune_unused_hashtags(PDO $db, $userId) {
+    $delete = $db->prepare(
+        'DELETE FROM hashtags WHERE user_id = :uid AND NOT EXISTS (SELECT 1 FROM task_hashtags th WHERE th.hashtag_id = hashtags.id)'
+    );
+    $delete->execute([':uid' => $userId]);
+}
+
 function ensure_hashtag_ids(PDO $db, $userId, array $hashtags) {
     if (empty($hashtags)) {
         return [];
@@ -129,6 +136,7 @@ function sync_task_hashtags(PDO $db, $taskId, $userId, array $hashtags) {
         if (empty($tags)) {
             $delete = $db->prepare('DELETE FROM task_hashtags WHERE task_id = :tid');
             $delete->execute([':tid' => $taskId]);
+            prune_unused_hashtags($db, $userId);
             $db->commit();
             return [];
         }
@@ -160,6 +168,8 @@ function sync_task_hashtags(PDO $db, $taskId, $userId, array $hashtags) {
                 }
             }
         }
+
+        prune_unused_hashtags($db, $userId);
 
         $db->commit();
         return $tags;

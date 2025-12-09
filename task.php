@@ -135,6 +135,14 @@ $user_hashtags_json = json_encode($user_hashtags);
             background-color: #f3e8ff;
             color: #6f42c1;
             border: 1px solid #e5d4ff;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .hashtag-badge .btn-close {
+            --bs-btn-close-opacity: 1;
+            --bs-btn-close-focus-shadow: 0 0 0 0.15rem rgba(111,66,193,.25);
+            filter: invert(31%) sepia(66%) saturate(655%) hue-rotate(240deg) brightness(93%) contrast(90%);
         }
         .hashtag-row-empty {
             color: #6c757d;
@@ -149,23 +157,28 @@ $user_hashtags_json = json_encode($user_hashtags);
             border-radius: 0.5rem;
             background: #fff;
             box-shadow: 0 0.75rem 1.5rem rgba(0,0,0,0.08);
-            padding: 0.5rem;
+            padding: 0.35rem;
             display: flex;
             gap: 0.35rem;
             flex-wrap: wrap;
             z-index: 1100;
         }
         .hashtag-suggestions button {
-            border: 1px solid #e5d4ff;
-            background: #faf5ff;
+            border: none;
+            background: transparent;
             color: #6f42c1;
-            border-radius: 999px;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.9rem;
+            border-radius: 0.35rem;
+            padding: 0.35rem 0.45rem;
+            font-size: 0.95rem;
+            text-align: left;
         }
         .hashtag-suggestions button:hover,
         .hashtag-suggestions button:focus {
             background: #f1e4ff;
+        }
+        .hashtag-suggestions button.active {
+            background: #e9ddff;
+            font-weight: 600;
         }
         .prism-editor {
             position: relative;
@@ -246,6 +259,16 @@ $user_hashtags_json = json_encode($user_hashtags);
         .prism-editor .token.attr-value {
             color: #0d6efd;
         }
+        .inline-hashtag {
+            position: relative;
+            color: #6f42c1;
+            font-weight: 600;
+            white-space: nowrap;
+            border-radius: 999px;
+            background: #f3e8ff;
+            box-shadow: 0 0 0 1px #e5d4ff, 0 0 0 6px #f3e8ff;
+            padding-inline: 0;
+        }
     </style>
     <title>Task Details</title>
 </head>
@@ -290,7 +313,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Hashtags</label>
-            <div class="d-flex flex-wrap gap-2 align-items-center" id="hashtagBadges" aria-live="polite">
+            <div class="d-flex flex-wrap gap-2 align-items-center position-relative" id="hashtagBadges" aria-live="polite">
                 <span class="small hashtag-row-empty">No hashtags yet</span>
             </div>
             <div id="hashtagSuggestions" class="hashtag-suggestions d-none" aria-live="polite"></div>
@@ -423,10 +446,35 @@ $user_hashtags_json = json_encode($user_hashtags);
         allHashtags.add(tag);
         const badge = document.createElement('span');
         badge.className = 'badge hashtag-badge';
-        badge.textContent = '#' + tag;
+        const label = document.createElement('span');
+        label.textContent = '#' + tag;
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'btn-close btn-close-white btn-sm ms-1';
+        close.setAttribute('aria-label', 'Remove hashtag #' + tag);
+        close.addEventListener('click', () => removeHashtag(tag));
+        badge.appendChild(label);
+        badge.appendChild(close);
         hashtagBadges.appendChild(badge);
       });
     }
+  }
+
+  function removeHashtag(tag) {
+    const normalized = normalizeHashtag(tag);
+    if (!normalized) return;
+    const pattern = new RegExp(`#${normalized}(?=$|[^\\p{L}\\p{N}_-])`, 'giu');
+    if (titleInputEl) {
+      titleInputEl.value = (titleInputEl.value || '').replace(pattern, '');
+    }
+    if (detailsTextarea) {
+      detailsTextarea.value = (detailsTextarea.value || '').replace(pattern, '');
+    }
+    if (detailsFieldHidden && detailsTextarea) {
+      detailsFieldHidden.value = detailsTextarea.value || '';
+    }
+    renderHashtagBadges();
+    scheduleSave();
   }
 
   function hideHashtagSuggestions() {
@@ -462,6 +510,22 @@ $user_hashtags_json = json_encode($user_hashtags);
     return { start: hashIndex, end: caret, query: match[1] || '' };
   }
 
+  function hasUnfinishedHashtag() {
+    const inputs = [titleInputEl, detailsTextarea];
+    return inputs.some(el => {
+      const active = detectActiveHashtag(el);
+      return active && active.query !== undefined && active.query.length > 0;
+    });
+  }
+
+  function positionHashtagSuggestions(target) {
+    if (!hashtagSuggestions || !target) return;
+    const rect = target.getBoundingClientRect();
+    hashtagSuggestions.style.left = `${rect.left + window.scrollX}px`;
+    hashtagSuggestions.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    hashtagSuggestions.style.width = `${rect.width}px`;
+  }
+
   function showHashtagSuggestions(target) {
     if (!hashtagSuggestions || !target) return;
     const active = detectActiveHashtag(target);
@@ -480,16 +544,22 @@ $user_hashtags_json = json_encode($user_hashtags);
       return;
     }
     hashtagSuggestions.innerHTML = '';
-    matches.slice(0, 8).forEach(tag => {
+    activeSuggestionIndex = 0;
+    matches.slice(0, 8).forEach((tag, index) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = '#' + tag;
+      if (index === activeSuggestionIndex) {
+        btn.classList.add('active');
+      }
+      btn.addEventListener('mouseenter', () => setActiveSuggestion(index));
       btn.addEventListener('click', () => insertHashtagSuggestion(tag));
       hashtagSuggestions.appendChild(btn);
     });
     positionHashtagSuggestions(target);
     hashtagSuggestions.classList.remove('d-none');
     activeHashtagTarget = { target, start: active.start, end: active.end };
+    positionHashtagSuggestions(target);
   }
 
   function insertHashtagSuggestion(tag) {
@@ -507,6 +577,24 @@ $user_hashtags_json = json_encode($user_hashtags);
     const evt = new Event('input', { bubbles: true });
     target.dispatchEvent(evt);
     hideHashtagSuggestions();
+    trySendPendingSave();
+  }
+
+  function setActiveSuggestion(index) {
+    const buttons = Array.from(hashtagSuggestions.querySelectorAll('button'));
+    if (!buttons.length) return;
+    activeSuggestionIndex = Math.max(0, Math.min(index, buttons.length - 1));
+    buttons.forEach((btn, idx) => {
+      btn.classList.toggle('active', idx === activeSuggestionIndex);
+    });
+  }
+
+  function acceptActiveSuggestion() {
+    const buttons = Array.from(hashtagSuggestions.querySelectorAll('button'));
+    if (!buttons.length) return false;
+    const btn = buttons[Math.max(0, Math.min(activeSuggestionIndex, buttons.length - 1))];
+    btn.click();
+    return true;
   }
 
   renderHashtagBadges();
@@ -516,10 +604,27 @@ $user_hashtags_json = json_encode($user_hashtags);
     const refresh = () => {
       renderHashtagBadges();
       showHashtagSuggestions(el);
+      trySendPendingSave();
     };
     el.addEventListener('input', refresh);
     el.addEventListener('click', () => showHashtagSuggestions(el));
     el.addEventListener('keyup', () => showHashtagSuggestions(el));
+    el.addEventListener('keydown', (event) => {
+      if (hashtagSuggestions && !hashtagSuggestions.classList.contains('d-none')) {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const delta = event.key === 'ArrowDown' ? 1 : -1;
+          setActiveSuggestion(activeSuggestionIndex + delta);
+        } else if (event.key === 'Enter') {
+          const accepted = acceptActiveSuggestion();
+          if (accepted) {
+            event.preventDefault();
+          }
+        } else if (event.key === 'Escape') {
+          hideHashtagSuggestions();
+        }
+      }
+    });
   }
 
   bindHashtagListeners(titleInputEl);
@@ -589,7 +694,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       const baseUpdate = editor.updateDetails;
       updateDetails = function() {
         const val = baseUpdate();
-        renderHashtagBadges();
+  renderHashtagBadges();
         return val;
       };
     }
@@ -697,10 +802,22 @@ $user_hashtags_json = json_encode($user_hashtags);
     renderHashtagBadges();
   }
 
+  function trySendPendingSave() {
+    if (pendingSaveBlocked && !hasUnfinishedHashtag()) {
+      pendingSaveBlocked = false;
+      scheduleSave();
+    }
+  }
+
   function scheduleSave() {
     captureFormState();
     markListReloadNeeded();
     if (timer) clearTimeout(timer);
+    if (hasUnfinishedHashtag()) {
+      pendingSaveBlocked = true;
+      return;
+    }
+    pendingSaveBlocked = false;
     timer = setTimeout(sendSave, 500);
   }
 
