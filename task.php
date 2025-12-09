@@ -269,7 +269,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             color: #6f42c1;
             font-weight: 600;
             white-space: nowrap;
-            border-radius: 2px;
+            border-radius: 0px;
             background: #f3e8ff;
             box-shadow: 0 0 0 1px #e5d4ff;
             padding-inline: 0;
