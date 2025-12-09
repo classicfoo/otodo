@@ -679,10 +679,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       isLoading = true;
       setStatus('Loading hashtags…', 'secondary');
       try {
-        const resp = await fetch('manage_hashtags.php', { headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' } });
+        const resp = await fetch('manage_hashtags.php', {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        const fallback = resp.clone();
         const json = await resp.json().catch(() => null);
         if (!resp.ok || !json || json.status !== 'ok') {
-          throw new Error(json && json.message ? json.message : 'Unable to load hashtags');
+          const text = !json ? await fallback.text().catch(() => '') : '';
+          const detail = (json && json.message) || (text ? text.slice(0, 140) : '');
+          throw new Error(detail || 'Unable to load hashtags');
         }
         hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
         renderList();

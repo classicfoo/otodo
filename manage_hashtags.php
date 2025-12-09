@@ -25,8 +25,12 @@ $db = get_db();
 $userId = (int)$_SESSION['user_id'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $tags = get_user_hashtags_with_counts($db, $userId);
-    respond('ok', '', ['hashtags' => $tags]);
+    try {
+        $tags = get_user_hashtags_with_counts($db, $userId);
+        respond('ok', '', ['hashtags' => $tags]);
+    } catch (Exception $e) {
+        respond('error', 'Failed to load hashtags', [], 500);
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
