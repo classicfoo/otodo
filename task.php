@@ -271,8 +271,8 @@ $user_hashtags_json = json_encode($user_hashtags);
             white-space: nowrap;
             border-radius: 999px;
             background: #f3e8ff;
-            box-shadow: 0 0 0 1px #e5d4ff, 0 0 0 6px #f3e8ff;
-            padding-inline: 0;
+            box-shadow: 0 0 0 1px #e5d4ff;
+            padding-inline: 0.2rem;
         }
     </style>
     <title>Task Details</title>
