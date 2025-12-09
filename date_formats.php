@@ -1,7 +1,14 @@
 <?php
 
 function get_default_date_formats(): array {
-    return ['DD MMM YYYY'];
+    return [
+        'DD MMM YYYY',
+        'DD MMM YY',
+        'DD/MM/YYYY',
+        'DD/MM/YY',
+        'DD-MM-YYYY',
+        'DD-MM-YY',
+    ];
 }
 
 function sanitize_date_formats_input($input): array {

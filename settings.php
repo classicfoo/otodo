@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mb-3">
             <label class="form-label" for="date_formats">Date formats to highlight</label>
             <textarea class="form-control" id="date_formats" name="date_formats" rows="3" placeholder="DD MMM YYYY&#10;YYYY-MM-DD"><?=htmlspecialchars(implode("\n", $date_formats))?></textarea>
-            <div class="form-text">One format per line. Supported tokens: D, DD, M, MM, MMM, MMMM, YY, YYYY. Default: DD MMM YYYY (for example, 31 Dec 2025).</div>
+            <div class="form-text">One format per line. Supported tokens: D, DD, M, MM, MMM, MMMM, YY, YYYY. Defaults include DD MMM YYYY and DD/MM/YYYY (for example, 31 Dec 2025).</div>
         </div>
         <div class="form-check form-switch mb-4">
             <input class="form-check-input" type="checkbox" role="switch" id="capitalize_sentences" name="capitalize_sentences" <?=$capitalize_sentences ? 'checked' : ''?>>
