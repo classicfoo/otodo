@@ -62,7 +62,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hashtags = collect_hashtags_from_texts($description, $details);
     sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'ok', 'hashtags' => $hashtags]);
+    $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
+    echo json_encode([
+        'status' => 'ok',
+        'hashtags' => $hashtags,
+        'user_hashtags' => $user_hashtags,
+    ]);
     exit();
 }
 
@@ -403,13 +408,29 @@ $user_hashtags_json = json_encode($user_hashtags);
   const detailsTextarea = document.querySelector('#detailsInput textarea');
   const taskHashtags = <?= $task_hashtags_json ?: '[]' ?>;
   const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
-  const allHashtags = new Set([...taskHashtags, ...userHashtags]);
   let activeHashtagTarget = null;
   let lastSuggestionTarget = null;
 
   function normalizeHashtag(tag) {
     return (tag || '').replace(/^#+/, '').trim().toLowerCase();
   }
+
+  function mergeHashtagsIntoAutocomplete(tags = []) {
+    (tags || []).forEach((tag) => {
+      const normalized = normalizeHashtag(tag);
+      if (normalized) {
+        allHashtags.add(normalized);
+      }
+    });
+  }
+
+  function replaceHashtagAutocomplete(tags = []) {
+    allHashtags.clear();
+    mergeHashtagsIntoAutocomplete(tags);
+  }
+
+  const allHashtags = new Set();
+  replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || [])]);
 
   function extractHashtags(text) {
     if (!text) return [];
@@ -443,7 +464,6 @@ $user_hashtags_json = json_encode($user_hashtags);
       hashtagBadges.appendChild(empty);
     } else {
       tags.forEach(tag => {
-        allHashtags.add(tag);
         const badge = document.createElement('span');
         badge.className = 'badge hashtag-badge';
         const label = document.createElement('span');
@@ -485,14 +505,68 @@ $user_hashtags_json = json_encode($user_hashtags);
     lastSuggestionTarget = null;
   }
 
-  function positionHashtagSuggestions(target) {
-    if (!hashtagSuggestions || !target) return;
-    const rect = target.getBoundingClientRect();
+  function getCaretPositionRect(target) {
+    if (!target) return null;
+    const baseRect = target.getBoundingClientRect();
     const scrollX = window.scrollX || window.pageXOffset;
     const scrollY = window.scrollY || window.pageYOffset;
-    hashtagSuggestions.style.left = `${rect.left + scrollX}px`;
-    hashtagSuggestions.style.top = `${rect.bottom + scrollY + 6}px`;
-    hashtagSuggestions.style.width = `${rect.width}px`;
+
+    if (target.tagName !== 'TEXTAREA' || typeof target.selectionStart !== 'number') {
+      return {
+        left: baseRect.left + scrollX,
+        right: baseRect.right + scrollX,
+        top: baseRect.top + scrollY,
+        bottom: baseRect.bottom + scrollY,
+        width: baseRect.width
+      };
+    }
+
+    const mirror = document.createElement('div');
+    const computed = window.getComputedStyle(target);
+    const properties = [
+      'boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+      'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+      'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
+      'textTransform', 'textDecoration', 'textAlign', 'tabSize', 'whiteSpace', 'wordBreak', 'overflowWrap'
+    ];
+
+    properties.forEach((prop) => {
+      mirror.style[prop] = computed[prop];
+    });
+
+    mirror.style.position = 'absolute';
+    mirror.style.visibility = 'hidden';
+    mirror.style.whiteSpace = 'pre-wrap';
+    mirror.style.wordWrap = 'break-word';
+    mirror.style.overflow = 'auto';
+    mirror.style.left = `${baseRect.left + scrollX}px`;
+    mirror.style.top = `${baseRect.top + scrollY}px`;
+    mirror.textContent = (target.value || '').slice(0, target.selectionStart);
+
+    const caretSpan = document.createElement('span');
+    caretSpan.textContent = '\u200b';
+    mirror.appendChild(caretSpan);
+
+    document.body.appendChild(mirror);
+    const caretRect = caretSpan.getBoundingClientRect();
+    document.body.removeChild(mirror);
+
+    return {
+      left: caretRect.left + scrollX,
+      right: caretRect.right + scrollX,
+      top: caretRect.top + scrollY,
+      bottom: caretRect.bottom + scrollY,
+      width: baseRect.width
+    };
+  }
+
+  function positionHashtagSuggestions(target) {
+    if (!hashtagSuggestions || !target) return;
+    const caretRect = getCaretPositionRect(target);
+    if (!caretRect) return;
+    hashtagSuggestions.style.left = `${caretRect.left}px`;
+    hashtagSuggestions.style.top = `${caretRect.bottom + 6}px`;
+    hashtagSuggestions.style.width = `${caretRect.width}px`;
     lastSuggestionTarget = target;
   }
 
@@ -516,14 +590,6 @@ $user_hashtags_json = json_encode($user_hashtags);
       const active = detectActiveHashtag(el);
       return active && active.query !== undefined && active.query.length > 0;
     });
-  }
-
-  function positionHashtagSuggestions(target) {
-    if (!hashtagSuggestions || !target) return;
-    const rect = target.getBoundingClientRect();
-    hashtagSuggestions.style.left = `${rect.left + window.scrollX}px`;
-    hashtagSuggestions.style.top = `${rect.bottom + window.scrollY + 4}px`;
-    hashtagSuggestions.style.width = `${rect.width}px`;
   }
 
   function showHashtagSuggestions(target) {
@@ -879,7 +945,21 @@ $user_hashtags_json = json_encode($user_hashtags);
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      const request = fetch(window.location.href, {method: 'POST', body: data});
+      const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
+        if (resp && resp.ok) {
+          try {
+            resp.clone().json().then((payload) => {
+              if (!payload || typeof payload !== 'object') return;
+              if (Array.isArray(payload.user_hashtags)) {
+                replaceHashtagAutocomplete(payload.user_hashtags);
+              } else if (Array.isArray(payload.hashtags)) {
+                mergeHashtagsIntoAutocomplete(payload.hashtags);
+              }
+            }).catch(() => {});
+          } catch (err) {}
+        }
+        return resp;
+      });
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
       }
