@@ -274,7 +274,6 @@ $user_hashtags_json = json_encode($user_hashtags);
             white-space: nowrap;
             border-radius: 2px;
             background: #f3e8ff;
-            box-shadow: 0 0 0 1px #e5d4ff;
             padding-inline: 0;
         }
         .inline-date {
@@ -283,8 +282,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             font-weight: 600;
             white-space: nowrap;
             border-radius: 2px;
-            background: #e7f1ff;
-            box-shadow: 0 0 0 1px #bfd7ff;
+            background: #fff2e7;
             padding: 0;
         }
     </style>
