@@ -2,6 +2,7 @@
 require_once 'db.php';
 require_once 'line_rules.php';
 require_once 'hashtags.php';
+require_once 'date_formats.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -82,9 +83,11 @@ if ($p < 0 || $p > 3) { $p = 0; }
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $details_color = normalize_editor_color($_SESSION['details_color'] ?? '#212529');
 $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
+$date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
 $line_rules_json = htmlspecialchars(json_encode($line_rules));
 $details_color_attr = htmlspecialchars($details_color);
 $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
+$date_formats_attr = htmlspecialchars(json_encode($date_formats));
 $task_hashtags_json = json_encode($task_hashtags);
 $user_hashtags_json = json_encode($user_hashtags);
 ?>
@@ -274,6 +277,16 @@ $user_hashtags_json = json_encode($user_hashtags);
             box-shadow: 0 0 0 1px #e5d4ff;
             padding-inline: 0;
         }
+        .inline-date {
+            position: relative;
+            color: #0d6efd;
+            font-weight: 600;
+            white-space: nowrap;
+            border-radius: 999px;
+            background: #e7f1ff;
+            box-shadow: 0 0 0 1px #bfd7ff;
+            padding: 0.05rem 0.35rem;
+        }
     </style>
     <title>Task Details</title>
 </head>
@@ -349,7 +362,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
                 <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
                 <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
             </div>
@@ -748,6 +761,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (details && detailsField && window.initTaskDetailsEditor) {
     let rules = [];
     const capitalizeSentences = details.dataset.capitalizeSentences === 'true';
+    let dateFormats = [];
     try {
       rules = JSON.parse(details.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
@@ -756,10 +770,19 @@ $user_hashtags_json = json_encode($user_hashtags);
     } catch (err) {
       rules = [];
     }
+    try {
+      dateFormats = JSON.parse(details.dataset.dateFormats || '[]');
+      if (!Array.isArray(dateFormats)) {
+        dateFormats = [];
+      }
+    } catch (err) {
+      dateFormats = [];
+    }
     const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
       lineRules: rules,
       textColor: details.dataset.textColor,
-      capitalizeSentences: capitalizeSentences
+      capitalizeSentences: capitalizeSentences,
+      dateFormats: dateFormats
     });
     if (editor && typeof editor.updateDetails === 'function') {
       const baseUpdate = editor.updateDetails;
