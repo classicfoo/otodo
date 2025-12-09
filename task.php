@@ -148,21 +148,20 @@ $user_hashtags_json = json_encode($user_hashtags);
             color: #6c757d;
         }
         .hashtag-suggestions {
-            margin-top: 0.5rem;
+            position: absolute;
+            left: 0;
+            top: 0;
+            min-width: 240px;
+            max-width: min(420px, calc(100vw - 2rem));
             border: 1px solid #e9ecef;
             border-radius: 0.5rem;
             background: #fff;
             box-shadow: 0 0.75rem 1.5rem rgba(0,0,0,0.08);
             padding: 0.35rem;
             display: flex;
-            flex-direction: column;
-            gap: 0.1rem;
-            position: absolute;
-            z-index: 1080;
-            min-width: 12rem;
-            max-width: 22rem;
-            max-height: 14rem;
-            overflow-y: auto;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            z-index: 1100;
         }
         .hashtag-suggestions button {
             border: none;
@@ -406,8 +405,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
   const allHashtags = new Set([...taskHashtags, ...userHashtags]);
   let activeHashtagTarget = null;
-  let pendingSaveBlocked = false;
-  let activeSuggestionIndex = -1;
+  let lastSuggestionTarget = null;
 
   function normalizeHashtag(tag) {
     return (tag || '').replace(/^#+/, '').trim().toLowerCase();
@@ -484,6 +482,18 @@ $user_hashtags_json = json_encode($user_hashtags);
     hashtagSuggestions.classList.add('d-none');
     hashtagSuggestions.innerHTML = '';
     activeHashtagTarget = null;
+    lastSuggestionTarget = null;
+  }
+
+  function positionHashtagSuggestions(target) {
+    if (!hashtagSuggestions || !target) return;
+    const rect = target.getBoundingClientRect();
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+    hashtagSuggestions.style.left = `${rect.left + scrollX}px`;
+    hashtagSuggestions.style.top = `${rect.bottom + scrollY + 6}px`;
+    hashtagSuggestions.style.width = `${rect.width}px`;
+    lastSuggestionTarget = target;
   }
 
   function detectActiveHashtag(target) {
@@ -546,6 +556,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       btn.addEventListener('click', () => insertHashtagSuggestion(tag));
       hashtagSuggestions.appendChild(btn);
     });
+    positionHashtagSuggestions(target);
     hashtagSuggestions.classList.remove('d-none');
     activeHashtagTarget = { target, start: active.start, end: active.end };
     positionHashtagSuggestions(target);
@@ -625,6 +636,18 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (titleInputEl && titleInputEl === event.target) return;
     if (detailsTextarea && detailsTextarea === event.target) return;
     hideHashtagSuggestions();
+  });
+
+  window.addEventListener('scroll', () => {
+    if (lastSuggestionTarget && !hashtagSuggestions.classList.contains('d-none')) {
+      positionHashtagSuggestions(lastSuggestionTarget);
+    }
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    if (lastSuggestionTarget && !hashtagSuggestions.classList.contains('d-none')) {
+      positionHashtagSuggestions(lastSuggestionTarget);
+    }
   });
 
   const nextTaskId = <?= $next_task_id !== null ? (int)$next_task_id : 'null' ?>;
