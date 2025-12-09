@@ -696,6 +696,10 @@ $user_hashtags_json = json_encode($user_hashtags);
     return true;
   }
 
+  function hasVisibleHashtagSuggestions() {
+    return !!(hashtagSuggestions && !hashtagSuggestions.classList.contains('d-none') && hashtagSuggestions.querySelector('button'));
+  }
+
   renderHashtagBadges();
 
   function bindHashtagListeners(el) {
@@ -714,19 +718,17 @@ $user_hashtags_json = json_encode($user_hashtags);
       showHashtagSuggestions(el);
     });
     el.addEventListener('keydown', (event) => {
-      if (hashtagSuggestions && !hashtagSuggestions.classList.contains('d-none')) {
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-          event.preventDefault();
-          const delta = event.key === 'ArrowDown' ? 1 : -1;
-          setActiveSuggestion(activeSuggestionIndex + delta);
-        } else if (event.key === 'Enter') {
-          const accepted = acceptActiveSuggestion();
-          if (accepted) {
-            event.preventDefault();
-          }
-        } else if (event.key === 'Escape' || event.key === 'Esc') {
-          hideHashtagSuggestions();
-        }
+      if (!hasVisibleHashtagSuggestions()) return;
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        setActiveSuggestion(activeSuggestionIndex + delta);
+      } else if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        acceptActiveSuggestion();
+      } else if (event.key === 'Escape' || event.key === 'Esc') {
+        hideHashtagSuggestions();
       }
     });
   }
