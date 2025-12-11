@@ -417,9 +417,18 @@
         return;
       }
       const lower = tokenText.toLowerCase();
-      const matches = normalizedExpanders.filter(function(entry) {
-        return entry.shortcut.toLowerCase().startsWith(lower);
-      });
+      const matches = normalizedExpanders
+        .filter(function(entry) {
+          return entry.shortcut.toLowerCase().startsWith(lower);
+        })
+        .sort(function(a, b) {
+          const aCaseSensitivePrefix = a.shortcut.startsWith(tokenText);
+          const bCaseSensitivePrefix = b.shortcut.startsWith(tokenText);
+          if (aCaseSensitivePrefix !== bCaseSensitivePrefix) {
+            return aCaseSensitivePrefix ? -1 : 1;
+          }
+          return a.shortcut.localeCompare(b.shortcut);
+        });
       if (!matches.length || (matches.length === 1 && matches[0].shortcut.toLowerCase() === lower)) {
         hideExpanderSuggestions();
         return;
@@ -431,6 +440,14 @@
       syncDetails();
       queueSave();
       updateExpanderSuggestions();
+    });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
+
+    textarea.addEventListener('click', updateExpanderSuggestions);
+    textarea.addEventListener('keyup', function(e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        updateExpanderSuggestions();
+      }
     });
     textarea.addEventListener('blur', hideExpanderSuggestions);
 
@@ -456,9 +473,6 @@
     });
 
     textarea.addEventListener('keydown', function(e) {
-      if (e.defaultPrevented) {
-        return;
-      }
       if (!expanderSuggestions.classList.contains('d-none')) {
         const tokenRange = findCurrentToken();
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
