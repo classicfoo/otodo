@@ -441,6 +441,15 @@
       queueSave();
       updateExpanderSuggestions();
     });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
+
+    textarea.addEventListener('click', updateExpanderSuggestions);
+    textarea.addEventListener('keyup', function(e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        updateExpanderSuggestions();
+      }
+    });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('click', updateExpanderSuggestions);
     textarea.addEventListener('keyup', function(e) {
