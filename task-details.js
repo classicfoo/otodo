@@ -432,6 +432,7 @@
       queueSave();
       updateExpanderSuggestions();
     });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('click', updateExpanderSuggestions);
     textarea.addEventListener('keyup', function(e) {
