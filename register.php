@@ -2,6 +2,7 @@
 require_once 'db.php';
 require_once 'line_rules.php';
 require_once 'date_formats.php';
+require_once 'text_expanders.php';
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -18,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $defaultRules = encode_line_rules_for_storage(get_default_line_rules());
-            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority, line_rules, details_color, hashtag_color, date_color, capitalize_sentences, date_formats) VALUES (:username, :password, 0, :rules, :color, :hashtag_color, :date_color, :capitalize, :date_formats)');
+            $stmt = get_db()->prepare('INSERT INTO users (username, password, default_priority, line_rules, details_color, hashtag_color, date_color, capitalize_sentences, date_formats, text_expanders) VALUES (:username, :password, 0, :rules, :color, :hashtag_color, :date_color, :capitalize, :date_formats, :text_expanders)');
             $stmt->execute([
                 ':username' => $username,
                 ':password' => $hash,
@@ -28,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':date_color' => '#FDA90D',
                 ':capitalize' => 1,
                 ':date_formats' => encode_date_formats_for_storage(get_default_date_formats()),
+                ':text_expanders' => encode_text_expanders_for_storage([]),
             ]);
             header('Location: login.php');
             exit();

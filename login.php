@@ -2,6 +2,7 @@
 require_once 'db.php';
 require_once 'line_rules.php';
 require_once 'date_formats.php';
+require_once 'text_expanders.php';
 
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -15,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === '' || $password === '') {
         $error = 'Please fill in all fields';
     } else {
-        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color, hashtag_color, date_color, capitalize_sentences, date_formats FROM users WHERE username = :username');
+        $stmt = get_db()->prepare('SELECT id, password, location, default_priority, line_rules, details_color, hashtag_color, date_color, capitalize_sentences, date_formats, text_expanders FROM users WHERE username = :username');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($user && password_verify($password, $user['password'])) {
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['date_color'] = normalize_hex_color($user['date_color'] ?? '#FDA90D', '#FDA90D');
             $_SESSION['capitalize_sentences'] = isset($user['capitalize_sentences']) ? (int)$user['capitalize_sentences'] === 1 : true;
             $_SESSION['date_formats'] = decode_date_formats_from_storage($user['date_formats'] ?? '');
+            $_SESSION['text_expanders'] = decode_text_expanders_from_storage($user['text_expanders'] ?? '');
             header('Location: index.php');
             exit();
         } else {
