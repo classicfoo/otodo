@@ -273,6 +273,61 @@
     details.appendChild(expanderSuggestions);
     let activeExpanderIndex = -1;
 
+    function getCaretPositionRect(target) {
+      if (!target || typeof target.selectionStart !== 'number') return null;
+
+      const baseRect = target.getBoundingClientRect();
+      const mirror = document.createElement('div');
+      const computed = window.getComputedStyle(target);
+      const properties = [
+        'boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+        'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
+        'textTransform', 'textDecoration', 'textAlign', 'tabSize', 'whiteSpace', 'wordBreak', 'overflowWrap'
+      ];
+
+      properties.forEach(function(prop) {
+        mirror.style[prop] = computed[prop];
+      });
+
+      mirror.style.position = 'absolute';
+      mirror.style.visibility = 'hidden';
+      mirror.style.whiteSpace = 'pre-wrap';
+      mirror.style.wordWrap = 'break-word';
+      mirror.style.overflow = 'auto';
+      mirror.style.left = (baseRect.left + window.scrollX) + 'px';
+      mirror.style.top = (baseRect.top + window.scrollY) + 'px';
+      mirror.textContent = (target.value || '').slice(0, target.selectionStart);
+
+      const caretSpan = document.createElement('span');
+      caretSpan.textContent = '\u200b';
+      mirror.appendChild(caretSpan);
+
+      document.body.appendChild(mirror);
+      const caretRect = caretSpan.getBoundingClientRect();
+      document.body.removeChild(mirror);
+
+      return {
+        left: caretRect.left + window.scrollX,
+        right: caretRect.right + window.scrollX,
+        top: caretRect.top + window.scrollY,
+        bottom: caretRect.bottom + window.scrollY,
+        width: baseRect.width
+      };
+    }
+
+    function positionExpanderSuggestions() {
+      const caretRect = getCaretPositionRect(textarea);
+      if (!caretRect) return;
+      const containerRect = details.getBoundingClientRect();
+      const left = caretRect.left - (containerRect.left + window.scrollX);
+      const top = caretRect.bottom - (containerRect.top + window.scrollY) + 6;
+      expanderSuggestions.style.left = left + 'px';
+      expanderSuggestions.style.top = top + 'px';
+      const width = Math.max(240, Math.min(420, caretRect.width));
+      expanderSuggestions.style.width = width + 'px';
+    }
+
     function hideExpanderSuggestions() {
       expanderSuggestions.classList.add('d-none');
       activeExpanderIndex = -1;
@@ -332,6 +387,7 @@
         }
       });
       expanderSuggestions.classList.remove('d-none');
+      positionExpanderSuggestions();
     }
 
     function findCurrentToken() {
@@ -376,6 +432,7 @@
       queueSave();
       updateExpanderSuggestions();
     });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('click', updateExpanderSuggestions);
     textarea.addEventListener('keyup', function(e) {

@@ -312,10 +312,10 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
         .expander-suggestions {
             position: absolute;
-            right: 0.75rem;
-            bottom: 0.75rem;
-            min-width: 260px;
-            max-width: 360px;
+            left: 0;
+            top: 0;
+            min-width: 240px;
+            max-width: min(420px, calc(100% - 2rem));
             border: 1px solid #e9ecef;
             border-radius: 0.5rem;
             background: #fff;
