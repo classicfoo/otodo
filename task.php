@@ -23,21 +23,26 @@ if (!$task) {
 $task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
-$ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
-$ordered_stmt->execute([':uid' => $_SESSION['user_id']]);
-$ordered_ids = $ordered_stmt->fetchAll(PDO::FETCH_COLUMN);
+$today = (new DateTime('now'))->format('Y-m-d');
+$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY starred DESC, due_date, priority DESC, id DESC');
+$overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
+$overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
 $next_task_id = null;
 $current_task_id = (int)$task['id'];
 $found_current = false;
-foreach ($ordered_ids as $ordered_id) {
-    $ordered_id = (int)$ordered_id;
+foreach ($overdue_ids as $overdue_id) {
+    $overdue_id = (int)$overdue_id;
     if ($found_current) {
-        $next_task_id = $ordered_id;
+        $next_task_id = $overdue_id;
         break;
     }
-    if ($ordered_id === $current_task_id) {
+    if ($overdue_id === $current_task_id) {
         $found_current = true;
     }
+}
+
+if ($next_task_id === null && !$found_current && count($overdue_ids) > 0) {
+    $next_task_id = (int)$overdue_ids[0];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -783,7 +788,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (nextTaskId === null) {
       nextButton.disabled = true;
       if (nextMessage) {
-        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     }
@@ -791,7 +796,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (nextTaskId !== null) {
         window.location.href = 'task.php?id=' + nextTaskId;
       } else if (nextMessage) {
-        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     });
