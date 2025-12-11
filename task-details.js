@@ -216,6 +216,18 @@
     const lineRules = pickRules(options.lineRules);
     const capitalizeSentences = !!options.capitalizeSentences;
     const dateRegexes = buildDateRegexes(options.dateFormats);
+    const normalizedExpanders = Array.isArray(options.textExpanders)
+      ? options.textExpanders.filter(function(entry) {
+          return entry && typeof entry.shortcut === 'string' && typeof entry.expansion === 'string';
+        }).map(function(entry) {
+          return {
+            shortcut: entry.shortcut.trim(),
+            expansion: entry.expansion.trim()
+          };
+        }).filter(function(entry) {
+          return entry.shortcut && entry.expansion;
+        })
+      : [];
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
@@ -256,10 +268,122 @@
       return nextValue;
     }
 
+    const expanderSuggestions = document.createElement('div');
+    expanderSuggestions.className = 'expander-suggestions d-none';
+    details.appendChild(expanderSuggestions);
+    let activeExpanderIndex = -1;
+
+    function hideExpanderSuggestions() {
+      expanderSuggestions.classList.add('d-none');
+      activeExpanderIndex = -1;
+    }
+
+    function setActiveExpander(idx) {
+      const buttons = Array.from(expanderSuggestions.querySelectorAll('button'));
+      if (!buttons.length) return;
+      activeExpanderIndex = Math.max(0, Math.min(idx, buttons.length - 1));
+      buttons.forEach(function(btn, index) {
+        btn.classList.toggle('active', index === activeExpanderIndex);
+      });
+    }
+
+    function replaceTokenWithExpansion(tokenRange, expansion) {
+      const value = textarea.value || '';
+      const start = tokenRange.start;
+      const end = tokenRange.end;
+      textarea.value = value.slice(0, start) + expansion + value.slice(end);
+      const nextPos = start + expansion.length;
+      textarea.selectionStart = textarea.selectionEnd = nextPos;
+      const updated = syncDetails();
+      queueSave();
+      return updated;
+    }
+
+    function acceptActiveExpander(tokenRange) {
+      const buttons = Array.from(expanderSuggestions.querySelectorAll('button'));
+      if (!buttons.length || activeExpanderIndex === -1) return false;
+      const btn = buttons[Math.max(0, Math.min(activeExpanderIndex, buttons.length - 1))];
+      const expansion = btn.dataset.expansion;
+      if (typeof expansion !== 'string') return false;
+      replaceTokenWithExpansion(tokenRange, expansion);
+      hideExpanderSuggestions();
+      return true;
+    }
+
+    function renderExpanderSuggestions(matches, tokenRange) {
+      expanderSuggestions.innerHTML = '';
+      if (!matches.length) {
+        hideExpanderSuggestions();
+        return;
+      }
+      matches.forEach(function(match, idx) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-light btn-sm w-100 text-start';
+        btn.textContent = match.shortcut + ' → ' + match.expansion;
+        btn.dataset.expansion = match.expansion;
+        btn.addEventListener('click', function() {
+          replaceTokenWithExpansion(tokenRange, match.expansion);
+          hideExpanderSuggestions();
+        });
+        expanderSuggestions.appendChild(btn);
+        if (idx === 0) {
+          setActiveExpander(0);
+        }
+      });
+      expanderSuggestions.classList.remove('d-none');
+    }
+
+    function findCurrentToken() {
+      const pos = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : 0;
+      const value = textarea.value || '';
+      let start = pos;
+      while (start > 0 && !/\s/.test(value[start - 1])) {
+        start--;
+      }
+      let end = pos;
+      while (end < value.length && !/\s/.test(value[end])) {
+        end++;
+      }
+      const text = value.slice(start, end);
+      return { text: text, start: start, end: end };
+    }
+
+    function updateExpanderSuggestions() {
+      if (!normalizedExpanders.length) {
+        hideExpanderSuggestions();
+        return;
+      }
+      const token = findCurrentToken();
+      const tokenText = token.text || '';
+      if (!tokenText) {
+        hideExpanderSuggestions();
+        return;
+      }
+      const lower = tokenText.toLowerCase();
+      const matches = normalizedExpanders.filter(function(entry) {
+        return entry.shortcut.toLowerCase().startsWith(lower);
+      });
+      if (!matches.length || (matches.length === 1 && matches[0].shortcut.toLowerCase() === lower)) {
+        hideExpanderSuggestions();
+        return;
+      }
+      renderExpanderSuggestions(matches, token);
+    }
+
     textarea.addEventListener('input', function() {
       syncDetails();
       queueSave();
+      updateExpanderSuggestions();
     });
+
+    textarea.addEventListener('click', updateExpanderSuggestions);
+    textarea.addEventListener('keyup', function(e) {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        updateExpanderSuggestions();
+      }
+    });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('scroll', function() {
       preview.parentElement.scrollTop = textarea.scrollTop;
@@ -275,6 +399,26 @@
     });
 
     textarea.addEventListener('keydown', function(e) {
+      if (!expanderSuggestions.classList.contains('d-none')) {
+        const tokenRange = findCurrentToken();
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          const delta = e.key === 'ArrowDown' ? 1 : -1;
+          setActiveExpander(activeExpanderIndex + delta);
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          const accepted = acceptActiveExpander(tokenRange);
+          if (accepted) {
+            e.preventDefault();
+            return;
+          }
+        }
+        if (e.key === 'Escape' || e.key === 'Esc') {
+          hideExpanderSuggestions();
+          return;
+        }
+      }
       if (e.key === 'Tab') {
         e.preventDefault();
         const start = textarea.selectionStart;

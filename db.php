@@ -30,7 +30,8 @@ function get_db() {
             hashtag_color TEXT,
             date_color TEXT,
             capitalize_sentences INTEGER NOT NULL DEFAULT 1,
-            date_formats TEXT
+            date_formats TEXT,
+            text_expanders TEXT
         )");
 
         $db->exec("CREATE TABLE IF NOT EXISTS tasks (
@@ -101,6 +102,9 @@ function get_db() {
         }
         if (!in_array('date_formats', $userColumns, true)) {
             $db->exec('ALTER TABLE users ADD COLUMN date_formats TEXT');
+        }
+        if (!in_array('text_expanders', $userColumns, true)) {
+            $db->exec('ALTER TABLE users ADD COLUMN text_expanders TEXT');
         }
 
         if (PHP_OS_FAMILY === 'Windows' && file_exists($databaseFile)) {
