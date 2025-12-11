@@ -43,6 +43,48 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('tab indents all selected lines and preserves selection range', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    textarea.value = 'alpha\nbeta\ngamma';
+    textarea.selectionStart = 0;
+    textarea.selectionEnd = 'alpha\nbeta'.length;
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    textarea.dispatchEvent(event);
+
+    expect(textarea.value).toBe('\talpha\n\tbeta\ngamma');
+    expect(hidden.value).toBe('\talpha\n\tbeta\ngamma');
+    expect(textarea.selectionStart).toBe(1);
+    expect(textarea.selectionEnd).toBe('alpha\nbeta'.length + 2);
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('shift+tab outdents selected lines and keeps selection', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    textarea.value = '\talpha\n\tbeta\ngamma';
+    textarea.selectionStart = 1;
+    textarea.selectionEnd = '\talpha\n\tbeta'.length + 1;
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true });
+    textarea.dispatchEvent(event);
+
+    expect(textarea.value).toBe('alpha\nbeta\ngamma');
+    expect(hidden.value).toBe('alpha\nbeta\ngamma');
+    expect(textarea.selectionStart).toBe(0);
+    expect(textarea.selectionEnd).toBe('alpha\nbeta'.length + 1);
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
   test('double space turns into a tab', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

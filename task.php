@@ -271,7 +271,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             white-space: nowrap;
             border-radius: 999px;
             background: #f3e8ff;
-            box-shadow: 0 0 0 1px #e5d4ff, 0 0 0 6px #f3e8ff;
+            box-shadow: 0 0 0 1px #e5d4ff;
             padding-inline: 0;
         }
     </style>
@@ -674,7 +674,12 @@ $user_hashtags_json = json_encode($user_hashtags);
     };
     el.addEventListener('input', refresh);
     el.addEventListener('click', () => showHashtagSuggestions(el));
-    el.addEventListener('keyup', () => showHashtagSuggestions(el));
+    el.addEventListener('keyup', (event) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        return;
+      }
+      showHashtagSuggestions(el);
+    });
     el.addEventListener('keydown', (event) => {
       if (hashtagSuggestions && !hashtagSuggestions.classList.contains('d-none')) {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -686,7 +691,7 @@ $user_hashtags_json = json_encode($user_hashtags);
           if (accepted) {
             event.preventDefault();
           }
-        } else if (event.key === 'Escape') {
+        } else if (event.key === 'Escape' || event.key === 'Esc') {
           hideHashtagSuggestions();
         }
       }

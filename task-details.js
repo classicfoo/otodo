@@ -192,7 +192,53 @@
     textarea.addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
-        insertAtSelection('\t');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+
+        if (start === end && !e.shiftKey) {
+          insertAtSelection('\t');
+          syncDetails();
+          queueSave();
+          return;
+        }
+
+        const value = textarea.value || '';
+        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const lineEndIndex = value.indexOf('\n', end);
+        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
+
+        const selectedLines = value.slice(lineStart, lineEnd).split('\n');
+
+        if (e.shiftKey) {
+          let totalRemoved = 0;
+          let firstLineRemoved = 0;
+          const outdented = selectedLines.map(function(line, index) {
+            const match = line.match(/^(\t| {1,4})/);
+            if (match) {
+              const removed = match[0].length;
+              totalRemoved += removed;
+              if (index === 0) {
+                firstLineRemoved = removed;
+              }
+              return line.slice(removed);
+            }
+            return line;
+          }).join('\n');
+
+          textarea.value = value.slice(0, lineStart) + outdented + value.slice(lineEnd);
+          const nextStart = Math.max(lineStart, start - firstLineRemoved);
+          const nextEnd = Math.max(nextStart, end - totalRemoved);
+          textarea.selectionStart = nextStart;
+          textarea.selectionEnd = nextEnd;
+        } else {
+          const indented = selectedLines.map(function(line) { return '\t' + line; }).join('\n');
+          textarea.value = value.slice(0, lineStart) + indented + value.slice(lineEnd);
+          const nextStart = start + 1;
+          const nextEnd = end + selectedLines.length;
+          textarea.selectionStart = nextStart;
+          textarea.selectionEnd = nextEnd;
+        }
+
         syncDetails();
         queueSave();
       } else if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
