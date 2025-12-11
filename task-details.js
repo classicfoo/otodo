@@ -456,6 +456,9 @@
     });
 
     textarea.addEventListener('keydown', function(e) {
+      if (e.defaultPrevented) {
+        return;
+      }
       if (!expanderSuggestions.classList.contains('d-none')) {
         const tokenRange = findCurrentToken();
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
