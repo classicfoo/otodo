@@ -2,6 +2,7 @@
 require_once 'db.php';
 require_once 'line_rules.php';
 require_once 'date_formats.php';
+require_once 'text_expanders.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -20,6 +21,7 @@ $date_color = normalize_hex_color($_SESSION['date_color'] ?? '#FDA90D', '#FDA90D
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
 $date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
+$text_expanders = $_SESSION['text_expanders'] ?? [];
 $timezones = DateTimeZone::listIdentifiers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -43,6 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $capitalize_sentences = isset($_POST['capitalize_sentences']);
     $date_formats_input = $_POST['date_formats'] ?? '';
     $date_formats = sanitize_date_formats_input($date_formats_input);
+    $text_expanders_input = $_POST['text_expanders_json'] ?? '[]';
+    $decoded_expanders = json_decode($text_expanders_input, true);
+    $text_expanders = sanitize_text_expanders($decoded_expanders);
 
     if ($username === '') {
         $error = 'Username cannot be empty';
@@ -50,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($password !== '') {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, password = :password, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats, text_expanders = :text_expanders WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':password' => $hash,
@@ -62,10 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':date_color' => $date_color,
                     ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':date_formats' => encode_date_formats_for_storage($date_formats),
+                    ':text_expanders' => encode_text_expanders_for_storage($text_expanders),
                     ':id' => $_SESSION['user_id'],
                 ]);
             } else {
-                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats WHERE id = :id');
+                $stmt = $db->prepare('UPDATE users SET username = :username, location = :loc, default_priority = :pri, line_rules = :rules, details_color = :color, hashtag_color = :hashtag_color, date_color = :date_color, capitalize_sentences = :capitalize, date_formats = :date_formats, text_expanders = :text_expanders WHERE id = :id');
                 $stmt->execute([
                     ':username' => $username,
                     ':loc' => $location !== '' ? $location : null,
@@ -76,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':date_color' => $date_color,
                     ':capitalize' => $capitalize_sentences ? 1 : 0,
                     ':date_formats' => encode_date_formats_for_storage($date_formats),
+                    ':text_expanders' => encode_text_expanders_for_storage($text_expanders),
                     ':id' => $_SESSION['user_id'],
                 ]);
             }
@@ -88,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['date_color'] = $date_color;
             $_SESSION['capitalize_sentences'] = $capitalize_sentences ? 1 : 0;
             $_SESSION['date_formats'] = $date_formats;
+            $_SESSION['text_expanders'] = $text_expanders;
             $message = 'Settings saved';
         } catch (PDOException $e) {
             $error = 'Username already taken';
@@ -202,6 +210,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <input type="hidden" name="line_rules_json" id="line_rules_json" value="<?=htmlspecialchars(json_encode($line_rules))?>">
         </div>
+        <div class="mb-4">
+            <label class="form-label">Text expanders</label>
+            <p class="text-muted small">Create shortcuts that expand into longer snippets while editing a task description. Start typing a shortcut to see suggestions.</p>
+            <div id="textExpandersContainer" class="d-flex flex-column gap-2"></div>
+            <div class="mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="addExpanderBtn">Add shortcut</button>
+            </div>
+            <input type="hidden" name="text_expanders_json" id="text_expanders_json" value="<?=htmlspecialchars(json_encode($text_expanders))?>">
+        </div>
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
@@ -226,6 +243,9 @@ if (!input.value) {
 const lineRulesContainer = document.getElementById('lineRulesContainer');
 const addRuleBtn = document.getElementById('addRuleBtn');
 const lineRulesInput = document.getElementById('line_rules_json');
+const textExpandersContainer = document.getElementById('textExpandersContainer');
+const addExpanderBtn = document.getElementById('addExpanderBtn');
+const textExpandersInput = document.getElementById('text_expanders_json');
 
 function readRules() {
     try {
@@ -359,6 +379,103 @@ addRuleBtn.addEventListener('click', function() {
 });
 
 renderRules();
+
+function readExpanders() {
+    try {
+        const parsed = JSON.parse(textExpandersInput.value || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+function writeExpanders(expanders) {
+    textExpandersInput.value = JSON.stringify(expanders);
+}
+
+function buildExpanderRow(expander, idx) {
+    const row = document.createElement('div');
+    row.className = 'border rounded p-2 d-flex flex-column flex-md-row gap-2 align-items-md-center';
+
+    const shortcut = document.createElement('input');
+    shortcut.type = 'text';
+    shortcut.className = 'form-control';
+    shortcut.placeholder = 'Shortcut (e.g. prompt:)';
+    shortcut.value = expander.shortcut || '';
+    shortcut.setAttribute('aria-label', 'Expander shortcut');
+
+    const expansion = document.createElement('input');
+    expansion.type = 'text';
+    expansion.className = 'form-control';
+    expansion.placeholder = 'Expansion (e.g. Follow up)';
+    expansion.value = expander.expansion || '';
+    expansion.setAttribute('aria-label', 'Expander expansion');
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-outline-danger btn-sm w-100 w-md-auto';
+    removeBtn.textContent = 'Remove';
+
+    function updateExpander() {
+        const expanders = readExpanders();
+        expanders[idx] = {
+            shortcut: shortcut.value,
+            expansion: expansion.value
+        };
+        writeExpanders(expanders);
+    }
+
+    shortcut.addEventListener('input', updateExpander);
+    expansion.addEventListener('input', updateExpander);
+    removeBtn.addEventListener('click', function() {
+        const expanders = readExpanders();
+        expanders.splice(idx, 1);
+        writeExpanders(expanders);
+        renderExpanders();
+    });
+
+    const rowTop = document.createElement('div');
+    rowTop.className = 'row g-2 flex-grow-1 align-items-center';
+
+    const shortcutCol = document.createElement('div');
+    shortcutCol.className = 'col-12 col-md-4';
+    shortcutCol.append(shortcut);
+
+    const expansionCol = document.createElement('div');
+    expansionCol.className = 'col-12 col-md-6';
+    expansionCol.append(expansion);
+
+    const removeCol = document.createElement('div');
+    removeCol.className = 'col-12 col-md-auto';
+    removeCol.append(removeBtn);
+
+    rowTop.append(shortcutCol, expansionCol, removeCol);
+    row.append(rowTop);
+    return row;
+}
+
+function renderExpanders() {
+    const expanders = readExpanders();
+    textExpandersContainer.innerHTML = '';
+    if (!expanders.length) {
+        expanders.push({ shortcut: 'prompt:', expansion: 'Follow up' });
+        writeExpanders(expanders);
+    }
+    expanders.forEach(function(expander, idx) {
+        textExpandersContainer.appendChild(buildExpanderRow(expander, idx));
+    });
+}
+
+if (addExpanderBtn) {
+    addExpanderBtn.addEventListener('click', function() {
+        const expanders = readExpanders();
+        expanders.push({ shortcut: '', expansion: '' });
+        writeExpanders(expanders);
+        renderExpanders();
+    });
+}
+
+renderExpanders();
 </script>
 </body>
 </html>
