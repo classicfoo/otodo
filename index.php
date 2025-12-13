@@ -273,10 +273,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
-            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
-            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
             <button type="button" class="list-group-item list-group-item-action text-start" data-bs-toggle="modal" data-bs-target="#hashtagManagerModal" id="openHashtagManager">Manage hashtags</button>
-            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
+            <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
         <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
@@ -318,6 +318,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         </div>
     </div>
 </div>
+<div id="view-root" data-view-root data-view="active">
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
         <div class="input-group">
@@ -389,10 +390,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         <?php endforeach; ?>
     </div>
 </div>
+</div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
+<script src="app-api.js"></script>
+<script src="app-router.js"></script>
 <script>
+    window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
     (function() {
         const searchContainer = document.getElementById('task-search');
         const searchToggle = document.getElementById('task-search-toggle');
@@ -510,7 +515,34 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const inputEl = document.getElementById('newHashtagInput');
     const totalEl = document.getElementById('hashtagTotal');
     const inUseEl = document.getElementById('hashtagInUse');
+    const openTrigger = document.getElementById('openHashtagManager');
     if (!modalEl || !listEl) return;
+
+    if (window.viewRouter && window.viewRouter.setSpecialRouteHandler) {
+      window.viewRouter.setSpecialRouteHandler((path) => {
+        if (path.replace(/\/$/, '') === '/hashtags') {
+          const modal = window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+          if (modal) modal.show();
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (openTrigger) {
+      openTrigger.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.history.pushState({}, '', '/hashtags');
+        const modal = window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+        if (modal) modal.show();
+      });
+    }
+
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      if (window.location.pathname === '/hashtags') {
+        window.history.back();
+      }
+    });
 
     let hashtags = [];
     let isLoading = false;
@@ -613,16 +645,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
         const sendAction = async (params) => {
           setStatus('Saving changes…', 'secondary');
-          const resp = await fetch('manage_hashtags.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
-            body: new URLSearchParams(params),
-          });
-          const json = await resp.json().catch(() => null);
-          if (!resp.ok || !json || json.status !== 'ok') {
-            throw new Error(json && json.message ? json.message : 'Unable to save hashtag');
+          const response = await ApiClient.manageHashtag(params.action, params);
+          if (!response.ok || !response.data || response.data.status !== 'ok') {
+            throw new Error(response.error || 'Unable to save hashtag');
           }
-          hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+          hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
           renderList();
           setStatus('Saved', 'success');
         };
@@ -679,19 +706,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       isLoading = true;
       setStatus('Loading hashtags…', 'secondary');
       try {
-        const resp = await fetch('manage_hashtags.php', {
-          headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
-          credentials: 'same-origin',
-          cache: 'no-store',
-        });
-        const fallback = resp.clone();
-        const json = await resp.json().catch(() => null);
-        if (!resp.ok || !json || json.status !== 'ok') {
-          const text = !json ? await fallback.text().catch(() => '') : '';
-          const detail = (json && json.message) || (text ? text.slice(0, 140) : '');
-          throw new Error(detail || 'Unable to load hashtags');
+        const response = await ApiClient.fetchHashtags();
+        if (!response.ok || !response.data || response.data.status !== 'ok') {
+          throw new Error(response.error || 'Unable to load hashtags');
         }
-        hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+        hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
         renderList();
         setStatus(hashtags.length ? '' : 'Start by adding your first hashtag.', hashtags.length ? 'muted' : 'info');
       } catch (err) {
@@ -713,16 +732,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         inputEl.disabled = true;
         try {
           await (async () => {
-            const resp = await fetch('manage_hashtags.php', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
-              body: new URLSearchParams({ action: 'create', name: value }),
-            });
-            const json = await resp.json().catch(() => null);
-            if (!resp.ok || !json || json.status !== 'ok') {
-              throw new Error(json && json.message ? json.message : 'Unable to add hashtag');
+            const response = await ApiClient.manageHashtag('create', { name: value });
+            if (!response.ok || !response.data || response.data.status !== 'ok') {
+              throw new Error(response.error || 'Unable to add hashtag');
             }
-            hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
+            hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
             renderList();
             setStatus('Added #' + value.replace(/^#+/, '').toLowerCase(), 'success');
             inputEl.value = '';
@@ -838,15 +852,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function sendStarUpdate(entry, options = {}) {
-    const data = new FormData();
-    data.append('id', entry.id);
-    data.append('starred', entry.starred);
-
-    const request = fetch('toggle_star.php', {
-      method: 'POST',
-      body: data,
-      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
-    });
+    const request = ApiClient.toggleStar(entry.id, entry.starred);
 
     const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {
       syncing: entry.starred ? 'Starring task…' : 'Unstarring task…',
@@ -854,7 +860,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       error: 'Could not reach server'
     }) : request;
 
-    return tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+    return tracked.then(resp => resp && resp.ok ? resp.data : Promise.reject())
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Update failed');
         const btn = findStarButton(entry.id);
@@ -1256,25 +1262,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (!taskId) {
         return;
       }
-      const data = new FormData();
-      data.append('id', taskId);
-      if (btn.dataset.action === 'priority') {
-        data.append('priority', btn.dataset.value);
-      } else if (btn.dataset.action === 'due') {
-        data.append('due_shortcut', btn.dataset.value);
-      }
-
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
 
-      const request = fetch('update_task_meta.php', {
-        method: 'POST',
-        body: data,
-        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      const request = ApiClient.updateTaskMeta(taskId, {
+        priority: btn.dataset.action === 'priority' ? btn.dataset.value : undefined,
+        due_shortcut: btn.dataset.action === 'due' ? btn.dataset.value : undefined,
       });
 
       const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
 
-      tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+      tracked.then(resp => resp && resp.ok ? resp.data : Promise.reject())
         .then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(taskEl, json);
@@ -1332,11 +1329,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       }
 
       data.set('description', description);
-      const request = fetch('add_task.php', {
-        method: 'POST',
-        body: data,
-        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
-      });
+      const request = ApiClient.createTask(description);
 
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {
@@ -1346,7 +1339,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         });
       }
 
-      request.then(resp => resp.ok ? resp.json() : Promise.reject())
+      request.then(resp => resp && resp.ok ? resp.data : Promise.reject())
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
