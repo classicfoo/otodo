@@ -35,13 +35,50 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install lftp
         run: |
           sudo apt-get update
           sudo apt-get install -y lftp
 
-      - name: Deploy with lftp
+      - name: Compute changed files (push)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE="${{ github.event.before }}"
+          HEAD="${{ github.sha }}"
+
+          EMPTY_TREE="$(git hash-object -t tree /dev/null)"
+
+          # github.event.before can be all zeros on the first push to a branch; fall back to
+          # the previous commit when available, or the empty tree when this is the very first
+          # commit so the diff still produces a meaningful list.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            if git rev-parse "$HEAD^" >/dev/null 2>&1; then
+              BASE="$(git rev-parse "$HEAD^")"
+              echo "No before SHA provided; diffing against HEAD^ ($BASE)."
+            else
+              BASE="$EMPTY_TREE"
+              echo "No before SHA available and no parent commit; diffing against empty tree ($BASE)."
+            fi
+          fi
+
+          git diff --name-only --diff-filter=AMCR "$BASE" "$HEAD" > changed_files.txt
+          git diff --name-only --diff-filter=D "$BASE" "$HEAD" > deleted_files.txt
+
+          # Exclude paths not deployed
+          grep -vE '^(\.git/|\.github/|node_modules/|__tests__/|.*\.md$|.*\.log$|\.env$)' changed_files.txt > changed_files.tmp || true
+          mv changed_files.tmp changed_files.txt
+
+          echo "Changed files to upload (BASE=$BASE -> HEAD=$HEAD):"
+          cat changed_files.txt || true
+          echo "Files to delete on server:"
+          cat deleted_files.txt || true
+
+      - name: Deploy only changed files (FTP)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
@@ -57,26 +94,39 @@ jobs:
           LOCAL_PATH="${GITHUB_WORKSPACE}"
           REMOTE_PATH="${REMOTE_PATH:-/var/www/html}"
 
-          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<EOF
-          set sftp:auto-confirm yes
-          set ssl:verify-certificate no
-          set ftp:passive-mode on
-          set xfer:clobber on
-          lcd $LOCAL_PATH
-          cd $REMOTE_PATH
-          mirror -R \
-            --verbose \
-            --only-newer \
-            --ignore-time \
-            --parallel=4 \
-            --no-perms \
-            --exclude-glob .git/* \
-            --exclude-glob .github/* \
-            --exclude-glob node_modules/* \
-            --exclude-glob __tests__/* \
-            --exclude-glob '*.log' \
-            --exclude-glob '*.md' \
-            --exclude .env \
-          ;
-          bye
-          EOF
+          cd "$LOCAL_PATH"
+
+          {
+            echo "set sftp:auto-confirm yes"
+            echo "set ssl:verify-certificate no"
+            echo "set ftp:passive-mode on"
+            echo "set xfer:clobber on"
+            echo "open -u \"$FTP_USER\",\"$FTP_PASS\" \"$FTP_HOST\""
+            echo "lcd \"$LOCAL_PATH\""
+            echo "cd \"$REMOTE_PATH\""
+
+            if [ -s deleted_files.txt ]; then
+              while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                echo "rm -f \"$f\""
+              done < deleted_files.txt
+            fi
+
+            if [ -s changed_files.txt ]; then
+              while IFS= read -r f; do
+                [ -z "$f" ] && continue
+                dir="$(dirname "$f")"
+                [ "$dir" = "." ] || echo "mkdir -p \"$dir\""
+                echo "put -O \"$dir\" \"$f\""
+              done < changed_files.txt
+            else
+              echo "echo \"No changed files to upload.\""
+            fi
+
+            echo "bye"
+          } > lftp_cmds.txt
+
+          echo "=== lftp plan ==="
+          perl -pe 's/\Q$ENV{FTP_PASS}\E/***/g' lftp_cmds.txt
+
+          lftp -f lftp_cmds.txt
