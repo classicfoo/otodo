@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otodo-cache-v9';
+const CACHE_BASE = 'otodo-cache-v9';
 const DB_NAME = 'otodo-offline';
 const DB_STORE = 'requests';
 const DB_VERSION = 1;
@@ -21,6 +21,49 @@ const URLS_TO_CACHE = [
 ];
 
 let isDrainingQueue = false;
+let activeUserScope = {
+  sessionId: null,
+  userId: null,
+};
+
+function cacheNameForSession(sessionId) {
+  return `${CACHE_BASE}::${sessionId || 'anon'}`;
+}
+
+function parseSessionId(cookieHeader = '') {
+  const match = cookieHeader.match(/PHPSESSID=([^;]+)/);
+  if (!match) return null;
+  return match[1];
+}
+
+function deriveSessionIdFromRequest(request) {
+  if (!request || !request.headers) return null;
+  const cookieHeader = request.headers.get('cookie') || '';
+  return parseSessionId(cookieHeader);
+}
+
+function resolveSessionId(request) {
+  return activeUserScope.sessionId || deriveSessionIdFromRequest(request) || 'anon';
+}
+
+async function getUserCache(request) {
+  const sessionId = resolveSessionId(request);
+  return caches.open(cacheNameForSession(sessionId));
+}
+
+async function matchUserCache(request) {
+  const cache = await getUserCache(request);
+  return cache.match(request);
+}
+
+async function deleteOtherUserCaches(currentSessionId) {
+  const keys = await caches.keys();
+  const expectedName = cacheNameForSession(currentSessionId);
+  const deletions = keys
+    .filter(key => key.startsWith(`${CACHE_BASE}::`) && key !== expectedName)
+    .map(key => caches.delete(key));
+  await Promise.all(deletions);
+}
 
 async function notifyClients(payload) {
   const clients = await self.clients.matchAll({ includeUncontrolled: true });
@@ -182,6 +225,19 @@ self.addEventListener('message', event => {
     event.waitUntil(discardQueuedRequest(data.id));
   } else if (data.type === 'prefetch-urls' && Array.isArray(data.urls)) {
     event.waitUntil(prefetchUrls(data.urls));
+  } else if (data.type === 'set-user') {
+    const previousSession = activeUserScope.sessionId;
+    activeUserScope = {
+      sessionId: data.sessionId || null,
+      userId: data.userId || null,
+    };
+    const currentSession = activeUserScope.sessionId || 'anon';
+
+    event.waitUntil(deleteOtherUserCaches(currentSession));
+
+    if (previousSession && previousSession !== currentSession) {
+      notifyClients({ type: 'user-session-changed', sessionId: currentSession }).catch(() => {});
+    }
   }
 });
 
@@ -207,7 +263,7 @@ async function prefetchUrls(urls = []) {
 
   try {
     await notifyClients({ type: 'prefetch-progress', status: 'start', total: unique.length, completed: 0 });
-    const cache = await caches.open(CACHE_NAME);
+    const cache = await getUserCache();
     let completed = 0;
 
     for (const url of unique) {
@@ -324,7 +380,7 @@ async function handleNonGetRequest(event) {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(URLS_TO_CACHE))
+    getUserCache().then(cache => cache.addAll(URLS_TO_CACHE))
   );
 });
 
@@ -332,7 +388,9 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     Promise.all([
       caches.keys().then(keys => Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys
+          .filter(key => !key.startsWith(`${CACHE_BASE}::`))
+          .map(key => caches.delete(key))
       )),
       drainQueue().catch(() => {}),
     ])
@@ -346,6 +404,12 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(event.request.url);
+  const sessionFromRequest = deriveSessionIdFromRequest(event.request);
+  if (sessionFromRequest && sessionFromRequest !== activeUserScope.sessionId) {
+    activeUserScope.sessionId = sessionFromRequest;
+    event.waitUntil(deleteOtherUserCaches(sessionFromRequest));
+  }
+
   const isNavigational =
     event.request.mode === 'navigate' ||
     ['/index.php', '/task.php', '/completed.php'].some(path => url.pathname.endsWith(path));
@@ -357,27 +421,27 @@ self.addEventListener('fetch', event => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
             event.waitUntil(
-              caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)).catch(() => {})
+              getUserCache(event.request).then(cache => cache.put(event.request, copy)).catch(() => {})
             );
           }
           return networkResponse;
         })
-        .catch(() => caches.match(event.request).then(cacheHit => cacheHit || caches.match('/')))
+        .catch(() => matchUserCache(event.request).then(cacheHit => cacheHit || matchUserCache('/')))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(response => {
+    matchUserCache(event.request).then(response => {
       const fetchPromise = fetch(event.request)
         .then(networkResponse => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+            getUserCache(event.request).then(cache => cache.put(event.request, responseClone));
           }
           return networkResponse;
         })
-        .catch(() => caches.match('/'));
+        .catch(() => matchUserCache('/'));
 
       event.waitUntil(fetchPromise.catch(() => {}));
       return response || fetchPromise;

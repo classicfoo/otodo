@@ -34,6 +34,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <script>
+        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
+    </script>
     <title>Completed Tasks</title>
     <style>
         .empty-state { color: #6c757d; }
@@ -141,6 +144,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 </div>
 </div>
 <script src="prevent-save-shortcut.js"></script>
+<script src="user-context.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
 <script src="sync-queue-ui.js"></script>

@@ -117,6 +117,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <script>
+        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
+    </script>
     <style>
         :root {
             --inline-hashtag-color: <?=$hashtag_color_attr?>;
@@ -1064,6 +1067,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
+<script src="user-context.js"></script>
 <script src="sw-register.js"></script>
 </body>
 </html>
