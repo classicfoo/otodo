@@ -67,7 +67,6 @@ jobs:
           mirror -R \
             --verbose \
             --only-newer \
-            --size-only \
             --ignore-time \
             --parallel=4 \
             --no-perms \
