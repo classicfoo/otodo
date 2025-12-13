@@ -14,6 +14,10 @@ class ApiClient {
       const isJson = (response.headers.get('content-type') || '').includes('application/json');
       const data = isJson ? await response.json() : null;
 
+      if (response.ok && response.status === 202 && data?.queued) {
+        return { ok: true, queued: true, offline: true, status: response.status, data };
+      }
+
       if (!response.ok) {
         return {
           ok: false,
