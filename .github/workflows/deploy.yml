@@ -6,7 +6,31 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sqlite3
+
+      - name: Install dependencies and run tests
+        run: |
+          npm install
+          npm test
+
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
