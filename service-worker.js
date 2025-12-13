@@ -277,7 +277,7 @@ async function prefetchUrls(urls = []) {
         console.warn('Prefetch failed', { url, error });
       } finally {
         completed += 1;
-        await notifyClients({ type: 'prefetch-progress', status: 'progress', total: unique.length, completed });
+        await notifyClients({ type: 'prefetch-progress', status: 'progress', total: unique.length, completed, currentUrl: url });
       }
     }
 
