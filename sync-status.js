@@ -8,17 +8,34 @@
   const badgesEl = document.createElement('span');
   badgesEl.className = 'sync-status-badges d-inline-flex align-items-center gap-1 ms-2';
   const detailEl = document.createElement('div');
-  detailEl.className = 'sync-status-detail small text-muted mt-1 d-flex align-items-center gap-2';
+  detailEl.className = 'sync-status-detail small text-muted mt-1 d-flex flex-column gap-2';
   detailEl.hidden = true;
+
+  const detailContentRow = document.createElement('div');
+  detailContentRow.className = 'd-flex align-items-center gap-2 w-100';
+
   const detailIcon = document.createElement('span');
   detailIcon.setAttribute('aria-hidden', 'true');
   const detailText = document.createElement('span');
   detailText.className = 'flex-grow-1';
   const detailProgress = document.createElement('span');
   detailProgress.className = 'badge rounded-pill bg-light text-body-secondary';
-  detailEl.appendChild(detailIcon);
-  detailEl.appendChild(detailText);
-  detailEl.appendChild(detailProgress);
+
+  const detailProgressBarContainer = document.createElement('div');
+  detailProgressBarContainer.className = 'progress w-100';
+  detailProgressBarContainer.hidden = true;
+  const detailProgressBar = document.createElement('div');
+  detailProgressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+  detailProgressBar.setAttribute('role', 'progressbar');
+  detailProgressBar.setAttribute('aria-valuemin', '0');
+  detailProgressBar.setAttribute('aria-valuemax', '100');
+  detailProgressBarContainer.appendChild(detailProgressBar);
+
+  detailContentRow.appendChild(detailIcon);
+  detailContentRow.appendChild(detailText);
+  detailContentRow.appendChild(detailProgress);
+  detailEl.appendChild(detailContentRow);
+  detailEl.appendChild(detailProgressBarContainer);
 
   if (statusEl.childNodes.length === 1 && statusEl.firstChild.nodeType === Node.TEXT_NODE) {
     messageEl.textContent = statusEl.textContent;
@@ -70,6 +87,8 @@
     if (!detail || !detail.message) {
       detailText.textContent = '';
       detailProgress.textContent = '';
+      detailProgressBar.style.width = '0%';
+      detailProgressBarContainer.hidden = true;
       detailIcon.className = '';
       detailIcon.innerHTML = '';
       detailEl.hidden = true;
@@ -81,11 +100,22 @@
     detailText.textContent = detail.message;
 
     if (detail.progress) {
-      detailProgress.textContent = `${detail.progress.completed}/${detail.progress.total}`;
+      const total = Number(detail.progress.total || 0);
+      const completed = Number(detail.progress.completed || 0);
+      const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+      detailProgress.textContent = `${completed}/${total} cached (${percentage}%)`;
       detailProgress.hidden = false;
+
+      detailProgressBar.style.width = `${percentage}%`;
+      detailProgressBar.setAttribute('aria-valuenow', `${percentage}`);
+      detailProgressBar.textContent = `${percentage}%`;
+      detailProgressBarContainer.hidden = false;
     } else {
       detailProgress.textContent = '';
       detailProgress.hidden = true;
+      detailProgressBar.style.width = '0%';
+      detailProgressBar.textContent = '';
+      detailProgressBarContainer.hidden = true;
     }
 
     if (detail.tone === 'progress' || tone === 'progress') {
