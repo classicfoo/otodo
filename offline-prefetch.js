@@ -47,6 +47,13 @@
       error: 'Could not refresh offline copy',
     };
 
+    const detailMap = {
+      start: 'Preparing offline copies of your tasks and pages.',
+      progress: `Saving tasks for offline (${friendlyCompleted} of ${friendlyTotal}).`,
+      done: 'Task pages cached. You can open them without a connection.',
+      error: 'Could not cache tasks right now. Will retry when online.',
+    };
+
     const badgeMap = {
       start: [{ text: 'Caching', variant: 'info' }],
       progress: [{ text: `${friendlyCompleted}/${friendlyTotal} cached`, variant: 'info' }],
@@ -62,6 +69,16 @@
     if (typeof window.setSyncBadges === 'function') {
       const badges = badgeMap[status] || [];
       window.setSyncBadges(badges);
+    }
+
+    if (typeof window.setSyncDetail === 'function') {
+      const tone = status === 'error' ? 'danger' : (status === 'done' ? 'success' : 'progress');
+      const progress = status === 'progress' ? { total: friendlyTotal, completed: friendlyCompleted } : null;
+      window.setSyncDetail({ message: detailMap[status], tone, progress });
+
+      if (status === 'done' || status === 'error') {
+        setTimeout(() => window.setSyncDetail(null), status === 'done' ? 4000 : 6000);
+      }
     }
   }
 

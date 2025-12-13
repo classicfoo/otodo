@@ -7,6 +7,18 @@
   messageEl.className = 'sync-status-text';
   const badgesEl = document.createElement('span');
   badgesEl.className = 'sync-status-badges d-inline-flex align-items-center gap-1 ms-2';
+  const detailEl = document.createElement('div');
+  detailEl.className = 'sync-status-detail small text-muted mt-1 d-flex align-items-center gap-2';
+  detailEl.hidden = true;
+  const detailIcon = document.createElement('span');
+  detailIcon.setAttribute('aria-hidden', 'true');
+  const detailText = document.createElement('span');
+  detailText.className = 'flex-grow-1';
+  const detailProgress = document.createElement('span');
+  detailProgress.className = 'badge rounded-pill bg-light text-body-secondary';
+  detailEl.appendChild(detailIcon);
+  detailEl.appendChild(detailText);
+  detailEl.appendChild(detailProgress);
 
   if (statusEl.childNodes.length === 1 && statusEl.firstChild.nodeType === Node.TEXT_NODE) {
     messageEl.textContent = statusEl.textContent;
@@ -18,6 +30,9 @@
   }
   if (!statusEl.querySelector('.sync-status-badges')) {
     statusEl.appendChild(badgesEl);
+  }
+  if (!statusEl.querySelector('.sync-status-detail')) {
+    statusEl.appendChild(detailEl);
   }
 
   function renderBadges(badges = []) {
@@ -49,6 +64,43 @@
 
   window.setSyncBadges = function(badges) {
     renderBadges(badges);
+  };
+
+  window.setSyncDetail = function(detail) {
+    if (!detail || !detail.message) {
+      detailText.textContent = '';
+      detailProgress.textContent = '';
+      detailIcon.className = '';
+      detailIcon.innerHTML = '';
+      detailEl.hidden = true;
+      return;
+    }
+
+    const tone = detail.tone || 'info';
+    detailEl.hidden = false;
+    detailText.textContent = detail.message;
+
+    if (detail.progress) {
+      detailProgress.textContent = `${detail.progress.completed}/${detail.progress.total}`;
+      detailProgress.hidden = false;
+    } else {
+      detailProgress.textContent = '';
+      detailProgress.hidden = true;
+    }
+
+    if (detail.tone === 'progress' || tone === 'progress') {
+      detailIcon.className = 'spinner-border spinner-border-sm text-warning';
+      detailIcon.innerHTML = '';
+    } else if (tone === 'success') {
+      detailIcon.className = 'text-success fw-semibold';
+      detailIcon.innerHTML = '&check;';
+    } else if (tone === 'danger' || tone === 'error') {
+      detailIcon.className = 'text-danger fw-semibold';
+      detailIcon.innerHTML = '&#9888;';
+    } else {
+      detailIcon.className = 'text-info';
+      detailIcon.innerHTML = '&#9432;';
+    }
   };
 
   window.updateSyncStatus = function(state, message) {
