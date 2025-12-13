@@ -116,7 +116,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
             --inline-hashtag-color: <?=$hashtag_color_attr?>;
@@ -426,7 +426,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <script src="sync-status.js"></script>
 <script src="sync-queue-ui.js"></script>
 <script src="task-details.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');

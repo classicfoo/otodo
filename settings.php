@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
     <title>Settings</title>
     <style>
         .navbar-toggler {
@@ -251,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="sync-queue-ui.js"></script>
 <script src="app-api.js"></script>
 <script src="app-router.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
 window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
 const input = document.getElementById('location');
