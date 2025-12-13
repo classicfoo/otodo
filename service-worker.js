@@ -27,6 +27,22 @@ let activeUserScope = {
   userId: null,
 };
 
+async function precacheCoreAssets() {
+  try {
+    const cache = await getUserCache();
+    const results = await Promise.all(
+      URLS_TO_CACHE.map(url => cache.add(url).catch(error => ({ error, url }))),
+    );
+
+    const failures = results.filter(result => result && result.error);
+    if (failures.length) {
+      console.warn('Some core assets failed to cache', failures);
+    }
+  } catch (error) {
+    console.warn('Precache failed', error);
+  }
+}
+
 function cacheNameForSession(sessionId) {
   return `${CACHE_BASE}::${sessionId || 'anon'}`;
 }
@@ -381,7 +397,7 @@ async function handleNonGetRequest(event) {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    getUserCache().then(cache => cache.addAll(URLS_TO_CACHE))
+    precacheCoreAssets()
   );
 });
 
