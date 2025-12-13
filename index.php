@@ -1410,7 +1410,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Save failed');
 
-        tempItem.href = json.id ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
+        tempItem.href = (!json.queued && json.id) ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
+        if (json.queued) {
+          tempItem.setAttribute('aria-disabled', 'true');
+        }
         tempItem.classList.remove('opacity-75');
           const title = tempItem.querySelector('.task-main');
           if (title) title.textContent = json.description;
