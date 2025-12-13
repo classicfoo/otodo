@@ -60,14 +60,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
-            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
-            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
-            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
+            <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
+            <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
         <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
+<div id="view-root" data-view-root data-view="completed">
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Completed Tasks</h5>
@@ -138,10 +139,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
     <?php endif; ?>
 </div>
+</div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
+<script src="app-api.js"></script>
+<script src="app-router.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
+</script>
 </body>
 </html>
 
