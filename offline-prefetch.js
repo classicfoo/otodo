@@ -42,6 +42,7 @@
     const progressPercent = friendlyTotal ? Math.round((friendlyCompleted / friendlyTotal) * 100) : 0;
 
     const messageMap = {
+      waiting: 'Preparing offline caching…',
       start: 'Caching tasks for offline use…',
       progress: `Caching tasks for offline use (${friendlyCompleted}/${friendlyTotal}, ${progressPercent}% complete)`,
       done: 'Offline copy ready',
@@ -49,6 +50,7 @@
     };
 
     const detailMap = {
+      waiting: 'Waiting for the offline worker to take control so caching can start.',
       start: 'Preparing offline copies of your tasks and pages so they open even without a connection.',
       progress: `Saving task pages for offline use (${friendlyCompleted} of ${friendlyTotal} cached, ${progressPercent}% done).`,
       done: 'Task pages cached. You can open them without a connection.',
@@ -56,6 +58,7 @@
     };
 
     const badgeMap = {
+      waiting: [{ text: 'Waiting for worker', variant: 'secondary' }],
       start: [{ text: 'Caching', variant: 'info' }],
       progress: [{ text: `${friendlyCompleted}/${friendlyTotal} cached`, variant: 'info' }],
       done: [{ text: 'Offline ready', variant: 'success' }],
@@ -73,7 +76,7 @@
     }
 
     if (typeof window.setSyncDetail === 'function') {
-      const tone = status === 'error' ? 'danger' : (status === 'done' ? 'success' : 'progress');
+      const tone = status === 'error' ? 'danger' : (status === 'done' ? 'success' : (status === 'waiting' ? 'info' : 'progress'));
       const progress = status === 'progress' ? { total: friendlyTotal, completed: friendlyCompleted } : null;
       window.setSyncDetail({ message: detailMap[status], tone, progress });
 
@@ -99,14 +102,25 @@
     }
   }
 
-  async function startPrefetch() {
+  let controllerListenerAttached = false;
+
+  async function startPrefetch(force = false) {
     const urls = gatherPrefetchUrls();
-    if (!shouldPrefetch(urls.length)) {
+    if (!force && !shouldPrefetch(urls.length)) {
       return;
     }
 
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) {
+      updateStatus('waiting', urls.length, 0);
+
+      if (!controllerListenerAttached) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          controllerListenerAttached = false;
+          startPrefetch(true).catch(() => {});
+        }, { once: true });
+        controllerListenerAttached = true;
+      }
       return;
     }
 
