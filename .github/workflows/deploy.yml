@@ -67,6 +67,7 @@ jobs:
           mirror -R \
             --verbose \
             --only-newer \
+            --ignore-time \
             --parallel=4 \
             --no-perms \
             --exclude-glob .git/* \
