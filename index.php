@@ -1039,6 +1039,39 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
 
+  function buildQueuedMetaUpdate(taskEl, action, value) {
+    const currentPriority = Number(taskEl?.dataset.priority || 0);
+    let priority = currentPriority;
+    let dueDate = (taskEl?.dataset.dueDate || '').slice(0, 10);
+
+    if (action === 'priority') {
+      priority = Number(value || 0);
+    } else if (action === 'due') {
+      if (value === 'today') {
+        dueDate = isoDateFromToday(0);
+      } else if (value === 'tomorrow') {
+        dueDate = isoDateFromToday(1);
+      } else if (value === 'next-week') {
+        dueDate = isoDateFromToday(7);
+      } else if (value === 'clear') {
+        dueDate = '';
+      }
+    }
+
+    const dueMeta = formatDue(dueDate);
+
+    return {
+      status: 'ok',
+      queued: true,
+      due_date: dueDate,
+      due_label: dueMeta.label,
+      due_class: dueMeta.className,
+      priority,
+      priority_label: priorityLabels[priority] ?? priorityLabels[0],
+      priority_class: priorityClasses[priority] ?? priorityClasses[0],
+    };
+  }
+
   function buildQueuedTaskPayload(description, data = {}) {
     const todayIso = toIsoDate(0);
     const dueMeta = formatDue(todayIso);
@@ -1294,8 +1327,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
 
-      tracked.then(resp => resp && resp.ok ? resp.data : Promise.reject())
-        .then(json => {
+      tracked.then(resp => {
+        if (!resp || !resp.ok) return Promise.reject();
+        if (resp.queued) {
+          return buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value);
+        }
+        return resp.data;
+      }).then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(taskEl, json);
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
