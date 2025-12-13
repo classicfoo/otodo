@@ -70,6 +70,17 @@ class ApiClient {
 
       return { ok: true, status: response.status, data };
     } catch (error) {
+      if (typeof caches !== 'undefined' && caches?.match) {
+        try {
+          const cached = await caches.match(url);
+          if (cached) {
+            return { ok: true, status: 200, offline: true, data: await cached.text() };
+          }
+        } catch (cacheError) {
+          console.warn('Offline cache lookup failed', cacheError);
+        }
+      }
+
       return { ok: false, status: 0, offline: true, error: 'Network error' };
     }
   }
