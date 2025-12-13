@@ -39,17 +39,18 @@
     lastProgress = { total, completed };
     const friendlyTotal = total || lastProgress.total;
     const friendlyCompleted = completed || lastProgress.completed;
+    const progressPercent = friendlyTotal ? Math.round((friendlyCompleted / friendlyTotal) * 100) : 0;
 
     const messageMap = {
       start: 'Caching tasks for offline use…',
-      progress: `Caching tasks for offline use (${friendlyCompleted}/${friendlyTotal})`,
+      progress: `Caching tasks for offline use (${friendlyCompleted}/${friendlyTotal}, ${progressPercent}% complete)`,
       done: 'Offline copy ready',
       error: 'Could not refresh offline copy',
     };
 
     const detailMap = {
-      start: 'Preparing offline copies of your tasks and pages.',
-      progress: `Saving tasks for offline (${friendlyCompleted} of ${friendlyTotal}).`,
+      start: 'Preparing offline copies of your tasks and pages so they open even without a connection.',
+      progress: `Saving task pages for offline use (${friendlyCompleted} of ${friendlyTotal} cached, ${progressPercent}% done).`,
       done: 'Task pages cached. You can open them without a connection.',
       error: 'Could not cache tasks right now. Will retry when online.',
     };
