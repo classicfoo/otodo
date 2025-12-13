@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otodo-cache-v8';
+const CACHE_NAME = 'otodo-cache-v9';
 const DB_NAME = 'otodo-offline';
 const DB_STORE = 'requests';
 const DB_VERSION = 1;
@@ -180,6 +180,8 @@ self.addEventListener('message', event => {
     event.waitUntil(retryQueuedRequest(data.id));
   } else if (data.type === 'discard-item' && data.id) {
     event.waitUntil(discardQueuedRequest(data.id));
+  } else if (data.type === 'prefetch-urls' && Array.isArray(data.urls)) {
+    event.waitUntil(prefetchUrls(data.urls));
   }
 });
 
@@ -197,6 +199,37 @@ function toRequestInit(entry) {
 
 function shouldDiscardOnConflict(status) {
   return status === 409 || status === 412;
+}
+
+async function prefetchUrls(urls = []) {
+  const unique = [...new Set(urls)].filter(Boolean);
+  if (!unique.length) return;
+
+  try {
+    await notifyClients({ type: 'prefetch-progress', status: 'start', total: unique.length, completed: 0 });
+    const cache = await caches.open(CACHE_NAME);
+    let completed = 0;
+
+    for (const url of unique) {
+      const request = new Request(url, { credentials: 'include' });
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          await cache.put(request, response.clone());
+        }
+      } catch (error) {
+        console.warn('Prefetch failed', { url, error });
+      } finally {
+        completed += 1;
+        await notifyClients({ type: 'prefetch-progress', status: 'progress', total: unique.length, completed });
+      }
+    }
+
+    await notifyClients({ type: 'prefetch-progress', status: 'done', total: unique.length, completed });
+  } catch (error) {
+    console.error('Prefetch error', error);
+    await notifyClients({ type: 'prefetch-progress', status: 'error', total: urls.length || 0, completed: 0 });
+  }
 }
 
 async function sendWithRetry(entry, attempts = 3) {
