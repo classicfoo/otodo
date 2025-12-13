@@ -2,6 +2,8 @@
 require_once 'db.php';
 require_once 'line_rules.php';
 require_once 'hashtags.php';
+require_once 'date_formats.php';
+require_once 'text_expanders.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
@@ -21,21 +23,26 @@ if (!$task) {
 $task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
-$ordered_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
-$ordered_stmt->execute([':uid' => $_SESSION['user_id']]);
-$ordered_ids = $ordered_stmt->fetchAll(PDO::FETCH_COLUMN);
+$today = (new DateTime('now'))->format('Y-m-d');
+$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY starred DESC, due_date, priority DESC, id DESC');
+$overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
+$overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
 $next_task_id = null;
 $current_task_id = (int)$task['id'];
 $found_current = false;
-foreach ($ordered_ids as $ordered_id) {
-    $ordered_id = (int)$ordered_id;
+foreach ($overdue_ids as $overdue_id) {
+    $overdue_id = (int)$overdue_id;
     if ($found_current) {
-        $next_task_id = $ordered_id;
+        $next_task_id = $overdue_id;
         break;
     }
-    if ($ordered_id === $current_task_id) {
+    if ($overdue_id === $current_task_id) {
         $found_current = true;
     }
+}
+
+if ($next_task_id === null && !$found_current && count($overdue_ids) > 0) {
+    $next_task_id = (int)$overdue_ids[0];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -81,10 +88,26 @@ $p = (int)($task['priority'] ?? 0);
 if ($p < 0 || $p > 3) { $p = 0; }
 $line_rules = $_SESSION['line_rules'] ?? get_default_line_rules();
 $details_color = normalize_editor_color($_SESSION['details_color'] ?? '#212529');
+$hashtag_color = normalize_hex_color($_SESSION['hashtag_color'] ?? '#6F42C1', '#6F42C1');
+$date_color = normalize_hex_color($_SESSION['date_color'] ?? '#FDA90D', '#FDA90D');
+$hashtag_background = hex_to_rgba($hashtag_color, 0.12);
+$hashtag_border = hex_to_rgba($hashtag_color, 0.25);
+$date_background = hex_to_rgba($date_color, 0.12);
+$date_border = hex_to_rgba($date_color, 0.25);
 $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSION['capitalize_sentences'] : true;
+$date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
+$text_expanders = $_SESSION['text_expanders'] ?? [];
 $line_rules_json = htmlspecialchars(json_encode($line_rules));
 $details_color_attr = htmlspecialchars($details_color);
+$hashtag_color_attr = htmlspecialchars($hashtag_color);
+$hashtag_background_attr = htmlspecialchars($hashtag_background);
+$hashtag_border_attr = htmlspecialchars($hashtag_border);
+$date_color_attr = htmlspecialchars($date_color);
+$date_background_attr = htmlspecialchars($date_background);
+$date_border_attr = htmlspecialchars($date_border);
 $capitalize_sentences_attr = $capitalize_sentences ? 'true' : 'false';
+$date_formats_attr = htmlspecialchars(json_encode($date_formats));
+$text_expanders_attr = htmlspecialchars(json_encode($text_expanders));
 $task_hashtags_json = json_encode($task_hashtags);
 $user_hashtags_json = json_encode($user_hashtags);
 ?>
@@ -95,6 +118,14 @@ $user_hashtags_json = json_encode($user_hashtags);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        :root {
+            --inline-hashtag-color: <?=$hashtag_color_attr?>;
+            --inline-hashtag-background: <?=$hashtag_background_attr?>;
+            --inline-hashtag-border: <?=$hashtag_border_attr?>;
+            --inline-date-color: <?=$date_color_attr?>;
+            --inline-date-background: <?=$date_background_attr?>;
+            --inline-date-border: <?=$date_border_attr?>;
+        }
         #prioritySelect option.bg-secondary-subtle:hover,
         #prioritySelect option.bg-secondary-subtle:focus,
         #prioritySelect option.bg-secondary-subtle:active {
@@ -266,13 +297,42 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
         .inline-hashtag {
             position: relative;
-            color: #6f42c1;
+            color: var(--inline-hashtag-color);
             font-weight: 600;
             white-space: nowrap;
-            border-radius: 999px;
-            background: #f3e8ff;
-            box-shadow: 0 0 0 1px #e5d4ff;
+            border-radius: 2px;
+            background: var(--inline-hashtag-background);
+            box-shadow: 0 0 0 1px var(--inline-hashtag-border);
             padding-inline: 0;
+        }
+        .inline-date {
+            position: relative;
+            color: var(--inline-date-color);
+            font-weight: 600;
+            white-space: nowrap;
+            border-radius: 2px;
+            background: var(--inline-date-background);
+            box-shadow: 0 0 0 1px var(--inline-date-border);
+            padding: 0;
+        }
+        .expander-suggestions {
+            position: absolute;
+            left: 0;
+            top: 0;
+            min-width: 240px;
+            max-width: min(420px, calc(100% - 2rem));
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            background: #fff;
+            box-shadow: 0 0.75rem 1.5rem rgba(0,0,0,0.08);
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            z-index: 10;
+        }
+        .expander-suggestions .btn.active {
+            background-color: #e7f1ff;
         }
     </style>
     <title>Task Details</title>
@@ -349,7 +409,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
                 <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
                 <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
             </div>
@@ -686,7 +746,7 @@ $user_hashtags_json = json_encode($user_hashtags);
           event.preventDefault();
           const delta = event.key === 'ArrowDown' ? 1 : -1;
           setActiveSuggestion(activeSuggestionIndex + delta);
-        } else if (event.key === 'Enter') {
+        } else if (event.key === 'Enter' || event.key === 'Tab') {
           const accepted = acceptActiveSuggestion();
           if (accepted) {
             event.preventDefault();
@@ -728,7 +788,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (nextTaskId === null) {
       nextButton.disabled = true;
       if (nextMessage) {
-        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     }
@@ -736,7 +796,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (nextTaskId !== null) {
         window.location.href = 'task.php?id=' + nextTaskId;
       } else if (nextMessage) {
-        nextMessage.textContent = 'End of list. No further tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     });
@@ -748,6 +808,8 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (details && detailsField && window.initTaskDetailsEditor) {
     let rules = [];
     const capitalizeSentences = details.dataset.capitalizeSentences === 'true';
+    let dateFormats = [];
+    let textExpanders = [];
     try {
       rules = JSON.parse(details.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
@@ -756,10 +818,28 @@ $user_hashtags_json = json_encode($user_hashtags);
     } catch (err) {
       rules = [];
     }
+    try {
+      dateFormats = JSON.parse(details.dataset.dateFormats || '[]');
+      if (!Array.isArray(dateFormats)) {
+        dateFormats = [];
+      }
+    } catch (err) {
+      dateFormats = [];
+    }
+    try {
+      textExpanders = JSON.parse(details.dataset.textExpanders || '[]');
+      if (!Array.isArray(textExpanders)) {
+        textExpanders = [];
+      }
+    } catch (err) {
+      textExpanders = [];
+    }
     const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
       lineRules: rules,
       textColor: details.dataset.textColor,
-      capitalizeSentences: capitalizeSentences
+      capitalizeSentences: capitalizeSentences,
+      dateFormats: dateFormats,
+      textExpanders: textExpanders
     });
     if (editor && typeof editor.updateDetails === 'function') {
       const baseUpdate = editor.updateDetails;
