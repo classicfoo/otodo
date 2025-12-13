@@ -34,7 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
     <style>
         .navbar-toggler {
             border: 1px solid #e9ecef;
@@ -506,7 +506,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         });
     })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
   (function() {
     const modalEl = document.getElementById('hashtagManagerModal');
