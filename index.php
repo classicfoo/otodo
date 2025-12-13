@@ -511,6 +511,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         });
     })();
 </script>
+<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
 <script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
   (function() {

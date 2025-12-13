@@ -151,6 +151,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="offline-prefetch.js"></script>
 <script src="app-api.js"></script>
 <script src="app-router.js"></script>
+<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
 <script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
 window.viewRouter = window.viewRouter || new ViewRouter('#view-root');

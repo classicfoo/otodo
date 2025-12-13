@@ -15,6 +15,7 @@ const URLS_TO_CACHE = [
   '/sync-status.js',
   '/sync-queue-ui.js',
   '/sw-register.js',
+  '/assets/jquery/jquery-3.7.1.min.js',
   '/assets/bootstrap/bootstrap.min.css',
   '/assets/bootstrap/bootstrap.bundle.min.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
