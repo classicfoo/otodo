@@ -1342,7 +1342,22 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       request.then(resp => resp && resp.ok ? resp.data : Promise.reject())
       .then(json => {
-        if (!json || json.status !== 'ok') throw new Error('Save failed');
+        if (!json) throw new Error('Save failed');
+
+        if (json.queued) {
+          const priority = tempItem.querySelector('.priority-text');
+          if (priority) {
+            priority.textContent = 'Queued for sync';
+            priority.classList.remove('text-secondary');
+            priority.classList.add('text-warning');
+          }
+          tempItem.classList.add('opacity-75');
+          tempItem.removeAttribute('href');
+          if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Task queued for sync');
+          return;
+        }
+
+        if (!json.status || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
           const title = tempItem.querySelector('.task-main');
