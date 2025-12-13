@@ -424,6 +424,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 </div>
 <script src="prevent-save-shortcut.js"></script>
 <script src="sync-status.js"></script>
+<script src="sync-queue-ui.js"></script>
 <script src="task-details.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
