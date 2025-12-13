@@ -143,6 +143,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="prevent-save-shortcut.js"></script>
 <script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
+<script src="sync-queue-ui.js"></script>
 <script src="app-api.js"></script>
 <script src="app-router.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

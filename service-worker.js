@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otodo-cache-v5';
+const CACHE_NAME = 'otodo-cache-v6';
 const DB_NAME = 'otodo-offline';
 const DB_STORE = 'requests';
 const DB_VERSION = 1;
@@ -13,11 +13,22 @@ const URLS_TO_CACHE = [
   '/register.php',
   '/settings.php',
   '/sync-status.js',
+  '/sync-queue-ui.js',
   '/sw-register.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 
 let isDrainingQueue = false;
+
+async function notifyClients(payload) {
+  const clients = await self.clients.matchAll({ includeUncontrolled: true });
+  clients.forEach(client => client.postMessage(payload));
+}
+
+async function broadcastQueueState(extra = {}) {
+  const queue = await getQueuedRequests();
+  await notifyClients({ type: 'queue-state', queue, ...extra });
+}
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
@@ -64,6 +75,8 @@ async function enqueueRequest(request) {
     tx.objectStore(DB_STORE).put(entry);
   });
 
+  await notifyClients({ type: 'queue-event', event: 'queued', entry });
+  await broadcastQueueState();
   return entry;
 }
 
@@ -97,6 +110,17 @@ async function getQueuedRequests() {
   });
 }
 
+async function getRequestById(id) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const store = tx.objectStore(DB_STORE);
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
 async function registerSync() {
   if (!self.registration || !('sync' in self.registration)) {
     return;
@@ -108,6 +132,54 @@ async function registerSync() {
     console.warn('Background sync registration failed', error);
   }
 }
+
+async function retryQueuedRequest(id) {
+  const entry = await getRequestById(id);
+  if (!entry) {
+    await broadcastQueueState();
+    return;
+  }
+
+  await notifyClients({ type: 'queue-event', event: 'retrying', entry });
+  const result = await sendWithRetry(entry);
+
+  if (result.outcome === 'success') {
+    await deleteRequest(id);
+    await notifyClients({ type: 'queue-event', event: 'sent', entry });
+  } else if (result.outcome === 'discard') {
+    await deleteRequest(id);
+    await notifyClients({ type: 'queue-event', event: 'discarded', entry });
+  } else {
+    await notifyClients({ type: 'queue-event', event: 'failed', entry });
+  }
+
+  await broadcastQueueState();
+}
+
+async function discardQueuedRequest(id) {
+  const entry = await getRequestById(id);
+  if (!entry) {
+    await broadcastQueueState();
+    return;
+  }
+
+  await deleteRequest(id);
+  await notifyClients({ type: 'queue-event', event: 'discarded', entry });
+  await broadcastQueueState();
+}
+
+self.addEventListener('message', event => {
+  const data = event.data || {};
+  if (!data || !data.type) return;
+
+  if (data.type === 'get-queue') {
+    event.waitUntil(broadcastQueueState());
+  } else if (data.type === 'retry-item' && data.id) {
+    event.waitUntil(retryQueuedRequest(data.id));
+  } else if (data.type === 'discard-item' && data.id) {
+    event.waitUntil(discardQueuedRequest(data.id));
+  }
+});
 
 function toRequestInit(entry) {
   const headers = new Headers(entry.headers || []);
@@ -159,15 +231,22 @@ async function drainQueue() {
 
   try {
     const requests = await getQueuedRequests();
+    if (requests.length) {
+      await notifyClients({ type: 'queue-drain-start', queueLength: requests.length });
+    }
     for (const entry of requests) {
       const result = await sendWithRetry(entry);
 
       if (result.outcome === 'success') {
         await deleteRequest(entry.id);
         console.info('Queued request sent successfully', { id: entry.id, url: entry.url });
+        await notifyClients({ type: 'queue-event', event: 'sent', entry });
+        await broadcastQueueState({ draining: true });
       } else if (result.outcome === 'discard') {
         await deleteRequest(entry.id);
         console.warn('Removed conflicting queued request', { id: entry.id, url: entry.url });
+        await notifyClients({ type: 'queue-event', event: 'discarded', entry });
+        await broadcastQueueState({ draining: true });
       } else {
         console.error('Leaving request in queue after repeated failures', { id: entry.id, url: entry.url });
         break;
@@ -177,6 +256,7 @@ async function drainQueue() {
     console.error('Error while draining queue', error);
   } finally {
     isDrainingQueue = false;
+    await broadcastQueueState({ draining: false });
   }
 }
 

@@ -3,10 +3,37 @@
   if (!statusEl) return;
 
   let hideTimer;
+  const messageEl = document.createElement('span');
+  messageEl.className = 'sync-status-text';
+  const badgesEl = document.createElement('span');
+  badgesEl.className = 'sync-status-badges d-inline-flex align-items-center gap-1 ms-2';
+
+  if (statusEl.childNodes.length === 1 && statusEl.firstChild.nodeType === Node.TEXT_NODE) {
+    messageEl.textContent = statusEl.textContent;
+    statusEl.textContent = '';
+  }
+
+  if (!statusEl.querySelector('.sync-status-text')) {
+    statusEl.appendChild(messageEl);
+  }
+  if (!statusEl.querySelector('.sync-status-badges')) {
+    statusEl.appendChild(badgesEl);
+  }
+
+  function renderBadges(badges = []) {
+    badgesEl.innerHTML = '';
+    badges.forEach(({ text, variant }) => {
+      const badge = document.createElement('span');
+      badge.className = `badge rounded-pill bg-${variant || 'secondary'} bg-opacity-75 text-body-secondary fw-semibold`;
+      badge.textContent = text;
+      badgesEl.appendChild(badge);
+    });
+  }
+
   function setState(state, message) {
     if (hideTimer) clearTimeout(hideTimer);
     statusEl.dataset.state = state;
-    statusEl.textContent = message;
+    messageEl.textContent = message;
     statusEl.classList.remove('text-success', 'text-warning', 'text-danger', 'opacity-75');
     if (state === 'synced') {
       statusEl.classList.add('text-success');
@@ -19,6 +46,10 @@
       statusEl.classList.add('text-danger');
     }
   }
+
+  window.setSyncBadges = function(badges) {
+    renderBadges(badges);
+  };
 
   window.updateSyncStatus = function(state, message) {
     setState(state, message || defaultMessages[state] || '');
@@ -59,7 +90,7 @@
   window.addEventListener('online', () => setState('synced', 'Back online. Synced'));
   window.addEventListener('offline', () => setState('error', 'Offline. Changes will sync later'));
 
-const sharedRaw = sessionStorage.getItem('sharedSyncStatus');
+  const sharedRaw = sessionStorage.getItem('sharedSyncStatus');
   if (sharedRaw) {
     try {
       const shared = JSON.parse(sharedRaw);
