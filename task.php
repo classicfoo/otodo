@@ -430,6 +430,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <script src="sync-queue-ui.js"></script>
 <script src="offline-prefetch.js"></script>
 <script src="task-details.js"></script>
+<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
 <script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
 (function(){

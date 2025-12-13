@@ -15,6 +15,7 @@ const URLS_TO_CACHE = [
   '/sync-status.js',
   '/sync-queue-ui.js',
   '/sw-register.js',
+  '/assets/jquery/jquery-3.7.1.min.js',
   '/assets/bootstrap/bootstrap.min.css',
   '/assets/bootstrap/bootstrap.bundle.min.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
@@ -25,6 +26,22 @@ let activeUserScope = {
   sessionId: null,
   userId: null,
 };
+
+async function precacheCoreAssets() {
+  try {
+    const cache = await getUserCache();
+    const results = await Promise.all(
+      URLS_TO_CACHE.map(url => cache.add(url).catch(error => ({ error, url }))),
+    );
+
+    const failures = results.filter(result => result && result.error);
+    if (failures.length) {
+      console.warn('Some core assets failed to cache', failures);
+    }
+  } catch (error) {
+    console.warn('Precache failed', error);
+  }
+}
 
 function cacheNameForSession(sessionId) {
   return `${CACHE_BASE}::${sessionId || 'anon'}`;
@@ -380,7 +397,7 @@ async function handleNonGetRequest(event) {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    getUserCache().then(cache => cache.addAll(URLS_TO_CACHE))
+    precacheCoreAssets()
   );
 });
 
