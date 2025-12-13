@@ -1039,6 +1039,28 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
 
+  function buildQueuedTaskPayload(description, data = {}) {
+    const todayIso = toIsoDate(0);
+    const dueMeta = formatDue(todayIso);
+    const priority = 0;
+
+    return {
+      status: 'ok',
+      id: data.requestId || `queued-${Date.now()}`,
+      description,
+      due_date: todayIso,
+      due_label: data.due_label || dueMeta.label,
+      due_class: data.due_class || dueMeta.className,
+      priority,
+      priority_label: data.priority_label || priorityLabels[priority],
+      priority_class: data.priority_class || priorityClasses[priority],
+      starred: data.starred ?? 0,
+      hashtags: data.hashtags || [],
+      queued: true,
+      requestId: data.requestId,
+    };
+  }
+
   function renderDueBadge(badge, label, className = '') {
     if (!badge) return;
     if (!label) {
@@ -1340,25 +1362,17 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         });
       }
 
-      request.then(resp => resp && resp.ok ? resp.data : Promise.reject())
-      .then(json => {
-        if (!json) throw new Error('Save failed');
-
-        if (json.queued) {
-          const priority = tempItem.querySelector('.priority-text');
-          if (priority) {
-            priority.textContent = 'Queued for sync';
-            priority.classList.remove('text-secondary');
-            priority.classList.add('text-warning');
-          }
-          tempItem.classList.add('opacity-75');
-          tempItem.removeAttribute('href');
-          if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Task queued for sync');
-          return;
+      request.then(resp => {
+        if (!resp || !resp.ok) return Promise.reject();
+        if (resp.queued) {
+          return buildQueuedTaskPayload(description, resp.data || {});
         }
+        return resp.data;
+      })
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Save failed');
 
-        if (!json.status || json.status !== 'ok') throw new Error('Save failed');
-        tempItem.href = `task.php?id=${json.id}`;
+        tempItem.href = json.id ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
         tempItem.classList.remove('opacity-75');
           const title = tempItem.querySelector('.task-main');
           if (title) title.textContent = json.description;
@@ -1375,12 +1389,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         renderHashtagRow(hashtagContainer, json.hashtags || []);
         const star = tempItem.querySelector('.star-toggle');
         if (star) {
-          star.dataset.id = json.id;
-          star.disabled = false;
           setStarAppearance(star, json.starred || 0);
-          bindStarButton(star);
+          if (!json.queued && json.id) {
+            star.dataset.id = json.id;
+            star.disabled = false;
+            bindStarButton(star);
+          } else {
+            star.disabled = true;
+          }
         }
-        tempItem.dataset.taskId = json.id;
+        tempItem.dataset.taskId = json.queued ? '' : (json.id || '');
         tempItem.dataset.dueDate = json.due_date || '';
         tempItem.dataset.priority = json.priority ?? '0';
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
