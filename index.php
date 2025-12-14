@@ -1463,7 +1463,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       sessionStorage.setItem('queuedTaskEditPayload', JSON.stringify(payload));
     } catch (err) {}
 
-    const targetUrl = `task.php?requestId=${encodeURIComponent(payload.requestId || '')}`;
+    const targetId = payload.id || payload.requestId || '';
+    const targetUrl = `task.php?id=${encodeURIComponent(targetId)}`;
     if (window.viewRouter && typeof window.viewRouter.navigate === 'function') {
       window.viewRouter.navigate(targetUrl, true);
     } else {
@@ -1481,6 +1482,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     e.preventDefault();
     const payload = findQueuedTaskPayload(requestId) || {
       requestId,
+      id: requestId,
       description: taskEl.querySelector('.task-title')?.textContent?.trim() || '',
       due_label: taskEl.querySelector('.due-date-badge')?.textContent?.trim() || '',
       priority: Number(taskEl.dataset.priority || 0),
