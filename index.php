@@ -39,8 +39,27 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
     </script>
     <style>
+        a {
+            color: #000;
+            text-decoration: none;
+        }
+        a:hover {
+            color: #000;
+            text-decoration: none;
+        }
         .navbar-toggler {
             border: 1px solid #e9ecef;
+        }
+        .visually-hidden {
+            border: 0;
+            clip: rect(0 0 0 0);
+            height: 1px;
+            margin: -1px;
+            overflow: hidden;
+            padding: 0;
+            position: absolute;
+            width: 1px;
+            white-space: nowrap;
         }
         .task-row {
             display: grid;
