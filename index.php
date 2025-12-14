@@ -1006,10 +1006,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function buildTaskRowFromPayload(payload) {
+    const requestId = payload.requestId || payload.id || '';
     const item = document.createElement('a');
     item.className = 'list-group-item list-group-item-action task-row';
     item.dataset.taskId = payload.queued ? '' : (payload.id || '');
-    item.dataset.requestId = payload.requestId || '';
+    item.dataset.requestId = requestId;
     item.dataset.dueDate = payload.due_date || '';
     item.dataset.priority = payload.priority ?? '0';
     item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
@@ -1045,8 +1046,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
     stored.forEach(payload => {
-      if (!payload?.requestId) return;
-      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(payload.requestId)}"]`);
+      const requestId = payload?.requestId || payload?.id;
+      if (!requestId) return;
+
+      if (!payload.requestId) {
+        payload.requestId = requestId;
+      }
+
+      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(requestId)}"]`);
       if (existing) return;
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
@@ -1265,10 +1272,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const todayIso = toIsoDate(0);
     const dueMeta = formatDue(todayIso);
     const priority = defaultPrioritySetting;
+    const requestId = data.requestId || data.id || `queued-${Date.now()}`;
 
     return {
       status: 'ok',
-      id: data.requestId || `queued-${Date.now()}`,
+      id: requestId,
       description,
       due_date: todayIso,
       due_label: data.due_label || dueMeta.label,
@@ -1279,7 +1287,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       starred: data.starred ?? 0,
       hashtags: data.hashtags || [],
       queued: true,
-      requestId: data.requestId,
+      requestId,
     };
   }
 
@@ -1624,7 +1632,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
 
         tempItem.href = (!json.queued && json.id) ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
-        tempItem.dataset.requestId = json.requestId || '';
+    tempItem.dataset.requestId = json.requestId || json.id || '';
         if (json.queued) {
           tempItem.setAttribute('aria-disabled', 'true');
           saveOfflineTask(json);
