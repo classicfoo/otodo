@@ -37,6 +37,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     <link rel="stylesheet" href="/assets/styles/vanilla.css">
     <script>
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
+        window.otodoDefaults = {
+            timeZone: <?=json_encode($_SESSION['location'] ?? null)?>,
+            defaultPriority: <?=json_encode((int)($_SESSION['default_priority'] ?? 0))?>,
+        };
     </script>
     <style>
         a {
@@ -1050,10 +1054,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function isoDateFromToday(offset) {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    now.setDate(now.getDate() + offset);
-    return now.toISOString().slice(0, 10);
+    return toIsoDate(offset);
   }
 
   function updateTaskRowUI(taskEl, payload) {
@@ -1137,27 +1138,36 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     } catch (err) {}
   }
 
-  function toIsoDate(offsetDays = 0) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().slice(0, 10);
+  const userTimeZone = (typeof window !== 'undefined' && window.otodoDefaults?.timeZone) || null;
+  const defaultPrioritySetting = (typeof window !== 'undefined' && window.otodoDefaults?.defaultPriority !== undefined)
+    ? Number(window.otodoDefaults.defaultPriority)
+    : 0;
+
+  function toIsoDate(offsetDays = 0, timeZone = userTimeZone) {
+    const parts = (typeof Intl !== 'undefined' && Intl.DateTimeFormat && timeZone)
+      ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+          .formatToParts(new Date())
+          .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {})
+      : null;
+
+    const baseDate = parts?.year
+      ? new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`)
+      : new Date();
+
+    baseDate.setHours(0, 0, 0, 0);
+    baseDate.setDate(baseDate.getDate() + offsetDays);
+    return baseDate.toISOString().slice(0, 10);
   }
 
-  function formatDue(dateStr) {
+  function formatDue(dateStr, timeZone = userTimeZone) {
     if (!dateStr) return { label: '', className: '' };
-    const today = toIsoDate(0);
-    const tomorrow = toIsoDate(1);
-    try {
-      const dt = new Date(`${dateStr}T00:00:00`);
-      const iso = dt.toISOString().slice(0, 10);
-      if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
-      if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
-      if (dt < new Date(today)) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
-      return { label: 'Later', className: 'bg-primary-subtle text-primary' };
-    } catch (err) {
-      return { label: '', className: '' };
-    }
+    const today = toIsoDate(0, timeZone);
+    const tomorrow = toIsoDate(1, timeZone);
+
+    if (dateStr === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+    if (dateStr === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+    if (dateStr < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
   }
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
@@ -1253,7 +1263,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function buildQueuedTaskPayload(description, data = {}) {
     const todayIso = toIsoDate(0);
     const dueMeta = formatDue(todayIso);
-    const priority = 0;
+    const priority = defaultPrioritySetting;
 
     return {
       status: 'ok',
