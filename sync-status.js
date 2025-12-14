@@ -73,8 +73,10 @@
     );
   }
 
-  function setState(state, message) {
+  function setState(state, message, { isOnline } = {}) {
     if (hideTimer) clearTimeout(hideTimer);
+    const onlineState = typeof isOnline === 'boolean' ? isOnline : navigator.onLine;
+    updateConnectionBadge(onlineState);
     statusEl.dataset.state = state;
     messageEl.textContent = message;
     statusEl.classList.remove('text-success', 'text-warning', 'text-danger', 'opacity-75');
