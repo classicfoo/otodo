@@ -1011,6 +1011,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     item.className = 'list-group-item list-group-item-action task-row';
     item.dataset.taskId = payload.queued ? '' : (payload.id || '');
     item.dataset.requestId = requestId;
+    item.dataset.localId = payload.id || '';
     item.dataset.dueDate = payload.due_date || '';
     item.dataset.priority = payload.priority ?? '0';
     item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
@@ -1047,7 +1048,21 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
-    stored.forEach(payload => {
+    let changed = false;
+    const normalized = stored.map(entry => {
+      if (entry?.queued && looksLikeRequestId(entry.id)) {
+        const newId = entry.localId || nextOfflineTaskId();
+        changed = true;
+        return { ...entry, id: newId, localId: newId };
+      }
+      return entry;
+    });
+
+    if (changed) {
+      persistOfflineTasks(normalized);
+    }
+
+    normalized.forEach(payload => {
       const requestId = payload?.requestId || payload?.id;
       if (!requestId) return;
 
@@ -1184,6 +1199,22 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
 
   const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
+  const OFFLINE_ID_COUNTER_KEY = 'offlineQueuedTaskCounter';
+
+  function looksLikeRequestId(value) {
+    return typeof value === 'string' && value.length > 16 && value.includes('-');
+  }
+
+  function nextOfflineTaskId() {
+    try {
+      const current = Number(localStorage.getItem(OFFLINE_ID_COUNTER_KEY) || '0');
+      const next = Number.isFinite(current) ? current + 1 : 1;
+      localStorage.setItem(OFFLINE_ID_COUNTER_KEY, String(next));
+      return `queued-${next}`;
+    } catch (err) {
+      return `queued-${Date.now()}`;
+    }
+  }
 
   function readOfflineTasks() {
     try {
@@ -1275,10 +1306,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const dueMeta = formatDue(todayIso);
     const priority = defaultPrioritySetting;
     const requestId = data.requestId || data.id || `queued-${Date.now()}`;
+    const queuedId = data.localId || data.offlineId || data.tempId || (looksLikeRequestId(data.id) ? nextOfflineTaskId() : (data.id || nextOfflineTaskId()));
 
     return {
       status: 'ok',
-      id: requestId,
+      id: queuedId,
       description,
       due_date: todayIso,
       due_label: data.due_label || dueMeta.label,
@@ -1290,6 +1322,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       hashtags: data.hashtags || [],
       queued: true,
       requestId,
+      localId: queuedId,
     };
   }
 
@@ -1477,12 +1510,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!taskEl) return;
     const taskId = taskEl.dataset.taskId;
     const requestId = taskEl.dataset.requestId;
+    const localId = taskEl.dataset.localId;
     if (taskId || !requestId) return;
 
     e.preventDefault();
     const payload = findQueuedTaskPayload(requestId) || {
       requestId,
-      id: requestId,
+      id: localId || requestId,
       description: taskEl.querySelector('.task-title')?.textContent?.trim() || '',
       due_label: taskEl.querySelector('.due-date-badge')?.textContent?.trim() || '',
       priority: Number(taskEl.dataset.priority || 0),

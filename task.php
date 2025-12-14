@@ -11,16 +11,42 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
-$stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
-$task = $stmt->fetch(PDO::FETCH_ASSOC);
-if (!$task) {
+$raw_id = isset($_GET['id']) ? trim($_GET['id']) : '';
+if ($raw_id === '') {
+    header('Location: index.php');
+    exit();
+}
+$is_numeric_id = ctype_digit($raw_id);
+$is_offline_task = !$is_numeric_id && $raw_id !== '';
+$id = $is_numeric_id ? (int)$raw_id : $raw_id;
+
+if ($is_offline_task && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: index.php');
     exit();
 }
 
-$task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
+$task = null;
+if ($is_numeric_id) {
+    $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
+    $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
+    $task = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$task) {
+        header('Location: index.php');
+        exit();
+    }
+} else {
+    $task = [
+        'id' => $id ?: 0,
+        'description' => '',
+        'due_date' => null,
+        'details' => '',
+        'priority' => 0,
+        'done' => 0,
+        'starred' => 0,
+    ];
+}
+
+$task_hashtags = $is_numeric_id ? get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']) : [];
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
 $tz = $_SESSION['location'] ?? 'UTC';
@@ -490,7 +516,14 @@ $user_hashtags_json = json_encode($user_hashtags);
   const deleteLink = document.getElementById('taskDeleteLink');
   const taskActionsToggle = document.getElementById('taskActionsToggle');
   const taskActionsMenu = document.getElementById('taskActionsMenu');
-  const currentTaskId = <?=$task['id']?>;
+  const currentTaskId = <?=json_encode($task['id'])?>;
+  const isOfflineTask = <?= $is_offline_task ? 'true' : 'false' ?>;
+
+  if (deleteLink && isOfflineTask) {
+    deleteLink.classList.add('disabled', 'text-muted');
+    deleteLink.setAttribute('aria-disabled', 'true');
+    deleteLink.href = '#';
+  }
 
   function closeTaskActionsMenu() {
     if (taskActionsMenu) {
@@ -530,6 +563,19 @@ $user_hashtags_json = json_encode($user_hashtags);
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
+  const queuedPayload = (() => {
+    try {
+      const raw = sessionStorage.getItem('queuedTaskEditPayload');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed) return null;
+      const matchesId = parsed.id && parsed.id === currentTaskId;
+      const matchesRequest = parsed.requestId && parsed.requestId === currentTaskId;
+      return (matchesId || matchesRequest) ? parsed : null;
+    } catch (err) {
+      return null;
+    }
+  })();
 
   const hashtagBadges = document.getElementById('hashtagBadges');
   const hashtagSuggestions = document.getElementById('hashtagSuggestions');
@@ -561,6 +607,9 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   const allHashtags = new Set();
   replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || [])]);
+  if (queuedPayload && Array.isArray(queuedPayload.hashtags)) {
+    mergeHashtagsIntoAutocomplete(queuedPayload.hashtags);
+  }
 
   function extractHashtags(text) {
     if (!text) return [];
@@ -608,6 +657,34 @@ $user_hashtags_json = json_encode($user_hashtags);
         hashtagBadges.appendChild(badge);
       });
     }
+  }
+
+  function hydrateQueuedTask(payload) {
+    if (!payload) return;
+    const titleInput = form.querySelector('input[name="description"]');
+    const dueInput = form.querySelector('input[name="due_date"]');
+    const prioritySelect = form.querySelector('select[name="priority"]');
+    const starredCheckbox = form.querySelector('input[name="starred"]');
+
+    if (titleInput && typeof payload.description === 'string') {
+      titleInput.value = payload.description;
+    }
+    if (dueInput) {
+      dueInput.value = (payload.due_date || '').slice(0, 10);
+    }
+    if (prioritySelect && payload.priority !== undefined && payload.priority !== null) {
+      prioritySelect.value = String(payload.priority);
+      prioritySelect.dispatchEvent(new Event('change'));
+    }
+    if (starredCheckbox && payload.starred !== undefined && payload.starred !== null) {
+      starredCheckbox.checked = !!payload.starred;
+    }
+
+    if (Array.isArray(payload.hashtags) && payload.hashtags.length) {
+      replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || []), ...payload.hashtags]);
+    }
+
+    renderHashtagBadges();
   }
 
   function removeHashtag(tag) {
@@ -793,6 +870,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     return true;
   }
 
+  hydrateQueuedTask(queuedPayload);
   renderHashtagBadges();
 
   function bindHashtagListeners(el) {
