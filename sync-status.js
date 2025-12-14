@@ -179,20 +179,34 @@
       if (shared && shared.state) {
         setState(shared.state, shared.message || defaultMessages[shared.state] || '');
         if (shared.state === 'syncing' && shared.extra && shared.extra.followUpUrl) {
-          const followUp = fetch(shared.extra.followUpUrl, {
-            method: 'GET',
-            headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
-            credentials: 'same-origin'
-          });
-          window.trackBackgroundSync(followUp, {
-            syncing: shared.message || defaultMessages.syncing,
-            synced: 'Task deleted',
-            error: 'Delete failed. Check connection.'
-          }).then(resp => resp && resp.ok ? resp : Promise.reject()).then(() => {
-            sessionStorage.removeItem('sharedSyncStatus');
-          }).catch(() => {
-            setSharedState('error', 'Delete failed. Check connection.');
-          });
+          const runFollowUp = () => {
+            const followUp = fetch(shared.extra.followUpUrl, {
+              method: 'GET',
+              headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'},
+              credentials: 'same-origin'
+            });
+            return window.trackBackgroundSync(followUp, {
+              syncing: shared.message || defaultMessages.syncing,
+              synced: 'Task deleted',
+              error: 'Delete failed. Check connection.'
+            }).then(resp => resp && resp.ok ? resp : Promise.reject()).then(() => {
+              sessionStorage.removeItem('sharedSyncStatus');
+            }).catch(() => {
+              setSharedState('error', 'Delete failed. Check connection.');
+            });
+          };
+
+          if (navigator.onLine) {
+            runFollowUp();
+          } else {
+            setState('error', 'Offline. Delete pending. Will retry when online.');
+            const retryOnOnline = () => {
+              window.removeEventListener('online', retryOnOnline);
+              setSharedState('syncing', shared.message || defaultMessages.syncing, shared.extra);
+              runFollowUp();
+            };
+            window.addEventListener('online', retryOnOnline);
+          }
         } else if (shared.state !== 'syncing') {
           sessionStorage.removeItem('sharedSyncStatus');
         }
