@@ -158,6 +158,55 @@ class TaskDestroyer {
     return String(rawId).trim();
   }
 
+  static escapeSelectorValue(value) {
+    if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(value);
+    return value.replace(/"/g, '\\"');
+  }
+
+  static removeOfflineQueuedTask(normalizedId) {
+    if (typeof normalizedId !== 'string' || !normalizedId.startsWith('queued-')) {
+      return { removedOfflineEntry: false, removedDomNodes: 0 };
+    }
+
+    let removedOfflineEntry = false;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = JSON.parse(localStorage.getItem('offlineQueuedTasks') || '[]');
+        const filtered = Array.isArray(stored)
+          ? stored.filter(entry => !entry || (
+            entry.requestId !== normalizedId &&
+            entry.id !== normalizedId &&
+            entry.localId !== normalizedId
+          ))
+          : [];
+
+        if (filtered.length !== stored.length) {
+          localStorage.setItem('offlineQueuedTasks', JSON.stringify(filtered));
+          removedOfflineEntry = true;
+        }
+      } catch (error) {
+        console.warn('Could not prune offline queued task', error);
+      }
+    }
+
+    let removedDomNodes = 0;
+    if (typeof document !== 'undefined' && document.querySelectorAll) {
+      const escaped = TaskDestroyer.escapeSelectorValue(normalizedId);
+      const selector = [
+        `[data-request-id="${escaped}"]`,
+        `[data-local-id="${escaped}"]`,
+        `[data-task-id="${escaped}"]`,
+      ].join(', ');
+
+      document.querySelectorAll(selector).forEach(node => {
+        node.remove();
+        removedDomNodes += 1;
+      });
+    }
+
+    return { removedOfflineEntry, removedDomNodes };
+  }
+
   static async purgeCaches(taskId) {
     if (typeof caches === 'undefined' || !caches?.keys) return { deleted: 0, checkedCaches: 0 };
 
@@ -252,13 +301,23 @@ class TaskDestroyer {
     }
 
     const apiResult = await ApiClient.requestJson(`delete_task.php?id=${encodeURIComponent(normalizedId)}`);
+    const offlineCleanup = TaskDestroyer.removeOfflineQueuedTask(normalizedId);
+
+    if (!apiResult.ok) {
+      if (offlineCleanup?.removedOfflineEntry) {
+        console.warn('Removed queued task locally because no server record existed.');
+      }
+      const error = new Error(apiResult.error || `Delete request failed (${apiResult.status})`);
+      error.result = apiResult;
+      throw error;
+    }
 
     const [cacheCleanup, queueCleanup] = await Promise.all([
       TaskDestroyer.purgeCaches(normalizedId).catch(error => ({ error })),
       TaskDestroyer.purgeQueuedDeletes(normalizedId).catch(error => ({ error })),
     ]);
 
-    const summary = { id: normalizedId, apiResult, cacheCleanup, queueCleanup };
+    const summary = { id: normalizedId, apiResult, cacheCleanup, queueCleanup, offlineCleanup };
     console.info('delete_task summary', summary);
     return summary;
   }

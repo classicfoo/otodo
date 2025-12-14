@@ -6,12 +6,21 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$id = (int)($_GET['id'] ?? 0);
+$rawId = $_GET['id'] ?? null;
+$isValidId = is_numeric($rawId) && (int)$rawId > 0;
+$id = $isValidId ? (int)$rawId : 0;
 $redirect = $_GET['redirect'] ?? '';
 $wantsJson = (
     ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch' ||
     strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false
 );
+
+if (!$isValidId && $wantsJson) {
+    http_response_code(400);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => 'A numeric id is required to delete a task.']);
+    exit();
+}
 if ($id) {
     $stmt = get_db()->prepare('DELETE FROM tasks WHERE id = :id AND user_id = :uid');
     $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
