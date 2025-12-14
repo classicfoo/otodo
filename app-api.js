@@ -151,3 +151,118 @@ class ApiClient {
 }
 
 window.ApiClient = ApiClient;
+
+class TaskDestroyer {
+  static normalizeId(rawId) {
+    if (rawId === undefined || rawId === null) return '';
+    return String(rawId).trim();
+  }
+
+  static async purgeCaches(taskId) {
+    if (typeof caches === 'undefined' || !caches?.keys) return { deleted: 0, checkedCaches: 0 };
+
+    const normalizedId = TaskDestroyer.normalizeId(taskId);
+    const cacheKeys = await caches.keys();
+    let deleted = 0;
+    let checkedCaches = 0;
+
+    await Promise.all(
+      cacheKeys
+        .filter(key => key.startsWith('otodo-cache-'))
+        .map(async key => {
+          checkedCaches += 1;
+          const cache = await caches.open(key);
+          const requests = await cache.keys();
+
+          await Promise.all(
+            requests.map(async request => {
+              try {
+                const url = new URL(request.url);
+                const isTaskDetail = url.pathname.endsWith('/task.php') &&
+                  (!normalizedId || url.searchParams.get('id') === normalizedId);
+                const isListPage = ['/', '/index.php', '/completed.php'].includes(url.pathname);
+
+                if (isTaskDetail || isListPage) {
+                  const removed = await cache.delete(request);
+                  if (removed) deleted += 1;
+                }
+              } catch (error) {
+                console.warn('Failed to inspect cached request', error);
+              }
+            })
+          );
+        })
+    );
+
+    return { deleted, checkedCaches };
+  }
+
+  static async purgeQueuedDeletes(taskId) {
+    if (!('indexedDB' in window)) return { removed: 0, total: 0 };
+
+    const normalizedId = TaskDestroyer.normalizeId(taskId);
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('otodo-offline', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains('requests')) {
+          database.createObjectStore('requests', { keyPath: 'id' }).createIndex('timestamp', 'timestamp');
+        }
+      };
+    });
+
+    const queued = await new Promise((resolve, reject) => {
+      const tx = db.transaction('requests', 'readonly');
+      const store = tx.objectStore('requests');
+      const getAll = store.getAll();
+      getAll.onsuccess = () => resolve(getAll.result || []);
+      getAll.onerror = () => reject(getAll.error);
+    });
+
+    const related = queued.filter(entry => {
+      if (!entry || !entry.url) return false;
+      try {
+        const url = new URL(entry.url);
+        return url.pathname.endsWith('/delete_task.php') &&
+          (!normalizedId || url.searchParams.get('id') === normalizedId);
+      } catch (error) {
+        return false;
+      }
+    });
+
+    if (!related.length) return { removed: 0, total: queued.length };
+
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('requests', 'readwrite');
+      const store = tx.objectStore('requests');
+      related.forEach(entry => store.delete(entry.id));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+
+    return { removed: related.length, total: queued.length };
+  }
+
+  static async deleteTask(rawId) {
+    const normalizedId = TaskDestroyer.normalizeId(rawId);
+    if (!normalizedId) {
+      throw new Error('A task id is required to delete a task.');
+    }
+
+    const apiResult = await ApiClient.requestJson(`delete_task.php?id=${encodeURIComponent(normalizedId)}`);
+
+    const [cacheCleanup, queueCleanup] = await Promise.all([
+      TaskDestroyer.purgeCaches(normalizedId).catch(error => ({ error })),
+      TaskDestroyer.purgeQueuedDeletes(normalizedId).catch(error => ({ error })),
+    ]);
+
+    const summary = { id: normalizedId, apiResult, cacheCleanup, queueCleanup };
+    console.info('delete_task summary', summary);
+    return summary;
+  }
+}
+
+window.TaskDestroyer = TaskDestroyer;
+window.delete_task = id => TaskDestroyer.deleteTask(id);
