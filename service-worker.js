@@ -51,8 +51,18 @@ function offlineNavigationResponse() {
 async function precacheCoreAssets() {
   try {
     const cache = await getUserCache();
+    const addToCache = (cache && typeof cache.add === 'function')
+      ? cache.add.bind(cache)
+      : (cache && typeof cache.addAll === 'function'
+        ? url => cache.addAll([url])
+        : null);
+
+    if (!addToCache) {
+      console.warn('Precache skipped: cache.add unavailable');
+      return;
+    }
     const results = await Promise.all(
-      URLS_TO_CACHE.map(url => cache.add(url).catch(error => ({ error, url }))),
+      URLS_TO_CACHE.map(url => addToCache(url).catch(error => ({ error, url }))),
     );
 
     const failures = results.filter(result => result && result.error);
@@ -91,7 +101,9 @@ async function getUserCache(request) {
 
 async function matchUserCache(request) {
   const cache = await getUserCache(request);
-  return cache.match(request);
+  if (cache && typeof cache.match === 'function') return cache.match(request);
+  if (typeof caches?.match === 'function') return caches.match(request);
+  return null;
 }
 
 async function deleteOtherUserCaches(currentSessionId) {

@@ -986,6 +986,69 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   flushPendingStars();
   window.addEventListener('online', flushPendingStars);
 
+  if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+    navigator.serviceWorker.addEventListener('message', event => {
+      const data = event.data || {};
+      if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
+        const entry = data.entry || {};
+        if (entry.url && entry.id && entry.url.includes('add_task.php')) {
+          removeOfflineTask(entry.id);
+          const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
+          const queuedRow = document.querySelector(selector);
+          if (queuedRow) queuedRow.remove();
+        }
+      }
+    });
+  }
+
+  function buildTaskRowFromPayload(payload) {
+    const item = document.createElement('a');
+    item.className = 'list-group-item list-group-item-action task-row';
+    item.dataset.taskId = payload.queued ? '' : (payload.id || '');
+    item.dataset.requestId = payload.requestId || '';
+    item.dataset.dueDate = payload.due_date || '';
+    item.dataset.priority = payload.priority ?? '0';
+    item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
+
+    item.innerHTML = `<div class="task-main"><div class="task-title"></div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge"></span><span class="small priority-text"></span><button type="button" class="task-star star-toggle" aria-pressed="false"><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+
+    const title = item.querySelector('.task-title');
+    if (title) title.textContent = payload.description || '';
+    const badge = item.querySelector('.badge');
+    renderDueBadge(badge, payload.due_label, payload.due_class);
+    const priority = item.querySelector('.priority-text');
+    renderPriorityText(priority, payload.priority, payload.priority_label, payload.priority_class);
+    const hashtagContainer = item.querySelector('.task-hashtags');
+    renderHashtagRow(hashtagContainer, payload.hashtags || []);
+
+    const star = item.querySelector('.star-toggle');
+    setStarAppearance(star, payload.starred || 0);
+    if (!payload.queued && payload.id) {
+      star.dataset.id = payload.id;
+      star.disabled = false;
+      bindStarButton(star);
+      item.href = `task.php?id=${encodeURIComponent(payload.id)}`;
+    } else {
+      star.disabled = true;
+      item.setAttribute('aria-disabled', 'true');
+      item.classList.add('opacity-75');
+      item.href = '#';
+    }
+
+    return item;
+  }
+
+  function restoreOfflineTasks(listGroupEl) {
+    const stored = readOfflineTasks();
+    stored.forEach(payload => {
+      if (!payload?.requestId) return;
+      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(payload.requestId)}"]`);
+      if (existing) return;
+      const row = buildTaskRowFromPayload(payload);
+      listGroupEl.prepend(row);
+    });
+  }
+
   function isoDateFromToday(offset) {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -1100,6 +1163,59 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
+
+  const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
+
+  function readOfflineTasks() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch (err) {
+      console.warn('Could not read offline tasks', err);
+      return [];
+    }
+  }
+
+  function persistOfflineTasks(tasks = []) {
+    try {
+      localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
+    } catch (err) {
+      console.warn('Could not persist offline tasks', err);
+    }
+  }
+
+  function saveOfflineTask(payload) {
+    if (!payload?.requestId) return;
+    const existing = readOfflineTasks();
+    const filtered = existing.filter(item => item.requestId !== payload.requestId);
+    filtered.unshift(payload);
+    persistOfflineTasks(filtered);
+  }
+
+  function updateOfflineTask(requestId, updates = {}) {
+    if (!requestId) return null;
+    const existing = readOfflineTasks();
+    let updatedEntry = null;
+    const next = existing.map(item => {
+      if (item.requestId !== requestId) return item;
+      updatedEntry = { ...item, ...updates, requestId: item.requestId };
+      return updatedEntry;
+    });
+    if (updatedEntry) {
+      persistOfflineTasks(next);
+      return updatedEntry;
+    }
+    return null;
+  }
+
+  function removeOfflineTask(requestId) {
+    if (!requestId) return;
+    const existing = readOfflineTasks();
+    const filtered = existing.filter(item => item.requestId !== requestId);
+    if (filtered.length !== existing.length) {
+      persistOfflineTasks(filtered);
+    }
+  }
 
   function buildQueuedMetaUpdate(taskEl, action, value) {
     const currentPriority = Number(taskEl?.dataset.priority || 0);
@@ -1375,12 +1491,21 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const taskEl = contextTask;
       const taskId = taskEl.dataset.taskId;
+      const requestId = taskEl.dataset.requestId;
       hideContextMenu();
 
-      if (!taskId) {
+      if (!taskId && !requestId) {
         return;
       }
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
+
+      if (!taskId && requestId) {
+        const queuedUpdate = buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value);
+        updateTaskRowUI(taskEl, queuedUpdate);
+        updateOfflineTask(requestId, queuedUpdate);
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+        return;
+      }
 
       const request = ApiClient.updateTaskMeta(taskId, {
         priority: btn.dataset.action === 'priority' ? btn.dataset.value : undefined,
@@ -1432,6 +1557,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
   let isFallbackSubmit = false;
   if (form && listGroup) {
+    restoreOfflineTasks(listGroup);
     form.addEventListener('submit', function(e){
       if (isFallbackSubmit) return;
       e.preventDefault();
@@ -1473,8 +1599,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
 
         tempItem.href = (!json.queued && json.id) ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
+        tempItem.dataset.requestId = json.requestId || '';
         if (json.queued) {
           tempItem.setAttribute('aria-disabled', 'true');
+          saveOfflineTask(json);
         }
         tempItem.classList.remove('opacity-75');
           const title = tempItem.querySelector('.task-main');
