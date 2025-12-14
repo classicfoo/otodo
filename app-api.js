@@ -303,11 +303,15 @@ class TaskDestroyer {
     const apiResult = await ApiClient.requestJson(`delete_task.php?id=${encodeURIComponent(normalizedId)}`);
     const offlineCleanup = TaskDestroyer.removeOfflineQueuedTask(normalizedId);
 
-    if (!apiResult.ok) {
+    const hasErrorStatus = apiResult.data?.status && apiResult.data.status !== 'ok';
+    const hasExplicitOkFlag = apiResult.data?.ok === false;
+
+    if (!apiResult.ok || hasErrorStatus || hasExplicitOkFlag) {
       if (offlineCleanup?.removedOfflineEntry) {
         console.warn('Removed queued task locally because no server record existed.');
       }
-      const error = new Error(apiResult.error || `Delete request failed (${apiResult.status})`);
+      const message = apiResult.error || apiResult.data?.message || `Delete request failed (${apiResult.status})`;
+      const error = new Error(message);
       error.result = apiResult;
       throw error;
     }

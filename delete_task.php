@@ -15,10 +15,20 @@ $wantsJson = (
     strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false
 );
 
-if (!$isValidId && $wantsJson) {
-    http_response_code(400);
-    header('Content-Type: application/json');
-    echo json_encode(['status' => 'error', 'message' => 'A numeric id is required to delete a task.']);
+if (!$isValidId) {
+    if ($wantsJson) {
+        http_response_code(400);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'ok' => false,
+            'status' => 'error',
+            'message' => 'A numeric id is required to delete a task.',
+        ]);
+        exit();
+    }
+
+    $target = $redirect === 'completed' ? 'completed.php' : 'index.php';
+    header("Location: {$target}");
     exit();
 }
 if ($id) {
@@ -28,7 +38,7 @@ if ($id) {
 
 if ($wantsJson) {
     header('Content-Type: application/json');
-    echo json_encode(['status' => 'ok']);
+    echo json_encode(['ok' => true, 'status' => 'ok']);
     exit();
 }
 
