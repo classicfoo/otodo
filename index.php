@@ -991,16 +991,64 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   window.addEventListener('online', flushPendingStars);
 
   if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+    function promoteQueuedTask(requestId, payload = {}) {
+      if (!requestId || !payload || !payload.id) return;
+
+      const escape = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape : (value => value);
+      removeOfflineTask(requestId);
+
+      const normalized = {
+        ...payload,
+        id: payload.id,
+        requestId: payload.requestId || payload.id || requestId,
+        localId: payload.id,
+        queued: false,
+        offline: false,
+      };
+
+      const remaining = readOfflineTasks().filter(item => item.requestId !== requestId);
+      remaining.unshift(normalized);
+      persistOfflineTasks(remaining);
+
+      const selector = `[data-request-id="${escape(requestId)}"]`;
+      const row = document.querySelector(selector);
+      if (!row) return;
+
+      row.dataset.taskId = normalized.id || '';
+      row.dataset.requestId = normalized.requestId || '';
+      row.dataset.queued = 'false';
+      row.classList.remove('opacity-75');
+      row.removeAttribute('aria-disabled');
+      row.href = `task.php?id=${encodeURIComponent(normalized.id)}`;
+
+      const star = row.querySelector('.star-toggle');
+      if (star) {
+        star.dataset.id = normalized.id;
+        star.disabled = false;
+        bindStarButton(star);
+      }
+
+      updateTaskRowUI(row, normalized);
+    }
+
     navigator.serviceWorker.addEventListener('message', event => {
       const data = event.data || {};
       if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
         const entry = data.entry || {};
         if (entry.url && entry.id && entry.url.includes('add_task.php')) {
-          removeOfflineTask(entry.id);
-          const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
-          const queuedRow = document.querySelector(selector);
-          if (queuedRow) queuedRow.remove();
+          if (data.payload && data.payload.id) {
+            promoteQueuedTask(entry.id, data.payload);
+          } else {
+            removeOfflineTask(entry.id);
+            const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
+            const queuedRow = document.querySelector(selector);
+            if (queuedRow) queuedRow.remove();
+          }
         }
+      }
+
+      if (data.type === 'queued-add-result' && data.requestId && data.payload?.id) {
+        promoteQueuedTask(data.requestId, data.payload);
       }
     });
   }
@@ -1498,11 +1546,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
     const targetId = payload.id || payload.requestId || '';
     const targetUrl = `task.php?id=${encodeURIComponent(targetId)}`;
-    if (window.viewRouter && typeof window.viewRouter.navigate === 'function') {
+    const shouldBypassSpa = !payload || payload.queued || payload.offline || !navigator.onLine;
+    if (!shouldBypassSpa && window.viewRouter && typeof window.viewRouter.navigate === 'function') {
       window.viewRouter.navigate(targetUrl, true);
-    } else {
-      window.location.href = targetUrl;
+      return;
     }
+
+    window.location.href = targetUrl;
   }
 
   document.addEventListener('click', function(e){
