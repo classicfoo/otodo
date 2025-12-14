@@ -1137,6 +1137,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     } catch (err) {}
   }
 
+  function recordPendingUpdate(update) {
+    if (!update || !update.id) return;
+    const updates = readPendingUpdates();
+    const existing = updates[update.id] || { id: update.id };
+    updates[update.id] = { ...existing, ...update };
+    writePendingUpdates(updates);
+  }
+
   function toIsoDate(offsetDays = 0) {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -1217,7 +1225,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     }
   }
 
-  function buildQueuedMetaUpdate(taskEl, action, value) {
+  function buildQueuedMetaUpdate(taskEl, action, value, extras = {}) {
     const currentPriority = Number(taskEl?.dataset.priority || 0);
     let priority = currentPriority;
     let dueDate = (taskEl?.dataset.dueDate || '').slice(0, 10);
@@ -1241,6 +1249,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     return {
       status: 'ok',
       queued: true,
+      requestId: extras.requestId || taskEl?.dataset?.requestId || undefined,
       due_date: dueDate,
       due_label: dueMeta.label,
       due_class: dueMeta.className,
@@ -1323,6 +1332,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       }
       if (titleEl && typeof update.done === 'boolean') {
         titleEl.classList.toggle('text-decoration-line-through', update.done);
+      }
+      if (typeof update.requestId === 'string') {
+        row.dataset.requestId = update.requestId;
       }
       if (typeof update.priority === 'number') {
         row.dataset.priority = String(update.priority);
@@ -1500,7 +1512,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
 
       if (!taskId && requestId) {
-        const queuedUpdate = buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value);
+        const queuedUpdate = buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value, { requestId });
         updateTaskRowUI(taskEl, queuedUpdate);
         updateOfflineTask(requestId, queuedUpdate);
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
@@ -1517,12 +1529,23 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       tracked.then(resp => {
         if (!resp || !resp.ok) return Promise.reject();
         if (resp.queued) {
-          return buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value);
+          return buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value, { requestId: resp.data?.requestId });
         }
         return resp.data;
       }).then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(taskEl, json);
+          taskEl.dataset.requestId = json.requestId || taskEl.dataset.requestId || '';
+          recordPendingUpdate({
+            id: taskId,
+            requestId: json.requestId,
+            due_date: json.due_date,
+            priority: json.priority,
+            due_label: json.due_label,
+            due_class: json.due_class,
+            priority_label: json.priority_label,
+            priority_class: json.priority_class,
+          });
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
         })
         .catch(() => {
