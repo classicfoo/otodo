@@ -202,7 +202,7 @@ a:hover { text-decoration: underline; }
     color: var(--body-color);
 }
 
-.list-group {
+.list-group { 
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border-color);
@@ -216,6 +216,14 @@ a:hover { text-decoration: underline; }
     background: #fff;
     border-radius: 0;
     width: 100%;
+    font: inherit;
+    color: inherit;
+}
+.list-group button.list-group-item {
+    text-align: left;
+    appearance: none;
+    -moz-appearance: none;
+    background: #fff;
 }
 .list-group-item:last-child { border-bottom: none; }
 .list-group-item-action { cursor: pointer; }
