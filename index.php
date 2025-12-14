@@ -1014,6 +1014,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     item.dataset.dueDate = payload.due_date || '';
     item.dataset.priority = payload.priority ?? '0';
     item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
+    item.dataset.queued = payload.queued ? 'true' : 'false';
 
     item.innerHTML = `<div class="task-main"><div class="task-title"></div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge"></span><span class="small priority-text"></span><button type="button" class="task-star star-toggle" aria-pressed="false"><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
 
@@ -1037,7 +1038,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       star.disabled = true;
       item.setAttribute('aria-disabled', 'true');
       item.classList.add('opacity-75');
-      item.href = '#';
+      item.removeAttribute('href');
+      item.dataset.offlineEditable = 'true';
     }
 
     return item;
@@ -1448,6 +1450,51 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   document.body.appendChild(contextMenu);
 
   let contextTask = null;
+
+  function findQueuedTaskPayload(requestId) {
+    if (!requestId) return null;
+    const cached = readOfflineTasks();
+    return cached.find(item => item.requestId === requestId) || null;
+  }
+
+  function openTaskEditorFromPayload(payload) {
+    if (!payload) return;
+    try {
+      sessionStorage.setItem('queuedTaskEditPayload', JSON.stringify(payload));
+    } catch (err) {}
+
+    const targetId = payload.id || payload.requestId || '';
+    const targetUrl = `task.php?id=${encodeURIComponent(targetId)}`;
+    if (window.viewRouter && typeof window.viewRouter.navigate === 'function') {
+      window.viewRouter.navigate(targetUrl, true);
+    } else {
+      window.location.href = targetUrl;
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    const taskEl = e.target.closest('.task-row');
+    if (!taskEl) return;
+    const taskId = taskEl.dataset.taskId;
+    const requestId = taskEl.dataset.requestId;
+    if (taskId || !requestId) return;
+
+    e.preventDefault();
+    const payload = findQueuedTaskPayload(requestId) || {
+      requestId,
+      id: requestId,
+      description: taskEl.querySelector('.task-title')?.textContent?.trim() || '',
+      due_label: taskEl.querySelector('.due-date-badge')?.textContent?.trim() || '',
+      priority: Number(taskEl.dataset.priority || 0),
+      hashtags: (taskEl.dataset.hashtags || '')
+        .split(' ')
+        .map(tag => tag.replace(/^#+/, ''))
+        .filter(Boolean),
+      queued: true,
+    };
+
+    openTaskEditorFromPayload(payload);
+  });
 
   function setActiveOption(group, value) {
     contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
