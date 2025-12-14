@@ -599,6 +599,15 @@ $user_hashtags_json = json_encode($user_hashtags);
     } catch (err) {}
   }
 
+  function removeOfflineTask(requestId) {
+    if (!requestId) return;
+    const existing = readOfflineTasks();
+    const filtered = existing.filter(item => item.requestId !== requestId);
+    if (filtered.length !== existing.length) {
+      persistOfflineTasks(filtered);
+    }
+  }
+
   function saveOfflineTask(payload) {
     if (!payload?.requestId) return;
     const existing = readOfflineTasks();
@@ -694,12 +703,6 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (doneCheckboxEl && isOfflineTask) {
     doneCheckboxEl.disabled = true;
     doneCheckboxEl.closest('label')?.classList.add('text-muted');
-  }
-
-  if (deleteLink && isOfflineTask) {
-    deleteLink.classList.add('disabled', 'text-muted');
-    deleteLink.setAttribute('aria-disabled', 'true');
-    deleteLink.href = '#';
   }
 
   function closeTaskActionsMenu() {
@@ -1316,6 +1319,27 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   if (deleteLink) {
+    if (isOfflineTask) {
+      deleteLink.classList.remove('disabled', 'text-muted');
+      deleteLink.removeAttribute('aria-disabled');
+      deleteLink.textContent = 'Discard';
+      deleteLink.href = '#';
+
+      deleteLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        removeOfflineTask(currentTaskId);
+        if (navigator?.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'discard-item', id: currentTaskId });
+        }
+        if (window.updateSharedSyncStatus) {
+          window.updateSharedSyncStatus('synced', 'Offline task discarded');
+        }
+        instantNavigateToIndex();
+      });
+
+      return;
+    }
+
     deleteLink.addEventListener('click', function(e){
       e.preventDefault();
       const url = deleteLink.getAttribute('href');
