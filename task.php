@@ -383,8 +383,11 @@ $user_hashtags_json = json_encode($user_hashtags);
 </nav>
 
 <div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
-    <div class="offcanvas-header">
-        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+    <div class="offcanvas-header d-flex align-items-start justify-content-between">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
+            <span class="badge bg-success-subtle text-success" id="connection-status" aria-live="polite">Online</span>
+        </div>
         <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">

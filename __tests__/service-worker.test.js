@@ -19,16 +19,30 @@ beforeEach(() => {
   });
 
   const cacheStore = new Map();
+  const cachesByName = new Map();
+  const makeCache = () => ({
+    add: jest.fn(async request => {
+      const key = request.url || request;
+      cacheStore.set(key, new Response('cached:' + key));
+    }),
+    addAll: jest.fn(async urls => {
+      urls.forEach(url => cacheStore.set(url, new Response('cached:' + url)));
+    }),
+    match: jest.fn(async request => cacheStore.get(request.url || request) || null),
+    put: jest.fn(async (request, response) => {
+      cacheStore.set(request.url || request, response.clone());
+    }),
+    keys: jest.fn(async () => Array.from(cacheStore.keys()).map(url => new Request(url))),
+  });
+
   global.caches = {
-    open: jest.fn(async () => ({
-      addAll: jest.fn(async urls => {
-        urls.forEach(url => cacheStore.set(url, new Response('cached:' + url)));
-      }),
-      put: jest.fn(async (request, response) => {
-        cacheStore.set(request.url || request, response.clone());
-      }),
-    })),
-    keys: jest.fn(async () => ['old-cache']),
+    open: jest.fn(async name => {
+      if (!cachesByName.has(name)) {
+        cachesByName.set(name, makeCache());
+      }
+      return cachesByName.get(name);
+    }),
+    keys: jest.fn(async () => ['otodo-cache-v10::anon']),
     delete: jest.fn(async () => true),
     match: jest.fn(async request => cacheStore.get(request.url || request) || null),
   };
@@ -124,7 +138,9 @@ test('installs and primes cache list', async () => {
 
 test('falls back to cached shell when offline during navigation', async () => {
   const cached = new Response('cached home');
-  caches.match.mockResolvedValueOnce(cached);
+  const userCache = await caches.open('otodo-cache-v10::anon');
+  await userCache.put(new Request('https://example.com/index.php'), cached.clone());
+  await userCache.put('/', cached.clone());
   global.fetch = jest.fn(() => Promise.reject(new Error('offline')));
 
   const respondWith = jest.fn(promise => promise);

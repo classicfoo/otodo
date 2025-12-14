@@ -10,6 +10,7 @@
   const detailEl = document.createElement('div');
   detailEl.className = 'sync-status-detail small text-muted mt-1 d-flex flex-column gap-2';
   detailEl.hidden = true;
+  const connectionBadge = document.getElementById('connection-status');
 
   const detailContentRow = document.createElement('div');
   detailContentRow.className = 'd-flex align-items-center gap-2 w-100';
@@ -60,6 +61,16 @@
       badge.textContent = text;
       badgesEl.appendChild(badge);
     });
+  }
+
+  function updateConnectionBadge(isOnline) {
+    if (!connectionBadge) return;
+    connectionBadge.textContent = isOnline ? 'Online' : 'Offline';
+    connectionBadge.classList.remove('bg-success-subtle', 'text-success', 'bg-danger-subtle', 'text-danger');
+    connectionBadge.classList.add(
+      isOnline ? 'bg-success-subtle' : 'bg-danger-subtle',
+      isOnline ? 'text-success' : 'text-danger'
+    );
   }
 
   function setState(state, message) {
@@ -169,14 +180,21 @@
       });
   };
 
-  window.addEventListener('online', () => setState('synced', 'Back online. Synced'));
-  window.addEventListener('offline', () => setState('error', 'Offline. Changes will sync later'));
+  window.addEventListener('online', () => {
+    updateConnectionBadge(true);
+    setState('synced', 'Back online. Synced');
+  });
+  window.addEventListener('offline', () => {
+    updateConnectionBadge(false);
+    setState('error', 'Offline. Changes will sync later');
+  });
 
   const sharedRaw = sessionStorage.getItem('sharedSyncStatus');
   if (sharedRaw) {
     try {
       const shared = JSON.parse(sharedRaw);
       if (shared && shared.state) {
+        updateConnectionBadge(navigator.onLine);
         setState(shared.state, shared.message || defaultMessages[shared.state] || '');
         if (shared.state === 'syncing' && shared.extra && shared.extra.followUpUrl) {
           const runFollowUp = () => {
@@ -211,12 +229,16 @@
           sessionStorage.removeItem('sharedSyncStatus');
         }
       } else {
+        updateConnectionBadge(navigator.onLine);
         setState(navigator.onLine ? 'synced' : 'error', navigator.onLine ? defaultMessages.synced : 'Offline. Changes will sync later');
       }
     } catch (e) {
+      updateConnectionBadge(navigator.onLine);
       setState(navigator.onLine ? 'synced' : 'error', navigator.onLine ? defaultMessages.synced : 'Offline. Changes will sync later');
     }
   } else {
+    updateConnectionBadge(navigator.onLine);
     setState(navigator.onLine ? 'synced' : 'error', navigator.onLine ? defaultMessages.synced : 'Offline. Changes will sync later');
   }
+  updateConnectionBadge(navigator.onLine);
 })();

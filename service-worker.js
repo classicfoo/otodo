@@ -31,6 +31,23 @@ function isOffline() {
   return activeUserScope.offlineMode === true || (self.navigator && self.navigator.onLine === false);
 }
 
+function offlineNavigationResponse() {
+  return new Response(
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Offline</title>` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<style>body{font-family:system-ui,-apple-system,sans-serif;background:#f8f9fa;color:#212529;` +
+    `display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:1rem;text-align:center;}` +
+    `.card{background:#fff;border:1px solid #dee2e6;border-radius:12px;padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.05);max-width:480px;}` +
+    `.badge{display:inline-block;padding:0.35rem 0.75rem;border-radius:999px;font-weight:600;font-size:0.9rem;}` +
+    `.badge.offline{background:#fff4e6;color:#d9480f;border:1px solid #ffd8a8;}</style></head>` +
+    `<body><div class="card"><div class="badge offline">Offline</div><h1 style="margin:12px 0 8px;">No offline copy yet</h1>` +
+    `<p style="margin:0 0 12px;font-size:0.95rem;">You're offline and this page wasn't saved for offline use. ` +
+    `Reconnect to load it, then it will be available even without a connection.</p>` +
+    `<p style="margin:0;font-size:0.9rem;color:#6c757d;">Tip: open tasks while online to refresh the offline cache.</p></div></body></html>`,
+    { status: 503, headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } },
+  );
+}
+
 async function precacheCoreAssets() {
   try {
     const cache = await getUserCache();
@@ -84,6 +101,28 @@ async function deleteOtherUserCaches(currentSessionId) {
     .filter(key => key.startsWith(`${CACHE_BASE}::`) && key !== expectedName)
     .map(key => caches.delete(key));
   await Promise.all(deletions);
+}
+
+async function migrateSessionCache(fromSessionId, toSessionId) {
+  const normalizedFrom = fromSessionId || 'anon';
+  const normalizedTo = toSessionId || 'anon';
+
+  if (normalizedFrom === normalizedTo) return;
+
+  const [sourceCache, targetCache] = await Promise.all([
+    caches.open(cacheNameForSession(normalizedFrom)),
+    caches.open(cacheNameForSession(normalizedTo)),
+  ]);
+
+  const requests = await sourceCache.keys();
+  if (!requests.length) return;
+
+  await Promise.all(requests.map(async request => {
+    const response = await sourceCache.match(request);
+    if (response) {
+      await targetCache.put(request, response.clone());
+    }
+  }));
 }
 
 async function notifyClients(payload) {
@@ -248,6 +287,7 @@ self.addEventListener('message', event => {
     event.waitUntil(prefetchUrls(data.urls));
   } else if (data.type === 'set-user') {
     const previousSession = activeUserScope.sessionId;
+    const previousUserId = activeUserScope.userId;
     activeUserScope = {
       sessionId: data.sessionId || null,
       userId: data.userId || null,
@@ -255,7 +295,14 @@ self.addEventListener('message', event => {
     };
     const currentSession = activeUserScope.sessionId || 'anon';
 
-    event.waitUntil(deleteOtherUserCaches(currentSession));
+    const shouldMigrate = (!previousUserId && (previousSession || 'anon') === 'anon')
+      && currentSession !== (previousSession || 'anon');
+    const migration = shouldMigrate ? migrateSessionCache(previousSession, currentSession) : Promise.resolve();
+
+    event.waitUntil(Promise.all([
+      migration.catch(() => {}),
+      deleteOtherUserCaches(currentSession),
+    ]));
 
     if (previousSession && previousSession !== currentSession) {
       notifyClients({ type: 'user-session-changed', sessionId: currentSession }).catch(() => {});
@@ -441,9 +488,14 @@ self.addEventListener('fetch', event => {
 
   if (isNavigational) {
     if (isOffline()) {
-      event.respondWith(
-        matchUserCache(event.request).then(cacheHit => cacheHit || matchUserCache('/'))
-      );
+      event.respondWith((async () => {
+        const cachedPage = await matchUserCache(event.request);
+        if (cachedPage) return cachedPage;
+
+        const userCache = await getUserCache(event.request);
+        const homeShell = await userCache.match('/');
+        return homeShell || offlineNavigationResponse();
+      })());
       return;
     }
 

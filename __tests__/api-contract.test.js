@@ -1,4 +1,4 @@
-const { Headers } = require('node-fetch');
+const { Headers, Response } = require('node-fetch');
 
 require('../app-api');
 
@@ -6,6 +6,8 @@ describe('ApiClient contract with PHP endpoints', () => {
   beforeEach(() => {
     jest.resetModules();
     require('../app-api');
+    delete global.caches;
+    document.cookie = '';
     global.fetch = jest.fn(async (url, options = {}) => ({
       ok: true,
       status: 200,
@@ -74,5 +76,29 @@ describe('ApiClient contract with PHP endpoints', () => {
 
     expect(result.ok).toBe(false);
     expect(result.offline).toBe(true);
+  });
+
+  test('requestText only reuses offline cache for the active session', async () => {
+    const cacheA = new Map();
+    const cacheB = new Map();
+    cacheA.set('/task.php?id=1', new Response('<div>Session A</div>'));
+    cacheB.set('/task.php?id=2', new Response('<div>Session B</div>'));
+
+    document.cookie = 'PHPSESSID=session-b';
+    global.caches = {
+      keys: jest.fn(async () => ['otodo-cache-v10::session-a', 'otodo-cache-v10::session-b']),
+      open: jest.fn(async key => ({
+        match: async url => (key.endsWith('session-a') ? cacheA : cacheB).get(url) || null,
+      })),
+    };
+
+    fetch.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+
+    const result = await window.ApiClient.requestText('/task.php?id=2');
+
+    expect(result.offline).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Session B');
+    expect(caches.open).toHaveBeenCalledWith('otodo-cache-v10::session-b');
   });
 });
