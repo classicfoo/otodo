@@ -295,6 +295,8 @@ self.addEventListener('message', event => {
     event.waitUntil(retryQueuedRequest(data.id));
   } else if (data.type === 'discard-item' && data.id) {
     event.waitUntil(discardQueuedRequest(data.id));
+  } else if (data.type === 'drain-queue') {
+    event.waitUntil(drainQueue());
   } else if (data.type === 'prefetch-urls' && Array.isArray(data.urls)) {
     event.waitUntil(prefetchUrls(data.urls));
   } else if (data.type === 'set-user') {
