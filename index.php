@@ -1006,10 +1006,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function buildTaskRowFromPayload(payload) {
+    const requestId = payload.requestId || payload.id || '';
     const item = document.createElement('a');
     item.className = 'list-group-item list-group-item-action task-row';
     item.dataset.taskId = payload.queued ? '' : (payload.id || '');
-    item.dataset.requestId = payload.requestId || '';
+    item.dataset.requestId = requestId;
     item.dataset.dueDate = payload.due_date || '';
     item.dataset.priority = payload.priority ?? '0';
     item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
@@ -1045,8 +1046,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
     stored.forEach(payload => {
-      if (!payload?.requestId) return;
-      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(payload.requestId)}"]`);
+      const requestId = payload?.requestId || payload?.id;
+      if (!requestId) return;
+
+      if (!payload.requestId) {
+        payload.requestId = requestId;
+      }
+
+      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(requestId)}"]`);
       if (existing) return;
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
@@ -1625,7 +1632,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
 
         tempItem.href = (!json.queued && json.id) ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
-        tempItem.dataset.requestId = json.requestId || '';
+    tempItem.dataset.requestId = json.requestId || json.id || '';
         if (json.queued) {
           tempItem.setAttribute('aria-disabled', 'true');
           saveOfflineTask(json);
