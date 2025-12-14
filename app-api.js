@@ -1,4 +1,33 @@
 class ApiClient {
+  static readSessionId() {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/PHPSESSID=([^;]+)/);
+    return match ? match[1] : null;
+  }
+
+  static async matchSessionCache(url) {
+    if (typeof caches === 'undefined' || !caches?.keys) {
+      return null;
+    }
+
+    try {
+      const sessionId = ApiClient.readSessionId() || 'anon';
+      const cacheKeys = await caches.keys();
+      const scopedKey = cacheKeys
+        .filter(key => key.includes('otodo-cache-') && key.split('::')[1] === sessionId)
+        .sort()
+        .pop();
+
+      if (!scopedKey) return null;
+
+      const cache = await caches.open(scopedKey);
+      return cache.match(url);
+    } catch (error) {
+      console.warn('Offline cache lookup failed', error);
+      return null;
+    }
+  }
+
   static async requestJson(url, options = {}) {
     const merged = {
       headers: {
@@ -70,9 +99,9 @@ class ApiClient {
 
       return { ok: true, status: response.status, data };
     } catch (error) {
-      if (typeof caches !== 'undefined' && caches?.match) {
+      if (typeof caches !== 'undefined' && caches?.keys) {
         try {
-          const cached = await caches.match(url);
+          const cached = await ApiClient.matchSessionCache(url);
           if (cached) {
             return { ok: true, status: 200, offline: true, data: await cached.text() };
           }
