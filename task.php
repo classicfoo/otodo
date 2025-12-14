@@ -23,7 +23,13 @@ if (!$task) {
 $task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
-$today = (new DateTime('now'))->format('Y-m-d');
+$tz = $_SESSION['location'] ?? 'UTC';
+try {
+    $tzObj = new DateTimeZone($tz);
+} catch (Exception $e) {
+    $tzObj = new DateTimeZone('UTC');
+}
+$today = (new DateTime('today', $tzObj))->format('Y-m-d');
 $overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY starred DESC, due_date, priority DESC, id DESC');
 $overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
 $overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
@@ -337,6 +343,19 @@ $user_hashtags_json = json_encode($user_hashtags);
         .expander-suggestions .btn.active {
             background-color: #e7f1ff;
         }
+        .task-actions-toggle {
+            line-height: 1;
+        }
+        .task-actions-dropdown .dropdown-menu {
+            display: none;
+            min-width: 160px;
+        }
+        .task-actions-dropdown .dropdown-menu.show {
+            display: block;
+        }
+        .task-nav-buttons .btn {
+            min-width: 90px;
+        }
     </style>
     <title>Task Details</title>
 </head>
@@ -346,7 +365,15 @@ $user_hashtags_json = json_encode($user_hashtags);
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
-            <a class="btn btn-outline-danger btn-sm" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a>
+            <div class="dropdown task-actions-dropdown">
+                <button class="btn btn-outline-secondary btn-sm task-actions-toggle" type="button" id="taskActionsToggle" aria-expanded="false" aria-haspopup="true">
+                    <span class="visually-hidden">Task actions</span>
+                    <span aria-hidden="true">&hellip;</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" id="taskActionsMenu" aria-labelledby="taskActionsToggle">
+                    <li><a class="dropdown-item text-danger" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
+                </ul>
+            </div>
             <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
                 <span class="navbar-toggler-icon"><span></span></span>
             </button>
@@ -416,9 +443,9 @@ $user_hashtags_json = json_encode($user_hashtags);
             </div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
-            <button type="button" class="btn btn-primary" id="nextTaskBtn">Next</button>
+        <div class="d-flex align-items-center gap-2 task-nav-buttons">
+            <a href="index.php" class="btn btn-secondary px-4" id="backToList">Back</a>
+            <button type="button" class="btn btn-primary px-4" id="nextTaskBtn">Next</button>
         </div>
         <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
     </form>
@@ -458,7 +485,44 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   const backLink = document.getElementById('backToList');
   const deleteLink = document.getElementById('taskDeleteLink');
+  const taskActionsToggle = document.getElementById('taskActionsToggle');
+  const taskActionsMenu = document.getElementById('taskActionsMenu');
   const currentTaskId = <?=$task['id']?>;
+
+  function closeTaskActionsMenu() {
+    if (taskActionsMenu) {
+      taskActionsMenu.classList.remove('show');
+    }
+    if (taskActionsToggle) {
+      taskActionsToggle.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  if (taskActionsToggle && taskActionsMenu) {
+    taskActionsToggle.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const isOpen = taskActionsMenu.classList.contains('show');
+      if (isOpen) {
+        closeTaskActionsMenu();
+      } else {
+        taskActionsMenu.classList.add('show');
+        taskActionsToggle.setAttribute('aria-expanded', 'true');
+        taskActionsToggle.focus({ preventScroll: true });
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!taskActionsMenu.contains(event.target) && event.target !== taskActionsToggle) {
+        closeTaskActionsMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        closeTaskActionsMenu();
+      }
+    });
+  }
 
   const form = document.querySelector('form');
   if (!form) return;
@@ -785,13 +849,14 @@ $user_hashtags_json = json_encode($user_hashtags);
   });
 
   const nextTaskId = <?= $next_task_id !== null ? (int)$next_task_id : 'null' ?>;
+  const hasOverdueTasks = <?= count($overdue_ids) > 0 ? 'true' : 'false' ?>;
   const nextButton = document.getElementById('nextTaskBtn');
   const nextMessage = document.getElementById('nextTaskMessage');
   if (nextButton) {
     if (nextTaskId === null) {
       nextButton.disabled = true;
       if (nextMessage) {
-        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
+        nextMessage.textContent = hasOverdueTasks ? 'No more overdue tasks to review.' : 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     }
@@ -799,7 +864,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (nextTaskId !== null) {
         window.location.href = 'task.php?id=' + nextTaskId;
       } else if (nextMessage) {
-        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
+        nextMessage.textContent = hasOverdueTasks ? 'No more overdue tasks to review.' : 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     });
