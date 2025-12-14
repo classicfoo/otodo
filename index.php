@@ -1498,11 +1498,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
     const targetId = payload.id || payload.requestId || '';
     const targetUrl = `task.php?id=${encodeURIComponent(targetId)}`;
-    if (window.viewRouter && typeof window.viewRouter.navigate === 'function') {
+    const shouldBypassSpa = !payload || payload.queued || payload.offline || !navigator.onLine;
+    if (!shouldBypassSpa && window.viewRouter && typeof window.viewRouter.navigate === 'function') {
       window.viewRouter.navigate(targetUrl, true);
-    } else {
-      window.location.href = targetUrl;
+      return;
     }
+
+    window.location.href = targetUrl;
   }
 
   document.addEventListener('click', function(e){
