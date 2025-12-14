@@ -78,6 +78,19 @@ describe('ApiClient contract with PHP endpoints', () => {
     expect(result.offline).toBe(true);
   });
 
+  test('requestText surfaces offline HTML fallbacks for navigation', async () => {
+    fetch.mockImplementationOnce(() => Promise.resolve(new Response('<html>offline copy</html>', {
+      status: 503,
+      headers: new Headers({ 'Content-Type': 'text/html' }),
+    })));
+
+    const result = await window.ApiClient.requestText('/completed.php');
+
+    expect(result.ok).toBe(true);
+    expect(result.offline).toBe(true);
+    expect(result.data).toContain('offline copy');
+  });
+
   test('requestText only reuses offline cache for the active session', async () => {
     const cacheA = new Map();
     const cacheB = new Map();
