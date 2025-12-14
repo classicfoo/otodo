@@ -1352,7 +1352,51 @@ $user_hashtags_json = json_encode($user_hashtags);
   function sendSave(immediate = false) {
     if (updateDetails) updateDetails();
     const data = new FormData(form);
+    const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
+    const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
+
+    const buildLocalPayload = () => {
+      const titleInput = form.querySelector('input[name="description"]');
+      const dueInput = form.querySelector('input[name="due_date"]');
+      const starredCheckbox = form.querySelector('input[name="starred"]');
+      const detailsField = form.querySelector('input[name="details"]');
+      const prioritySelect = form.querySelector('select[name="priority"]');
+      const dueValue = dueInput ? (dueInput.value || '').slice(0, 10) : '';
+      const dueMeta = formatDue(dueValue);
+
+      const priorityVal = prioritySelect ? Number(prioritySelect.value) : 0;
+      const normalizedPriority = Number.isFinite(priorityVal) ? priorityVal : 0;
+
+      return {
+        status: 'ok',
+        queued: true,
+        offline: true,
+        id: currentTaskId,
+        requestId: currentTaskId,
+        localId: currentTaskId,
+        description: titleInput ? titleInput.value.trim() : '',
+        due_date: dueValue,
+        due_label: dueMeta.label,
+        due_class: dueMeta.className,
+        priority: normalizedPriority,
+        priority_label: priorityLabels[normalizedPriority] || 'None',
+        priority_class: priorityClasses[normalizedPriority] || 'text-secondary',
+        starred: starredCheckbox ? starredCheckbox.checked : false,
+        done: false,
+        hashtags: currentHashtags(),
+        details: detailsField ? detailsField.value : '',
+      };
+    };
+
     const canUseBeacon = immediate && navigator.sendBeacon && !isOfflineTask;
+    const forceLocal = isOfflineTask || !navigator.onLine;
+
+    if (forceLocal) {
+      refreshOfflineCache(buildLocalPayload());
+      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saved offline');
+      return;
+    }
+
     if (canUseBeacon) {
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
@@ -1374,9 +1418,16 @@ $user_hashtags_json = json_encode($user_hashtags);
                 }
               }
             }
-          } catch (err) {}
+          } catch (err) {
+            refreshOfflineCache(buildLocalPayload());
+          }
+        } else {
+          refreshOfflineCache(buildLocalPayload());
         }
         return resp;
+      }).catch(() => {
+        refreshOfflineCache(buildLocalPayload());
+        return null;
       });
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
