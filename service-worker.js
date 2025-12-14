@@ -412,25 +412,9 @@ async function drainQueue() {
       const result = await sendWithRetry(entry);
 
       if (result.outcome === 'success') {
-        let parsedPayload = null;
-        if (entry.url && entry.url.includes('add_task.php') && result.response) {
-          try {
-            const cloned = result.response.clone();
-            const isJson = (cloned.headers.get('content-type') || '').includes('application/json');
-            if (isJson) {
-              parsedPayload = await cloned.json();
-            }
-          } catch (error) {
-            console.warn('Could not parse queued add_task response', { id: entry.id, error });
-          }
-        }
-
         await deleteRequest(entry.id);
         console.info('Queued request sent successfully', { id: entry.id, url: entry.url });
-        await notifyClients({ type: 'queue-event', event: 'sent', entry, payload: parsedPayload });
-        if (parsedPayload && parsedPayload.id) {
-          await notifyClients({ type: 'queued-add-result', requestId: entry.id, payload: parsedPayload });
-        }
+        await notifyClients({ type: 'queue-event', event: 'sent', entry });
         await broadcastQueueState({ draining: true });
       } else if (result.outcome === 'discard') {
         await deleteRequest(entry.id);
