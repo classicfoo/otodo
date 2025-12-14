@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/vanilla.css">
     <title>Login</title>
     <script>
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;

@@ -34,7 +34,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/vanilla.css">
     <script>
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
     </script>
@@ -261,31 +261,31 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 <input type="text" id="task-search-input" class="search-input" placeholder="Search tasks…" aria-label="Search tasks" tabindex="-1" inputmode="search">
                 <button class="search-clear" type="button" id="task-search-clear" aria-label="Clear search">&times;</button>
             </div>
-            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
-                <span class="navbar-toggler-icon"></span>
+            <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
+                <span class="navbar-toggler-icon"><span></span></span>
             </button>
         </div>
     </div>
 </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
             <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
             <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
-            <button type="button" class="list-group-item list-group-item-action text-start" data-bs-toggle="modal" data-bs-target="#hashtagManagerModal" id="openHashtagManager">Manage hashtags</button>
+            <button type="button" class="list-group-item list-group-item-action text-start" id="openHashtagManager">Manage hashtags</button>
             <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
         <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
-<div class="modal fade" id="hashtagManagerModal" tabindex="-1" aria-labelledby="hashtagManagerLabel" aria-hidden="true">
+<div class="modal" id="hashtagManagerModal" tabindex="-1" aria-labelledby="hashtagManagerLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -293,7 +293,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     <h5 class="modal-title" id="hashtagManagerLabel">Manage hashtags</h5>
                     <p class="mb-0 text-muted small">Curate your tags, keep naming consistent, and tidy up unused ones.</p>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-close-modal aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="hashtag-manager-hero d-flex flex-column flex-md-row align-items-md-center gap-3 mb-4 p-3 rounded-4">
@@ -402,6 +402,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="offline-prefetch.js"></script>
 <script src="app-api.js"></script>
 <script src="app-router.js"></script>
+<script src="/assets/vanilla-ui.js"></script>
 <script>
     window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
     (function() {
@@ -510,9 +511,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             }
         });
     })();
-</script>
-<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
-<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
+  </script>
 <script>
   (function() {
     const modalEl = document.getElementById('hashtagManagerModal');
@@ -525,11 +524,47 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const openTrigger = document.getElementById('openHashtagManager');
     if (!modalEl || !listEl) return;
 
+    const modalController = (() => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      let open = false;
+
+      const close = () => {
+        if (!open) return;
+        open = false;
+        modalEl.classList.remove('show');
+        modalEl.setAttribute('aria-hidden', 'true');
+        if (backdrop.parentElement) backdrop.remove();
+        document.body.classList.remove('no-scroll');
+        modalEl.dispatchEvent(new CustomEvent('otodo.modal.hidden'));
+      };
+
+      const show = () => {
+        if (open) return;
+        open = true;
+        modalEl.classList.add('show');
+        modalEl.setAttribute('aria-hidden', 'false');
+        document.body.appendChild(backdrop);
+        document.body.classList.add('no-scroll');
+        modalEl.focus({ preventScroll: true });
+      };
+
+      backdrop.addEventListener('click', close);
+      modalEl.addEventListener('click', (event) => {
+        if (event.target === modalEl) close();
+      });
+      modalEl.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', close));
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && open) close();
+      });
+
+      return { show, close, isOpen: () => open };
+    })();
+
     if (window.viewRouter && window.viewRouter.setSpecialRouteHandler) {
       window.viewRouter.setSpecialRouteHandler((path) => {
         if (path.replace(/\/$/, '') === '/hashtags') {
-          const modal = window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-          if (modal) modal.show();
+          modalController.show();
           return true;
         }
         return false;
@@ -540,12 +575,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       openTrigger.addEventListener('click', (event) => {
         event.preventDefault();
         window.history.pushState({}, '', '/hashtags');
-        const modal = window.bootstrap ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-        if (modal) modal.show();
+        modalController.show();
       });
     }
 
-    modalEl.addEventListener('hidden.bs.modal', () => {
+    modalEl.addEventListener('otodo.modal.hidden', () => {
       if (window.location.pathname === '/hashtags') {
         window.history.back();
       }

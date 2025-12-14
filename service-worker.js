@@ -1,4 +1,4 @@
-const CACHE_BASE = 'otodo-cache-v9';
+const CACHE_BASE = 'otodo-cache-v10';
 const DB_NAME = 'otodo-offline';
 const DB_STORE = 'requests';
 const DB_VERSION = 1;
@@ -15,9 +15,8 @@ const URLS_TO_CACHE = [
   '/sync-status.js',
   '/sync-queue-ui.js',
   '/sw-register.js',
-  '/assets/jquery/jquery-3.7.1.min.js',
-  '/assets/bootstrap/bootstrap.min.css',
-  '/assets/bootstrap/bootstrap.bundle.min.js',
+  '/assets/styles/vanilla.css',
+  '/assets/vanilla-ui.js',
   // Removed dynamic-formatting.js as the app no longer uses dynamic line formatting
 ];
 

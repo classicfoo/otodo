@@ -33,7 +33,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/vanilla.css">
     <script>
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
     </script>
@@ -49,16 +49,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
-            <span class="navbar-toggler-icon"></span>
+        <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
+            <span class="navbar-toggler-icon"><span></span></span>
         </button>
     </div>
     </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
@@ -151,8 +151,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <script src="offline-prefetch.js"></script>
 <script src="app-api.js"></script>
 <script src="app-router.js"></script>
-<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
-<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="/assets/vanilla-ui.js"></script>
 <script>
 window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
 </script>

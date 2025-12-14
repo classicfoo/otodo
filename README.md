@@ -1,6 +1,6 @@
 # otodo
 
-A simple PHP online todo list application with user authentication and SQLite storage. The interface uses [Bootstrap](https://getbootstrap.com/) for a mobile‑responsive layout.
+A simple PHP online todo list application with user authentication and SQLite storage. The interface now uses custom vanilla CSS and JavaScript for its responsive layout.
 
 ## Features
 
