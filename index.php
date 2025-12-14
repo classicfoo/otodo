@@ -1265,10 +1265,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const todayIso = toIsoDate(0);
     const dueMeta = formatDue(todayIso);
     const priority = defaultPrioritySetting;
+    const requestId = data.requestId || data.id || `queued-${Date.now()}`;
 
     return {
       status: 'ok',
-      id: data.requestId || `queued-${Date.now()}`,
+      id: requestId,
       description,
       due_date: todayIso,
       due_label: data.due_label || dueMeta.label,
@@ -1279,7 +1280,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       starred: data.starred ?? 0,
       hashtags: data.hashtags || [],
       queued: true,
-      requestId: data.requestId,
+      requestId,
     };
   }
 
