@@ -88,6 +88,11 @@ class ApiClient {
       const response = await fetch(url, merged);
       const data = await response.text();
       if (!response.ok) {
+        const isOfflineFallback = response.status === 503 && typeof data === 'string';
+        if (isOfflineFallback) {
+          return { ok: true, status: response.status, offline: true, data };
+        }
+
         return {
           ok: false,
           status: response.status,
