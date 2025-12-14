@@ -458,7 +458,7 @@ self.addEventListener('fetch', event => {
           }
           return networkResponse;
         })
-        .catch(() => matchUserCache('/'));
+        .catch(() => matchUserCache(event.request).then(cacheHit => cacheHit || Response.error()));
 
       event.waitUntil(fetchPromise.catch(() => {}));
       return response || fetchPromise;
