@@ -20,11 +20,6 @@ $is_numeric_id = ctype_digit($raw_id);
 $is_offline_task = !$is_numeric_id && $raw_id !== '';
 $id = $is_numeric_id ? (int)$raw_id : $raw_id;
 
-if ($is_offline_task && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    header('Location: index.php');
-    exit();
-}
-
 $task = null;
 if ($is_numeric_id) {
     $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
@@ -87,6 +82,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $done = isset($_POST['done']) ? 1 : 0;
     $starred = isset($_POST['starred']) ? 1 : 0;
+
+    if ($is_offline_task) {
+        $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
+        $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
+
+        $tz = $_SESSION['location'] ?? 'UTC';
+        try {
+            $tzObj = new DateTimeZone($tz);
+        } catch (Exception $e) {
+            $tzObj = new DateTimeZone('UTC');
+        }
+
+        $today = new DateTime('today', $tzObj);
+        $tomorrow = (clone $today)->modify('+1 day');
+        $todayFmt = $today->format('Y-m-d');
+        $tomorrowFmt = $tomorrow->format('Y-m-d');
+        $due_label = '';
+        $due_class = '';
+
+        if ($due_date !== '') {
+            try {
+                $dueDateObj = new DateTime($due_date, $tzObj);
+                $dueFmt = $dueDateObj->format('Y-m-d');
+                if ($dueFmt === $todayFmt) {
+                    $due_label = 'Today';
+                    $due_class = 'bg-success-subtle text-success';
+                } elseif ($dueFmt === $tomorrowFmt) {
+                    $due_label = 'Tomorrow';
+                    $due_class = 'bg-primary-subtle text-primary';
+                } elseif ($dueDateObj < $today) {
+                    $due_label = 'Overdue';
+                    $due_class = 'bg-danger-subtle text-danger';
+                } else {
+                    $due_label = 'Later';
+                    $due_class = 'bg-primary-subtle text-primary';
+                }
+            } catch (Exception $e) {
+                $due_label = '';
+                $due_class = '';
+            }
+        }
+
+        $hashtags = collect_hashtags_from_texts($description, $details);
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'status' => 'ok',
+            'queued' => true,
+            'offline' => true,
+            'id' => $id,
+            'requestId' => $id,
+            'description' => $description,
+            'due_date' => $due_date !== '' ? $due_date : null,
+            'due_label' => $due_label,
+            'due_class' => $due_class,
+            'priority' => $priority,
+            'priority_label' => $priority_labels[$priority] ?? 'None',
+            'priority_class' => $priority_classes[$priority] ?? 'text-secondary',
+            'starred' => $starred,
+            'done' => $done,
+            'details' => $details,
+            'hashtags' => $hashtags,
+            'user_hashtags' => $user_hashtags,
+        ]);
+        exit();
+    }
+
     $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
@@ -518,6 +580,121 @@ $user_hashtags_json = json_encode($user_hashtags);
   const taskActionsMenu = document.getElementById('taskActionsMenu');
   const currentTaskId = <?=json_encode($task['id'])?>;
   const isOfflineTask = <?= $is_offline_task ? 'true' : 'false' ?>;
+  const userTimeZone = <?= json_encode($tz) ?> || 'UTC';
+
+  const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
+
+  function readOfflineTasks() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function persistOfflineTasks(tasks = []) {
+    try {
+      localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
+    } catch (err) {}
+  }
+
+  function saveOfflineTask(payload) {
+    if (!payload?.requestId) return;
+    const existing = readOfflineTasks();
+    const filtered = existing.filter(item => item.requestId !== payload.requestId);
+    filtered.unshift(payload);
+    persistOfflineTasks(filtered);
+  }
+
+  function updateOfflineTask(requestId, updates = {}) {
+    if (!requestId) return null;
+    const existing = readOfflineTasks();
+    let updatedEntry = null;
+    const next = existing.map(item => {
+      if (item.requestId !== requestId) return item;
+      updatedEntry = { ...item, ...updates, requestId: item.requestId };
+      return updatedEntry;
+    });
+    if (updatedEntry) {
+      persistOfflineTasks(next);
+      return updatedEntry;
+    }
+    return null;
+  }
+
+  function toIsoDate(offsetDays = 0) {
+    const parts = (typeof Intl !== 'undefined' && Intl.DateTimeFormat && userTimeZone)
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: userTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+          .formatToParts(new Date())
+          .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {})
+      : null;
+
+    const baseDate = parts?.year
+      ? new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`)
+      : new Date();
+
+    baseDate.setHours(0, 0, 0, 0);
+    baseDate.setDate(baseDate.getDate() + offsetDays);
+    return baseDate.toISOString().slice(0, 10);
+  }
+
+  function formatDue(dateStr) {
+    if (!dateStr) return { label: '', className: '' };
+    const today = toIsoDate(0);
+    const tomorrow = toIsoDate(1);
+
+    if (dateStr === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+    if (dateStr === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+    if (dateStr < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
+  }
+
+  function normalizeQueuedPayload(payload = {}) {
+    if (!payload) return null;
+    const requestId = payload.requestId || payload.id || '';
+    const due = (payload.due_date || '').slice(0, 10);
+    const dueMeta = payload.due_label || payload.due_class ? { label: payload.due_label, className: payload.due_class } : formatDue(due);
+
+    return {
+      status: payload.status || 'ok',
+      queued: true,
+      offline: true,
+      id: payload.id || requestId,
+      requestId,
+      localId: payload.localId || payload.id || requestId,
+      description: payload.description || '',
+      due_date: due,
+      due_label: dueMeta.label,
+      due_class: dueMeta.className,
+      priority: Number(payload.priority || 0),
+      priority_label: payload.priority_label || 'None',
+      priority_class: payload.priority_class || 'text-secondary',
+      starred: payload.starred ? 1 : 0,
+      done: payload.done ? 1 : 0,
+      hashtags: Array.isArray(payload.hashtags) ? payload.hashtags : [],
+      details: payload.details || '',
+    };
+  }
+
+  function refreshOfflineCache(payload) {
+    const normalized = normalizeQueuedPayload(payload);
+    if (!normalized || !normalized.requestId) return;
+    const updated = updateOfflineTask(normalized.requestId, normalized);
+    if (!updated) {
+      saveOfflineTask(normalized);
+    }
+    try {
+      sessionStorage.setItem('queuedTaskEditPayload', JSON.stringify(normalized));
+    } catch (err) {}
+  }
+
+  const doneCheckboxEl = document.querySelector('input[name="done"]');
+
+  if (doneCheckboxEl && isOfflineTask) {
+    doneCheckboxEl.disabled = true;
+    doneCheckboxEl.closest('label')?.classList.add('text-muted');
+  }
 
   if (deleteLink && isOfflineTask) {
     deleteLink.classList.add('disabled', 'text-muted');
@@ -1175,21 +1352,28 @@ $user_hashtags_json = json_encode($user_hashtags);
   function sendSave(immediate = false) {
     if (updateDetails) updateDetails();
     const data = new FormData(form);
-    if (immediate && navigator.sendBeacon) {
+    const canUseBeacon = immediate && navigator.sendBeacon && !isOfflineTask;
+    if (canUseBeacon) {
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
-        if (resp && resp.ok) {
+      const request = fetch(window.location.href, {method: 'POST', body: data}).then(async (resp) => {
+        if (resp) {
           try {
-            resp.clone().json().then((payload) => {
-              if (!payload || typeof payload !== 'object') return;
-              if (Array.isArray(payload.user_hashtags)) {
-                replaceHashtagAutocomplete(payload.user_hashtags);
-              } else if (Array.isArray(payload.hashtags)) {
-                mergeHashtagsIntoAutocomplete(payload.hashtags);
+            const isJson = (resp.headers.get('content-type') || '').includes('application/json');
+            if (isJson) {
+              const payload = await resp.clone().json();
+              if (payload && typeof payload === 'object') {
+                if (Array.isArray(payload.user_hashtags)) {
+                  replaceHashtagAutocomplete(payload.user_hashtags);
+                } else if (Array.isArray(payload.hashtags)) {
+                  mergeHashtagsIntoAutocomplete(payload.hashtags);
+                }
+                if (payload.queued || payload.offline) {
+                  refreshOfflineCache(payload);
+                }
               }
-            }).catch(() => {});
+            }
           } catch (err) {}
         }
         return resp;
