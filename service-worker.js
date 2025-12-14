@@ -24,7 +24,12 @@ let isDrainingQueue = false;
 let activeUserScope = {
   sessionId: null,
   userId: null,
+  offlineMode: false,
 };
+
+function isOffline() {
+  return activeUserScope.offlineMode === true || (self.navigator && self.navigator.onLine === false);
+}
 
 async function precacheCoreAssets() {
   try {
@@ -246,6 +251,7 @@ self.addEventListener('message', event => {
     activeUserScope = {
       sessionId: data.sessionId || null,
       userId: data.userId || null,
+      offlineMode: data.offlineMode === true,
     };
     const currentSession = activeUserScope.sessionId || 'anon';
 
@@ -371,6 +377,9 @@ async function handleNonGetRequest(event) {
   const queuedRequestClone = event.request.clone();
 
   try {
+    if (isOffline()) {
+      throw new Error('offline-mode');
+    }
     const liveResponse = await fetch(event.request);
     return liveResponse;
   } catch (error) {
@@ -431,6 +440,13 @@ self.addEventListener('fetch', event => {
     ['/index.php', '/task.php', '/completed.php'].some(path => url.pathname.endsWith(path));
 
   if (isNavigational) {
+    if (isOffline()) {
+      event.respondWith(
+        matchUserCache(event.request).then(cacheHit => cacheHit || matchUserCache('/'))
+      );
+      return;
+    }
+
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
@@ -443,6 +459,13 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         })
         .catch(() => matchUserCache(event.request).then(cacheHit => cacheHit || matchUserCache('/')))
+    );
+    return;
+  }
+
+  if (isOffline()) {
+    event.respondWith(
+      matchUserCache(event.request).then(cacheHit => cacheHit || Response.error())
     );
     return;
   }
