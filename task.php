@@ -116,7 +116,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/assets/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/styles/vanilla.css">
     <script>
         window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
     </script>
@@ -346,21 +346,19 @@ $user_hashtags_json = json_encode($user_hashtags);
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
-            <div class="dropdown">
-                <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
-                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
-                    <li><a class="dropdown-item text-danger" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
-                </ul>
-            </div>
+            <a class="btn btn-outline-danger btn-sm" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a>
+            <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
+                <span class="navbar-toggler-icon"><span></span></span>
+            </button>
         </div>
 
     </div>
 </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
     <div class="offcanvas-header">
         <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
@@ -430,8 +428,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <script src="sync-queue-ui.js"></script>
 <script src="offline-prefetch.js"></script>
 <script src="task-details.js"></script>
-<script src="/assets/jquery/jquery-3.7.1.min.js"></script>
-<script src="/assets/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="/assets/vanilla-ui.js"></script>
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
