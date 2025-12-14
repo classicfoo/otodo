@@ -7,6 +7,11 @@
   messageEl.className = 'sync-status-text';
   const badgesEl = document.createElement('span');
   badgesEl.className = 'sync-status-badges d-inline-flex align-items-center gap-1 ms-2';
+  const actionEl = document.createElement('button');
+  actionEl.type = 'button';
+  actionEl.className = 'btn btn-link btn-sm p-0 align-baseline ms-2';
+  actionEl.hidden = true;
+  actionEl.textContent = 'Sync now';
   const detailEl = document.createElement('div');
   detailEl.className = 'sync-status-detail small text-muted mt-1 d-flex flex-column gap-2';
   detailEl.hidden = true;
@@ -49,6 +54,10 @@
   if (!statusEl.querySelector('.sync-status-badges')) {
     statusEl.appendChild(badgesEl);
   }
+  if (!statusEl.querySelector('.sync-status-action')) {
+    actionEl.classList.add('sync-status-action');
+    statusEl.appendChild(actionEl);
+  }
   if (!statusEl.querySelector('.sync-status-detail')) {
     statusEl.appendChild(detailEl);
   }
@@ -79,6 +88,7 @@
     updateConnectionBadge(onlineState);
     statusEl.dataset.state = state;
     messageEl.textContent = message;
+    updateActionButton(state, message);
     statusEl.classList.remove('text-success', 'text-warning', 'text-danger', 'opacity-75');
     if (state === 'synced') {
       statusEl.classList.add('text-success');
@@ -168,6 +178,33 @@
     syncing: 'Syncing changes…',
     error: 'Sync issue. Will retry when online.'
   };
+
+  function requestQueueDrain() {
+    if (!('serviceWorker' in navigator)) return;
+
+    const send = () => {
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'drain-queue' });
+        return true;
+      }
+      return false;
+    };
+
+    if (!send()) {
+      navigator.serviceWorker.ready.then(() => send()).catch(() => {});
+    }
+  }
+
+  function updateActionButton(state, message) {
+    const shouldShow = state === 'syncing' && typeof message === 'string' && message.toLowerCase().includes('queued actions pending sync');
+    actionEl.hidden = !shouldShow;
+    actionEl.disabled = !navigator.onLine;
+  }
+
+  actionEl.addEventListener('click', () => {
+    setState('syncing', 'Resyncing queued actions…');
+    requestQueueDrain();
+  });
 
   window.trackBackgroundSync = function(promise, messages = {}) {
     setState('syncing', messages.syncing || defaultMessages.syncing);
