@@ -23,10 +23,33 @@ if (!$task) {
 $task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
-$today = (new DateTime('now'))->format('Y-m-d');
-$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
-$overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
-$overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
+// Match the main task list ordering and overdue determination so the Next button
+// walks overdue tasks consistently.
+$tz = $_SESSION['location'] ?? 'UTC';
+try {
+    $tzObj = new DateTimeZone($tz);
+} catch (Exception $e) {
+    $tzObj = new DateTimeZone('UTC');
+}
+$today = new DateTime('today', $tzObj);
+$overdue_stmt = $db->prepare('SELECT id, due_date, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$overdue_stmt->execute([':uid' => $_SESSION['user_id']]);
+$overdue_rows = $overdue_stmt->fetchAll(PDO::FETCH_ASSOC);
+$overdue_ids = [];
+foreach ($overdue_rows as $row) {
+    $rawDue = $row['due_date'] ?? '';
+    if ($rawDue === '' || $rawDue === null) {
+        continue;
+    }
+    try {
+        $dueDate = new DateTime($rawDue, $tzObj);
+        if ($dueDate < $today) {
+            $overdue_ids[] = (int)$row['id'];
+        }
+    } catch (Exception $e) {
+        // Ignore unparsable dates for overdue navigation.
+    }
+}
 $next_task_id = null;
 $current_task_id = (int)$task['id'];
 $found_current = false;
