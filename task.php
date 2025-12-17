@@ -52,20 +52,14 @@ foreach ($overdue_rows as $row) {
 }
 $next_task_id = null;
 $current_task_id = (int)$task['id'];
-$found_current = false;
-foreach ($overdue_ids as $overdue_id) {
-    $overdue_id = (int)$overdue_id;
-    if ($found_current) {
-        $next_task_id = $overdue_id;
-        break;
+$overdue_count = count($overdue_ids);
+if ($overdue_count > 0) {
+    $current_index = array_search($current_task_id, $overdue_ids, true);
+    if ($current_index === false) {
+        $next_task_id = (int)$overdue_ids[0];
+    } else {
+        $next_task_id = (int)$overdue_ids[($current_index + 1) % $overdue_count];
     }
-    if ($overdue_id === $current_task_id) {
-        $found_current = true;
-    }
-}
-
-if ($next_task_id === null && !$found_current && count($overdue_ids) > 0) {
-    $next_task_id = (int)$overdue_ids[0];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
