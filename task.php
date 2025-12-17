@@ -24,7 +24,7 @@ $task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_i
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
 $today = (new DateTime('now'))->format('Y-m-d');
-$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY starred DESC, due_date, priority DESC, id DESC');
+$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
 $overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
 $overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
 $next_task_id = null;
