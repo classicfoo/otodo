@@ -1705,11 +1705,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       }
 
       request.then(resp => {
-        if (!resp || !resp.ok) return Promise.reject();
-        if (resp.queued) {
+        if (resp?.queued) {
           return buildQueuedTaskPayload(description, resp.data || {});
         }
-        return resp.data;
+        if (resp?.ok) {
+          return resp.data;
+        }
+        if (resp?.offline) {
+          return buildQueuedTaskPayload(description, resp.data || {});
+        }
+        return Promise.reject(resp);
       })
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Save failed');
