@@ -743,6 +743,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
+  let discardInProgress = false;
   const queuedPayload = (() => {
     try {
       const raw = sessionStorage.getItem('queuedTaskEditPayload');
@@ -1327,6 +1328,11 @@ $user_hashtags_json = json_encode($user_hashtags);
 
       deleteLink.addEventListener('click', (event) => {
         event.preventDefault();
+        discardInProgress = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
         removeOfflineTask(currentTaskId);
         if (navigator?.serviceWorker?.controller) {
           navigator.serviceWorker.controller.postMessage({ type: 'discard-item', id: currentTaskId });
@@ -1374,6 +1380,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function sendSave(immediate = false) {
+    if (discardInProgress) return;
     if (updateDetails) updateDetails();
     const data = new FormData(form);
     const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
@@ -1463,6 +1470,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
   window.addEventListener('beforeunload', function(){
+    if (discardInProgress) return;
     if (timer) {
       sendSave(true);
     }
