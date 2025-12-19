@@ -744,6 +744,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
+  let pendingSaveBlocked = false;
   let discardInProgress = false;
   const queuedPayload = (() => {
     try {
@@ -1291,10 +1292,17 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
   }
 
+  function clearSaveTimer() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  }
+
   function scheduleSave() {
     captureFormState();
     markListReloadNeeded();
-    if (timer) clearTimeout(timer);
+    clearSaveTimer();
     if (hasUnfinishedHashtag()) {
       pendingSaveBlocked = true;
       return;
@@ -1330,13 +1338,26 @@ $user_hashtags_json = json_encode($user_hashtags);
       deleteLink.addEventListener('click', (event) => {
         event.preventDefault();
         discardInProgress = true;
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
+        clearSaveTimer();
+
+        const discardIds = Array.from(new Set([
+          queuedPayload?.requestId,
+          queuedPayload?.id,
+          currentTaskId,
+        ].filter(Boolean)));
+
+        discardIds.forEach(removeOfflineTask);
+        const pendingUpdates = readPendingUpdates();
+        if (pendingUpdates[currentTaskId]) {
+          delete pendingUpdates[currentTaskId];
+          writePendingUpdates(pendingUpdates);
         }
-        removeOfflineTask(currentTaskId);
+        try { sessionStorage.removeItem('queuedTaskEditPayload'); } catch (err) {}
+
         if (navigator?.serviceWorker?.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'discard-item', id: currentTaskId });
+          discardIds.forEach(id => {
+            navigator.serviceWorker.controller.postMessage({ type: 'discard-item', id });
+          });
         }
         if (window.updateSharedSyncStatus) {
           window.updateSharedSyncStatus('synced', 'Offline task discarded');
