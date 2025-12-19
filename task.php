@@ -687,6 +687,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function refreshOfflineCache(payload) {
+    if (discardInProgress) return;
     const normalized = normalizeQueuedPayload(payload);
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
