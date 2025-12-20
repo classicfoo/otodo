@@ -300,6 +300,16 @@ self.addEventListener('message', event => {
     event.waitUntil(drainQueue());
   } else if (data.type === 'prefetch-urls' && Array.isArray(data.urls)) {
     event.waitUntil(prefetchUrls(data.urls));
+  } else if (data.type === 'queue-task-add' && data.payload) {
+    const body = new FormData();
+    body.append('description', data.payload.description);
+
+    const request = new Request('/add_task.php', {
+        method: 'POST',
+        body: body,
+    });
+    
+    event.waitUntil(handleNonGetRequest({ request: request }));
   } else if (data.type === 'set-user') {
     const previousSession = activeUserScope.sessionId;
     const previousUserId = activeUserScope.userId;

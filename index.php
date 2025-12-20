@@ -1964,16 +1964,42 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
-        tempItem.remove();
-        if (descriptionInput) descriptionInput.value = description;
-        isFallbackSubmit = true;
-        form.submit();
+        const payload = buildQueuedTaskPayload(description, {});
+        saveOfflineTask(payload);
+        const row = buildTaskRowFromPayload(payload);
+        listGroup.replaceChild(tempItem, row);
+
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'queue-task-add',
+            payload: { description: description }
+          });
+        }
       })
       .finally(() => {
         if (!isFallbackSubmit) {
           form.reset();
         }
       });
+    });
+  }
+</script>
+<div class="container mt-5">
+    <h2>Debug Log</h2>
+    <div id="debug-log" style="background: #eee; padding: 1rem; border-radius: 5px; max-height: 400px; overflow-y: scroll; font-family: monospace;"></div>
+</div>
+<script>
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', event => {
+      const debugLog = document.getElementById('debug-log');
+      if (debugLog) {
+        const entry = document.createElement('pre');
+        entry.style.borderBottom = '1px solid #ccc';
+        entry.style.marginBottom = '1rem';
+        entry.style.paddingBottom = '1rem';
+        entry.textContent = JSON.stringify(event.data, null, 2);
+        debugLog.prepend(entry);
+      }
     });
   }
 </script>
