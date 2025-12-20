@@ -504,6 +504,7 @@ async function handleNonGetRequest(event) {
       );
     } catch (queueError) {
       console.error('Failed to queue offline request', { reason, error: queueError });
+      await notifyClients({ type: 'debug-enqueue-failed', error: queueError.message });
       return new Response(
         JSON.stringify({ error: 'Unable to save request for retry', offline: true }),
         { status: 503, headers: { 'Content-Type': 'application/json' } },

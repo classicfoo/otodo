@@ -1985,6 +1985,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const debugLog = document.getElementById('debug-log');
     if (navigator.serviceWorker) {
         navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data && event.data.type === 'debug-enqueue-failed') {
+                const logEntry = document.createElement('div');
+                logEntry.style.color = 'red';
+                logEntry.textContent = `ENQUEUE FAILED: ${event.data.error} at ${new Date().toLocaleTimeString()}`;
+                debugLog.prepend(logEntry);
+            }
             if (event.data && event.data.type === 'debug-enqueue') {
                 const logEntry = document.createElement('div');
                 logEntry.style.color = 'blue';
