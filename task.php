@@ -1215,7 +1215,11 @@ $user_hashtags_json = json_encode($user_hashtags);
     return true;
   }
 
-  hydrateQueuedTask(queuedPayload);
+  // Hydrate with queuedPayload or fallback to offlineEntryForTask
+  const payloadToHydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
+  if (payloadToHydrate) {
+    hydrateQueuedTask(payloadToHydrate);
+  }
   renderHashtagBadges();
 
   function bindHashtagListeners(el) {
@@ -1345,8 +1349,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     
     // Re-hydrate queued task after editor is initialized to ensure details field is set
-    if (queuedPayload && isOfflineTask) {
-      hydrateQueuedTask(queuedPayload);
+    const payloadToRehydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
+    if (payloadToRehydrate && isOfflineTask) {
+      hydrateQueuedTask(payloadToRehydrate);
     }
   }
 

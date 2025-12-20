@@ -1104,23 +1104,41 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const taskId = payload.id || '';
       
       // Try to find existing row by checking all possible identifier combinations
+      // Check across the entire document, not just listGroupEl, in case rows are elsewhere
       let existing = null;
       const allPossibleIds = [requestId, localId, taskId].filter(Boolean);
       
+      // First try within the list group
       for (const checkId of allPossibleIds) {
+        if (!checkId) continue;
+        const checkIdStr = String(checkId);
         existing = listGroupEl.querySelector(
-          `[data-request-id="${CSS.escape(checkId)}"], ` +
-          `[data-local-id="${CSS.escape(checkId)}"], ` +
-          `[data-task-id="${CSS.escape(checkId)}"]`
+          `[data-request-id="${CSS.escape(checkIdStr)}"], ` +
+          `[data-local-id="${CSS.escape(checkIdStr)}"], ` +
+          `[data-task-id="${CSS.escape(checkIdStr)}"]`
         );
         if (existing) break;
       }
       
+      // If not found, try document-wide (in case row is in a different container)
+      if (!existing) {
+        for (const checkId of allPossibleIds) {
+          if (!checkId) continue;
+          const checkIdStr = String(checkId);
+          existing = document.querySelector(
+            `.task-row[data-request-id="${CSS.escape(checkIdStr)}"], ` +
+            `.task-row[data-local-id="${CSS.escape(checkIdStr)}"], ` +
+            `.task-row[data-task-id="${CSS.escape(checkIdStr)}"]`
+          );
+          if (existing) break;
+        }
+      }
+      
       if (existing) {
         // Update existing row attributes to ensure consistency with latest payload
-        existing.dataset.requestId = requestId;
-        existing.dataset.localId = localId;
-        existing.dataset.taskId = taskId;
+        existing.dataset.requestId = String(requestId);
+        existing.dataset.localId = String(localId);
+        existing.dataset.taskId = String(taskId);
         // Update the row UI to reflect any changes in the payload
         updateTaskRowUI(existing, payload);
         return;
@@ -1141,6 +1159,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function updateTaskRowUI(taskEl, payload) {
     if (!taskEl) return;
+    
+    // Update title if provided
+    if (typeof payload.description === 'string' && payload.description.trim()) {
+      const titleEl = taskEl.querySelector('.task-title');
+      if (titleEl) {
+        titleEl.textContent = payload.description;
+      }
+    }
+    
     if (payload.priority !== undefined && payload.priority !== null) {
       taskEl.dataset.priority = payload.priority;
     }
@@ -1685,7 +1712,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function findQueuedTaskPayload(requestId) {
     if (!requestId) return null;
     const cached = readOfflineTasks();
-    return cached.find(item => item.requestId === requestId) || null;
+    const requestIdStr = String(requestId);
+    // Search by requestId, id, or localId
+    return cached.find(item => 
+      String(item.requestId || '') === requestIdStr ||
+      String(item.id || '') === requestIdStr ||
+      String(item.localId || '') === requestIdStr
+    ) || null;
   }
 
   function openTaskEditorFromPayload(payload) {
