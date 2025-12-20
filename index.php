@@ -993,6 +993,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
     navigator.serviceWorker.addEventListener('message', event => {
       const data = event.data || {};
+
+      if (data.type === 'queue-state') {
+        if (!data.draining && (!Array.isArray(data.queue) || !data.queue.length)) {
+          clearOfflineTasksNotInQueue(data.queue || []);
+          if (taskListGroup) restoreOfflineTasks(taskListGroup);
+        }
+        return;
+      }
+
       if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
         const entry = data.entry || {};
         if (data.event === 'sent' && data.responseData?.id && entry.url?.includes('add_task.php')) {
@@ -1206,6 +1215,28 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function looksLikeRequestId(value) {
     return typeof value === 'string' && value.length > 16 && value.includes('-');
+  }
+
+  function clearOfflineTasksNotInQueue(queueEntries = []) {
+    const allowedRequestIds = new Set((queueEntries || []).map(entry => entry?.id).filter(Boolean));
+    const existing = readOfflineTasks();
+    const removedIds = [];
+    const filtered = existing.filter(item => {
+      const keep = allowedRequestIds.has(item.requestId);
+      if (!keep && item?.requestId) removedIds.push(item.requestId);
+      return keep;
+    });
+
+    if (filtered.length !== existing.length) {
+      persistOfflineTasks(filtered);
+      removedIds.forEach(requestId => {
+        const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+        const queuedRow = document.querySelector(selector);
+        if (queuedRow) queuedRow.remove();
+      });
+    }
+
+    return filtered;
   }
 
   function nextOfflineTaskId() {
@@ -1746,10 +1777,45 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
+  let taskListGroup = listGroup;
   const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
   let isFallbackSubmit = false;
   if (form && listGroup) {
-    restoreOfflineTasks(listGroup);
+    const restoreTasks = () => restoreOfflineTasks(taskListGroup || listGroup);
+
+    if (navigator.onLine && navigator.serviceWorker?.controller) {
+      const awaitQueueState = new Promise(resolve => {
+        let finished = false;
+        const handler = (event) => {
+          const payload = event.data || {};
+          if (payload.type === 'queue-state') {
+            finished = true;
+            navigator.serviceWorker.removeEventListener('message', handler);
+            if (!Array.isArray(payload.queue) || !payload.queue.length) {
+              clearOfflineTasksNotInQueue(payload.queue || []);
+            }
+            resolve(payload.queue || []);
+          }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handler);
+
+        try {
+          navigator.serviceWorker.controller.postMessage({ type: 'get-queue' });
+        } catch (err) {}
+
+        setTimeout(() => {
+          if (!finished) {
+            navigator.serviceWorker.removeEventListener('message', handler);
+            resolve(null);
+          }
+        }, 1500);
+      });
+
+      awaitQueueState.then(() => restoreTasks());
+    } else {
+      restoreTasks();
+    }
     form.addEventListener('submit', function(e){
       if (isFallbackSubmit) return;
       e.preventDefault();
