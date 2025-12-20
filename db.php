@@ -1,11 +1,6 @@
 <?php
 session_start();
 
-// Allow service worker to authenticate via user ID query parameter
-if (!isset($_SESSION['user_id']) && isset($_REQUEST['otodo_user_id']) && ctype_digit((string)$_REQUEST['otodo_user_id'])) {
-    $_SESSION['user_id'] = (int)$_REQUEST['otodo_user_id'];
-}
-
 function get_db() {
     static $db = null;
     if ($db === null) {

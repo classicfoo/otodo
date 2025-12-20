@@ -392,11 +392,7 @@ async function parseJsonResponse(response) {
 async function sendWithRetry(entry, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const url = new URL(entry.url, self.location.origin);
-      if (activeUserScope.userId) {
-        url.searchParams.set('otodo_user_id', activeUserScope.userId);
-      }
-      const response = await fetch(url.toString(), toRequestInit(entry));
+      const response = await fetch(entry.url, toRequestInit(entry));
 
       if (response.ok) {
         const responseData = await parseJsonResponse(response);
@@ -481,11 +477,10 @@ async function handleNonGetRequest(event) {
       );
     } catch (queueError) {
       console.error('Failed to queue offline request', { reason, error: queueError });
-      await notifyClients({ type: 'debug-enqueue-failed', error: queueError.message || queueError.name || queueError.toString() });
       return new Response(
         JSON.stringify({ error: 'Unable to save request for retry', offline: true }),
-        { status: 503, headers: { 'Content-Type': 'application/json' },
-      });
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      );
     }
   };
 
@@ -520,6 +515,7 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  notifyClients({ type: 'debug-fetch-event', method: event.request.method, url: event.request.url });
   if (event.request.method !== 'GET') {
     event.respondWith(handleNonGetRequest(event));
     return;
