@@ -1011,15 +1011,18 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           return;
         }
 
+        let taskRowUpdated = false;
         if (data.event === 'sent' && data.responseData?.id) {
-          applyServerIdForQueuedTask(entry.id, data.responseData);
+          taskRowUpdated = applyServerIdForQueuedTask(entry.id, data.responseData);
         }
 
         if (entry.id) {
           removeOfflineTask(entry.id);
-          const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
-          const queuedRow = document.querySelector(selector);
-          if (queuedRow) queuedRow.remove();
+          if (!taskRowUpdated) {
+            const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
+            const queuedRow = document.querySelector(selector);
+            if (queuedRow) queuedRow.remove();
+          }
         }
       }
     });
@@ -1400,48 +1403,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
-    if (!requestId || !serverPayload || !serverPayload.id) return;
+    if (!requestId || !serverPayload || !serverPayload.id) return false;
 
     removeOfflineTask(requestId);
 
     const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
     const taskEl = document.querySelector(selector);
-    if (!taskEl) return;
-
-    const normalizedPayload = {
-      ...serverPayload,
-      queued: false,
-      requestId,
-      id: serverPayload.id,
-      localId: serverPayload.id,
-    };
-
-    taskEl.dataset.requestId = '';
-    taskEl.dataset.taskId = String(serverPayload.id);
-    taskEl.dataset.localId = String(serverPayload.id);
-    taskEl.dataset.queued = 'false';
-    taskEl.classList.remove('opacity-75');
-    taskEl.removeAttribute('aria-disabled');
-    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
-
-    updateTaskRowUI(taskEl, normalizedPayload);
-
-    const star = taskEl.querySelector('.star-toggle');
-    if (star) {
-      star.dataset.id = String(serverPayload.id);
-      star.disabled = false;
-      bindStarButton(star);
-    }
-  }
-
-  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
-    if (!requestId || !serverPayload || !serverPayload.id) return;
-
-    removeOfflineTask(requestId);
-
-    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
-    const taskEl = document.querySelector(selector);
-    if (!taskEl) return;
+    if (!taskEl) return false;
 
     const normalizedPayload = {
       ...serverPayload,
@@ -1468,77 +1436,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       bindStarButton(star);
     }
     window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
-  }
-
-  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
-    if (!requestId || !serverPayload || !serverPayload.id) return;
-
-    removeOfflineTask(requestId);
-
-    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
-    const taskEl = document.querySelector(selector);
-    if (!taskEl) return;
-
-    const normalizedPayload = {
-      ...serverPayload,
-      queued: false,
-      requestId,
-      id: serverPayload.id,
-      localId: serverPayload.id,
-    };
-
-    taskEl.dataset.requestId = '';
-    taskEl.dataset.taskId = String(serverPayload.id);
-    taskEl.dataset.localId = String(serverPayload.id);
-    taskEl.dataset.queued = 'false';
-    taskEl.classList.remove('opacity-75');
-    taskEl.removeAttribute('aria-disabled');
-    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
-
-    updateTaskRowUI(taskEl, normalizedPayload);
-
-    const star = taskEl.querySelector('.star-toggle');
-    if (star) {
-      star.dataset.id = String(serverPayload.id);
-      star.disabled = false;
-      bindStarButton(star);
-    }
-    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
-  }
-
-  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
-    if (!requestId || !serverPayload || !serverPayload.id) return;
-
-    removeOfflineTask(requestId);
-
-    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
-    const taskEl = document.querySelector(selector);
-    if (!taskEl) return;
-
-    const normalizedPayload = {
-      ...serverPayload,
-      queued: false,
-      requestId,
-      id: serverPayload.id,
-      localId: serverPayload.id,
-    };
-
-    taskEl.dataset.requestId = '';
-    taskEl.dataset.taskId = String(serverPayload.id);
-    taskEl.dataset.localId = String(serverPayload.id);
-    taskEl.dataset.queued = 'false';
-    taskEl.classList.remove('opacity-75');
-    taskEl.removeAttribute('aria-disabled');
-    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
-
-    updateTaskRowUI(taskEl, normalizedPayload);
-
-    const star = taskEl.querySelector('.star-toggle');
-    if (star) {
-      star.dataset.id = String(serverPayload.id);
-      star.disabled = false;
-      bindStarButton(star);
-    }
+    return true;
   }
 
   function buildQueuedMetaUpdate(taskEl, action, value, extras = {}) {
