@@ -612,6 +612,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (meta.payload) safeMeta.payload = summarizeOfflinePayload(meta.payload);
     if (Array.isArray(meta.payloads)) safeMeta.payloads = meta.payloads.map(summarizeOfflinePayload);
     safeMeta.requestId = meta.requestId || meta.payload?.requestId;
+    safeMeta.localId = meta.localId || meta.payload?.localId;
     const logger = level === 'warn' ? console.warn : console.debug;
     logger(`[offline] ${message}`, safeMeta);
   }
@@ -707,7 +708,12 @@ $user_hashtags_json = json_encode($user_hashtags);
     const requestId = payload.requestId || payload.id || '';
     const due = (payload.due_date || '').slice(0, 10);
     const dueMeta = payload.due_label || payload.due_class ? { label: payload.due_label, className: payload.due_class } : formatDue(due);
-    logOffline('debug', 'normalizeQueuedPayload: resolved identifiers', { requestId, payload });
+    logOffline('debug', 'normalizeQueuedPayload: resolved identifiers', {
+      action: 'normalize:queued',
+      requestId,
+      localId: payload.localId || payload.id,
+      payload,
+    });
 
     return {
       status: payload.status || 'ok',
@@ -764,7 +770,13 @@ $user_hashtags_json = json_encode($user_hashtags);
   function refreshOfflineCache(payload) {
     if (discardInProgress) return;
     const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
-    logOffline('debug', 'refreshOfflineCache: resolved request', { requestId, localId, payload, offlineMatch: summarizeOfflinePayload(offlineMatch) });
+    logOffline('debug', 'refreshOfflineCache: resolved request', {
+      action: 'cache:resolve',
+      requestId,
+      localId,
+      payload,
+      offlineMatch: summarizeOfflinePayload(offlineMatch),
+    });
     const normalized = normalizeQueuedPayload({
       ...payload,
       requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,

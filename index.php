@@ -1061,7 +1061,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
     let changed = false;
-    logOffline('debug', 'restoreOfflineTasks: hydrate start', { count: stored.length, payloads: stored.slice(0, 5) });
+    logOffline('debug', 'restoreOfflineTasks: hydrate start', {
+      action: 'hydrate:start',
+      count: stored.length,
+      payloads: stored.slice(0, 5),
+    });
     const normalized = stored.map(entry => {
       if (entry?.queued && looksLikeRequestId(entry.id)) {
         const newId = entry.localId || nextOfflineTaskId();
@@ -1088,7 +1092,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
     });
-    logOffline('debug', 'restoreOfflineTasks: hydrate complete', { count: normalized.length, payloads: normalized.slice(0, 5) });
+    logOffline('debug', 'restoreOfflineTasks: hydrate complete', {
+      action: 'hydrate:complete',
+      count: normalized.length,
+      payloads: normalized.slice(0, 5),
+    });
   }
 
   function isoDateFromToday(offset) {
@@ -1243,6 +1251,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (meta.payload) safeMeta.payload = summarizeOfflinePayload(meta.payload);
     if (Array.isArray(meta.payloads)) safeMeta.payloads = meta.payloads.map(summarizeOfflinePayload);
     safeMeta.requestId = meta.requestId || meta.payload?.requestId;
+    safeMeta.localId = meta.localId || meta.payload?.localId;
     const logger = level === 'warn' ? console.warn : console.debug;
     logger(`[offline] ${message}`, safeMeta);
   }
@@ -1306,18 +1315,35 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function saveOfflineTask(payload) {
     if (!payload?.requestId) return;
-    logOffline('debug', 'saveOfflineTask: start', { requestId: payload.requestId, payload });
+    logOffline('debug', 'saveOfflineTask: start', {
+      action: 'save:start',
+      requestId: payload.requestId,
+      localId: payload.localId,
+      payload,
+    });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== payload.requestId);
     filtered.unshift(payload);
     persistOfflineTasks(filtered);
-    logOffline('debug', 'saveOfflineTask: persisted payload', { requestId: payload.requestId, count: filtered.length, payload });
+    logOffline('debug', 'saveOfflineTask: persisted payload', {
+      action: 'save:complete',
+      requestId: payload.requestId,
+      localId: payload.localId,
+      beforeCount: existing.length,
+      count: filtered.length,
+      payload,
+    });
     window.dispatchEvent(new CustomEvent('offline-task-queued', { detail: payload }));
   }
 
   function updateOfflineTask(requestId, updates = {}) {
     if (!requestId) return null;
-    logOffline('debug', 'updateOfflineTask: start', { requestId, updates: summarizeOfflinePayload(updates) });
+    logOffline('debug', 'updateOfflineTask: start', {
+      action: 'update:start',
+      requestId,
+      localId: updates?.localId,
+      updates: summarizeOfflinePayload(updates),
+    });
     const existing = readOfflineTasks();
     let updatedEntry = null;
     const next = existing.map(item => {
@@ -1327,23 +1353,45 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
     if (updatedEntry) {
       persistOfflineTasks(next);
-      logOffline('debug', 'updateOfflineTask: updated entry', { requestId, payload: updatedEntry, count: next.length });
+      logOffline('debug', 'updateOfflineTask: updated entry', {
+        action: 'update:complete',
+        requestId,
+        localId: updatedEntry.localId,
+        payload: updatedEntry,
+        count: next.length,
+      });
       return updatedEntry;
     }
-    logOffline('warn', 'updateOfflineTask: no matching entry found', { requestId, count: existing.length });
+    logOffline('warn', 'updateOfflineTask: no matching entry found', {
+      action: 'update:missing',
+      requestId,
+      count: existing.length,
+    });
     return null;
   }
 
   function removeOfflineTask(requestId) {
     if (!requestId) return;
-    logOffline('debug', 'removeOfflineTask: start', { requestId });
     const existing = readOfflineTasks();
+    logOffline('debug', 'removeOfflineTask: start', {
+      action: 'remove:start',
+      requestId,
+      count: existing.length,
+    });
     const filtered = existing.filter(item => item.requestId !== requestId);
     if (filtered.length !== existing.length) {
       persistOfflineTasks(filtered);
-      logOffline('debug', 'removeOfflineTask: removed entry', { requestId, count: filtered.length });
+      logOffline('debug', 'removeOfflineTask: removed entry', {
+        action: 'remove:complete',
+        requestId,
+        count: filtered.length,
+      });
     } else {
-      logOffline('warn', 'removeOfflineTask: no entry removed', { requestId, count: existing.length });
+      logOffline('warn', 'removeOfflineTask: no entry removed', {
+        action: 'remove:missing',
+        requestId,
+        count: existing.length,
+      });
     }
     window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
   }
