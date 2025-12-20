@@ -701,17 +701,20 @@ $user_hashtags_json = json_encode($user_hashtags);
       return taskIds.some(id => candidateIds.includes(id));
     });
 
-    const requestId = queuedPayload?.requestId
-      || offlineMatch?.requestId
+    const requestId = offlineMatch?.requestId
+      || queuedPayload?.requestId
       || preferredRequestId
+      || queuedPayload?.id
       || currentTaskId;
 
     const localId = preferredLocalId
       || offlineMatch?.localId
       || offlineMatch?.id
+      || queuedPayload?.localId
+      || queuedPayload?.id
       || currentTaskId;
 
-    return { requestId, localId };
+    return { requestId, localId, offlineMatch };
   }
 
   function refreshOfflineCache(payload) {
@@ -1442,6 +1445,11 @@ $user_hashtags_json = json_encode($user_hashtags);
     const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
     const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
 
+    const withResolvedIdentifiers = (payload = {}) => {
+      const { requestId, localId } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+      return { ...payload, requestId, localId: payload?.localId || localId };
+    };
+
     const buildLocalPayload = () => {
       const { requestId, localId } = resolveOfflineIdentifiers();
       const titleInput = form.querySelector('input[name="description"]');
@@ -1455,7 +1463,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       const priorityVal = prioritySelect ? Number(prioritySelect.value) : 0;
       const normalizedPriority = Number.isFinite(priorityVal) ? priorityVal : 0;
 
-      return {
+      return withResolvedIdentifiers({
         status: 'ok',
         queued: true,
         offline: true,
@@ -1473,7 +1481,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         done: false,
         hashtags: currentHashtags(),
         details: detailsField ? detailsField.value : '',
-      };
+      });
     };
 
     const canUseBeacon = immediate && navigator.sendBeacon && !isOfflineTask;
@@ -1502,7 +1510,7 @@ $user_hashtags_json = json_encode($user_hashtags);
                   mergeHashtagsIntoAutocomplete(payload.hashtags);
                 }
                 if (payload.queued || payload.offline) {
-                  refreshOfflineCache(payload);
+                  refreshOfflineCache(withResolvedIdentifiers(payload));
                 }
               }
             }
