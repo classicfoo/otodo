@@ -437,6 +437,34 @@ async function drainQueue() {
 async function handleNonGetRequest(event) {
   const queuedRequestClone = event.request.clone();
 
+  const queueOfflineRequest = async (reason) => {
+    try {
+      const entry = await enqueueRequest(queuedRequestClone);
+      event.waitUntil(registerSync());
+      console.warn('Queued offline request', { id: entry.id, url: entry.url, method: entry.method, reason });
+
+      return new Response(
+        JSON.stringify({
+          queued: true,
+          offline: true,
+          placeholder: true,
+          requestId: entry.id,
+          message: 'Request saved for retry when back online.',
+        }),
+        {
+          status: 202,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
+    } catch (queueError) {
+      console.error('Failed to queue offline request', { reason, error: queueError });
+      return new Response(
+        JSON.stringify({ error: 'Unable to save request for retry', offline: true }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+  };
+
   try {
     if (isOffline()) {
       throw new Error('offline-mode');
@@ -444,23 +472,7 @@ async function handleNonGetRequest(event) {
     const liveResponse = await fetch(event.request);
     return liveResponse;
   } catch (error) {
-    const entry = await enqueueRequest(queuedRequestClone);
-    event.waitUntil(registerSync());
-    console.warn('Queued offline request', { id: entry.id, url: entry.url, method: entry.method, error });
-
-    return new Response(
-      JSON.stringify({
-        queued: true,
-        offline: true,
-        placeholder: true,
-        requestId: entry.id,
-        message: 'Request saved for retry when back online.',
-      }),
-      {
-        status: 202,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
+    return queueOfflineRequest(error);
   }
 }
 
@@ -558,8 +570,4 @@ self.addEventListener('sync', event => {
   if (event.tag === SYNC_TAG) {
     event.waitUntil(drainQueue());
   }
-});
-
-self.addEventListener('online', () => {
-  drainQueue();
 });

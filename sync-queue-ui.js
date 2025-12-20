@@ -269,6 +269,14 @@
 
   window.addEventListener('online', () => {
     updateBadges();
+    navigator.serviceWorker.ready
+      .then(reg => reg.active || navigator.serviceWorker.controller)
+      .then(worker => {
+        if (worker) {
+          worker.postMessage({ type: 'drain-queue' });
+        }
+      })
+      .catch(() => {});
   });
   window.addEventListener('offline', () => {
     updateBadges();
