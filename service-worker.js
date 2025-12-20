@@ -392,8 +392,8 @@ async function sendWithRetry(entry, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const url = new URL(entry.url, self.location.origin);
-      if (activeUserScope.sessionId) {
-        url.searchParams.set('otodo_session_id', activeUserScope.sessionId);
+      if (activeUserScope.userId) {
+        url.searchParams.set('otodo_user_id', activeUserScope.userId);
       }
       const response = await fetch(url.toString(), toRequestInit(entry));
 
