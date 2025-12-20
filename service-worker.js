@@ -199,6 +199,7 @@ async function enqueueRequest(request) {
 
 async function deleteRequest(id) {
   const db = await openDatabase();
+  await notifyClients({ type: 'debug-delete', id: id, timestamp: Date.now() });
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
     tx.oncomplete = () => resolve();
@@ -480,10 +481,11 @@ async function handleNonGetRequest(event) {
       );
     } catch (queueError) {
       console.error('Failed to queue offline request', { reason, error: queueError });
+      await notifyClients({ type: 'debug-enqueue-failed', error: queueError.message || queueError.name || queueError.toString() });
       return new Response(
         JSON.stringify({ error: 'Unable to save request for retry', offline: true }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } },
-      );
+        { status: 503, headers: { 'Content-Type': 'application/json' },
+      });
     }
   };
 
