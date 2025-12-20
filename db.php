@@ -1,6 +1,6 @@
 <?php
-if (isset($_SERVER['HTTP_X_OTODO_SESSION_ID']) && !empty($_SERVER['HTTP_X_OTODO_SESSION_ID'])) {
-    session_id($_SERVER['HTTP_X_OTODO_SESSION_ID']);
+if (isset($_REQUEST['otodo_session_id']) && !empty($_REQUEST['otodo_session_id'])) {
+    session_id($_REQUEST['otodo_session_id']);
 }
 session_start();
 

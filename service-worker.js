@@ -328,10 +328,6 @@ function toRequestInit(entry) {
   const headers = new Headers(entry.headers || []);
   const body = entry.body ? new Uint8Array(entry.body).buffer : undefined;
 
-  if (activeUserScope.sessionId) {
-    headers.set('X-Otodo-Session-Id', activeUserScope.sessionId);
-  }
-
   return {
     method: entry.method,
     headers,
@@ -395,7 +391,11 @@ async function parseJsonResponse(response) {
 async function sendWithRetry(entry, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const response = await fetch(entry.url, toRequestInit(entry));
+      const url = new URL(entry.url, self.location.origin);
+      if (activeUserScope.sessionId) {
+        url.searchParams.set('otodo_session_id', activeUserScope.sessionId);
+      }
+      const response = await fetch(url.toString(), toRequestInit(entry));
 
       if (response.ok) {
         const responseData = await parseJsonResponse(response);
