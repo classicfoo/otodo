@@ -1514,6 +1514,9 @@ $user_hashtags_json = json_encode($user_hashtags);
 
     const buildLocalPayload = () => {
       const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers();
+      const stableRequestId = offlineMatch?.requestId || queuedPayload?.requestId || requestId;
+      const stableLocalId = offlineMatch?.localId || localId;
+      const stableId = offlineMatch?.id || stableLocalId;
       const titleInput = form.querySelector('input[name="description"]');
       const dueInput = form.querySelector('input[name="due_date"]');
       const starredCheckbox = form.querySelector('input[name="starred"]');
@@ -1529,9 +1532,9 @@ $user_hashtags_json = json_encode($user_hashtags);
         status: 'ok',
         queued: true,
         offline: true,
-        id: offlineMatch?.id || localId,
-        requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
-        localId: offlineMatch?.localId || localId,
+        id: stableId,
+        requestId: stableRequestId,
+        localId: stableLocalId,
         description: titleInput ? titleInput.value.trim() : '',
         due_date: dueValue,
         due_label: dueMeta.label,
