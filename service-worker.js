@@ -559,7 +559,3 @@ self.addEventListener('sync', event => {
     event.waitUntil(drainQueue());
   }
 });
-
-self.addEventListener('online', () => {
-  drainQueue();
-});
