@@ -4,9 +4,11 @@
   }
 
   const statusEl = document.getElementById('sync-status');
+  const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
   const state = {
     items: [],
     draining: false,
+    offlineItems: [],
   };
 
   const styles = document.createElement('style');
@@ -104,8 +106,33 @@
     }
   }
 
+  function readOfflineTasks() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      return Array.isArray(stored) ? stored : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function normalizeOfflineQueue() {
+    const existingIds = new Set(state.items.map(item => item.id));
+    const offline = readOfflineTasks();
+
+    state.offlineItems = offline
+      .map(task => ({
+        id: task.requestId || task.localId || `offline-${Date.now()}`,
+        url: 'add_task.php',
+        method: 'POST',
+        timestamp: task.timestamp || Date.now(),
+        taskHint: task.description ? `Task: ${task.description}` : '',
+      }))
+      .filter(entry => entry.id && !existingIds.has(entry.id));
+  }
+
   function updateBadges() {
-    const count = state.items.length;
+    normalizeOfflineQueue();
+    const count = state.items.length + state.offlineItems.length;
     queueTotalBadge.textContent = count;
     queueDrainBadge.hidden = !state.draining;
     if (menuBadge) {
@@ -143,14 +170,17 @@
   }
 
   function renderQueue() {
+    normalizeOfflineQueue();
     queueListEl.innerHTML = '';
-    if (!state.items.length) {
+    const allItems = [...state.items, ...state.offlineItems].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (!allItems.length) {
       renderEmptyState();
       updateBadges();
       return;
     }
 
-    state.items.forEach(entry => {
+    allItems.forEach(entry => {
       const wrapper = document.createElement('div');
       wrapper.className = 'queue-item border rounded-3 p-3';
       wrapper.dataset.queueId = entry.id;
@@ -250,6 +280,21 @@
   }
 
   navigator.serviceWorker.addEventListener('message', handleMessage);
+
+  window.addEventListener('offline-task-queued', () => {
+    normalizeOfflineQueue();
+    renderQueue();
+  });
+  window.addEventListener('offline-task-removed', () => {
+    normalizeOfflineQueue();
+    renderQueue();
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === OFFLINE_TASKS_KEY) {
+      normalizeOfflineQueue();
+      renderQueue();
+    }
+  });
 
   function requestQueueState() {
     postToServiceWorker({ type: 'get-queue' });
