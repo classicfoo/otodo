@@ -1,4 +1,7 @@
 <?php
+if (isset($_SERVER['HTTP_X_OTODO_SESSION_ID']) && !empty($_SERVER['HTTP_X_OTODO_SESSION_ID'])) {
+    session_id($_SERVER['HTTP_X_OTODO_SESSION_ID']);
+}
 session_start();
 
 function get_db() {

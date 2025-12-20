@@ -328,6 +328,10 @@ function toRequestInit(entry) {
   const headers = new Headers(entry.headers || []);
   const body = entry.body ? new Uint8Array(entry.body).buffer : undefined;
 
+  if (activeUserScope.sessionId) {
+    headers.set('X-Otodo-Session-Id', activeUserScope.sessionId);
+  }
+
   return {
     method: entry.method,
     headers,
