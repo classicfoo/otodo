@@ -1985,6 +1985,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const debugLog = document.getElementById('debug-log');
     if (navigator.serviceWorker) {
         navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data && event.data.type === 'debug-enqueue') {
+                const logEntry = document.createElement('div');
+                logEntry.style.color = 'blue';
+                logEntry.textContent = `ENQUEUED: ${event.data.entry.url} at ${new Date().toLocaleTimeString()}`;
+                debugLog.prepend(logEntry);
+            }
             if (event.data && event.data.type === 'debug-sync-attempt') {
                 const logEntry = document.createElement('div');
                 logEntry.style.borderBottom = '1px solid #ccc';

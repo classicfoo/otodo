@@ -192,6 +192,8 @@ async function enqueueRequest(request) {
     tx.objectStore(DB_STORE).put(entry);
   });
 
+  await notifyClients({ type: 'debug-enqueue', entry: entry });
+
   await notifyClients({ type: 'queue-event', event: 'queued', entry });
   await broadcastQueueState();
   return entry;
