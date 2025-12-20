@@ -1030,11 +1030,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function buildTaskRowFromPayload(payload) {
     const requestId = payload.requestId || payload.id || '';
+    const localId = payload.localId || payload.id || '';
     const item = document.createElement('a');
     item.className = 'list-group-item list-group-item-action task-row';
     item.dataset.taskId = payload.queued ? '' : (payload.id || '');
     item.dataset.requestId = requestId;
-    item.dataset.localId = payload.id || '';
+    item.dataset.localId = localId;
     item.dataset.dueDate = payload.due_date || '';
     item.dataset.priority = payload.priority ?? '0';
     item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
@@ -1098,8 +1099,24 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         payload.requestId = requestId;
       }
 
-      const existing = listGroupEl.querySelector(`[data-request-id="${CSS.escape(requestId)}"]`);
-      if (existing) return;
+      // Check multiple identifiers to find existing row
+      const localId = payload.localId || payload.id || '';
+      const taskId = payload.id || '';
+      const existing = listGroupEl.querySelector(
+        `[data-request-id="${CSS.escape(requestId)}"], ` +
+        `[data-local-id="${CSS.escape(localId)}"], ` +
+        `[data-task-id="${CSS.escape(taskId)}"]`
+      );
+      if (existing) {
+        // Update existing row attributes to ensure consistency
+        if (!existing.dataset.requestId && requestId) {
+          existing.dataset.requestId = requestId;
+        }
+        if (!existing.dataset.localId && localId) {
+          existing.dataset.localId = localId;
+        }
+        return;
+      }
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
     });

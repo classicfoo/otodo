@@ -744,6 +744,9 @@ $user_hashtags_json = json_encode($user_hashtags);
       queuedPayload?.id,
       queuedPayload?.localId,
       queuedPayload?.requestId,
+      offlineEntryForTask?.requestId,
+      offlineEntryForTask?.id,
+      offlineEntryForTask?.localId,
     ].filter(Boolean)));
 
     const offlineMatch = readOfflineTasks().find(task => {
@@ -752,19 +755,23 @@ $user_hashtags_json = json_encode($user_hashtags);
     });
 
     const requestId = offlineMatch?.requestId
+      || offlineEntryForTask?.requestId
       || queuedPayload?.requestId
       || preferredRequestId
+      || offlineEntryForTask?.id
       || queuedPayload?.id
       || currentTaskId;
 
     const localId = preferredLocalId
       || offlineMatch?.localId
       || offlineMatch?.id
+      || offlineEntryForTask?.localId
+      || offlineEntryForTask?.id
       || queuedPayload?.localId
       || queuedPayload?.id
       || currentTaskId;
 
-    return { requestId, localId, offlineMatch };
+    return { requestId, localId, offlineMatch: offlineMatch || offlineEntryForTask };
   }
 
   function refreshOfflineCache(payload) {
@@ -779,9 +786,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     });
     const normalized = normalizeQueuedPayload({
       ...payload,
-      requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
-      localId: payload?.localId || offlineMatch?.localId || localId,
-      id: (payload?.id && payload.id !== (offlineMatch?.requestId || requestId)) ? payload.id : (offlineMatch?.id || localId),
+      requestId: offlineMatch?.requestId || offlineEntryForTask?.requestId || queuedPayload?.requestId || requestId,
+      localId: payload?.localId || offlineMatch?.localId || offlineEntryForTask?.localId || localId,
+      id: (payload?.id && payload.id !== (offlineMatch?.requestId || offlineEntryForTask?.requestId || requestId)) ? payload.id : (offlineMatch?.id || offlineEntryForTask?.id || localId),
     });
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
@@ -840,23 +847,33 @@ $user_hashtags_json = json_encode($user_hashtags);
   let timer;
   let pendingSaveBlocked = false;
   let discardInProgress = false;
-  const queuedPayload = (() => {
-    try {
-      const raw = sessionStorage.getItem('queuedTaskEditPayload');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed) return null;
-      const matchesId = parsed.id && String(parsed.id) === String(currentTaskId);
-      const matchesRequest = parsed.requestId && String(parsed.requestId) === String(currentTaskId);
-      return (matchesId || matchesRequest) ? parsed : null;
-    } catch (err) {
-      return null;
-    }
-  })();
-
   const offlineEntryForTask = (() => {
     const entries = readOfflineTasks();
     return entries.find(entry => [entry.requestId, entry.id, entry.localId].includes(currentTaskId));
+  })();
+
+  const queuedPayload = (() => {
+    try {
+      const raw = sessionStorage.getItem('queuedTaskEditPayload');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          const matchesId = parsed.id && String(parsed.id) === String(currentTaskId);
+          const matchesRequest = parsed.requestId && String(parsed.requestId) === String(currentTaskId);
+          if (matchesId || matchesRequest) {
+            return parsed;
+          }
+        }
+      }
+    } catch (err) {
+      // Fall through to localStorage fallback
+    }
+    
+    // Fall back to localStorage if sessionStorage is empty or doesn't match
+    if (isOfflineTask && offlineEntryForTask) {
+      return offlineEntryForTask;
+    }
+    return null;
   })();
 
   const stableRequestId = queuedPayload?.requestId
