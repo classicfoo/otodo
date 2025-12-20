@@ -192,8 +192,6 @@ async function enqueueRequest(request) {
     tx.objectStore(DB_STORE).put(entry);
   });
 
-  await notifyClients({ type: 'debug-enqueue', entry: entry });
-
   await notifyClients({ type: 'queue-event', event: 'queued', entry });
   await broadcastQueueState();
   return entry;
@@ -397,29 +395,7 @@ async function sendWithRetry(entry, attempts = 3) {
       if (activeUserScope.userId) {
         url.searchParams.set('otodo_user_id', activeUserScope.userId);
       }
-      const requestInit = toRequestInit(entry);
-      const response = await fetch(url.toString(), requestInit);
-      const clonedResponse = response.clone();
-
-      const responseBody = await clonedResponse.text();
-      const responseHeaders = [...clonedResponse.headers.entries()];
-
-      // Send debug info to the client
-      await notifyClients({
-          type: 'debug-sync-attempt',
-          request: {
-              url: url.toString(),
-              method: requestInit.method,
-              headers: [...requestInit.headers.entries()]
-          },
-          response: {
-              ok: response.ok,
-              status: response.status,
-              statusText: response.statusText,
-              headers: responseHeaders,
-              body: responseBody
-          }
-      });
+      const response = await fetch(url.toString(), toRequestInit(entry));
 
       if (response.ok) {
         const responseData = await parseJsonResponse(response);
@@ -504,7 +480,6 @@ async function handleNonGetRequest(event) {
       );
     } catch (queueError) {
       console.error('Failed to queue offline request', { reason, error: queueError });
-      await notifyClients({ type: 'debug-enqueue-failed', error: queueError.message });
       return new Response(
         JSON.stringify({ error: 'Unable to save request for retry', offline: true }),
         { status: 503, headers: { 'Content-Type': 'application/json' } },
