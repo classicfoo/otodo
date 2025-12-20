@@ -1269,6 +1269,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function clearOfflineTasksNotInQueue(queueEntries = []) {
+    if (navigator.onLine === false) {
+      return;
+    }
     const allowedRequestIds = new Set((queueEntries || []).map(entry => entry?.id).filter(Boolean));
     const existing = readOfflineTasks();
     const removedIds = [];
