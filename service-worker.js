@@ -395,7 +395,29 @@ async function sendWithRetry(entry, attempts = 3) {
       if (activeUserScope.userId) {
         url.searchParams.set('otodo_user_id', activeUserScope.userId);
       }
-      const response = await fetch(url.toString(), toRequestInit(entry));
+      const requestInit = toRequestInit(entry);
+      const response = await fetch(url.toString(), requestInit);
+      const clonedResponse = response.clone();
+
+      const responseBody = await clonedResponse.text();
+      const responseHeaders = [...clonedResponse.headers.entries()];
+
+      // Send debug info to the client
+      await notifyClients({
+          type: 'debug-sync-attempt',
+          request: {
+              url: url.toString(),
+              method: requestInit.method,
+              headers: [...requestInit.headers.entries()]
+          },
+          response: {
+              ok: response.ok,
+              status: response.status,
+              statusText: response.statusText,
+              headers: responseHeaders,
+              body: responseBody
+          }
+      });
 
       if (response.ok) {
         const responseData = await parseJsonResponse(response);

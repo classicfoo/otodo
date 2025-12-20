@@ -1977,5 +1977,47 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
   }
 </script>
+<div class="container mt-5">
+    <h2>Debug Log</h2>
+    <pre id="debug-log" style="background: #eee; padding: 1rem; border-radius: 5px; max-height: 300px; overflow-y: scroll;"></pre>
+</div>
+<script>
+    const debugLog = document.getElementById('debug-log');
+    if (navigator.serviceWorker) {
+        navigator.serviceWorker.addEventListener('message', event => {
+            if (event.data && event.data.type === 'debug-sync-attempt') {
+                const logEntry = document.createElement('div');
+                logEntry.style.borderBottom = '1px solid #ccc';
+                logEntry.style.marginBottom = '1rem';
+                logEntry.style.paddingBottom = '1rem';
+
+                function escapeHtml(text) {
+                    if (typeof text !== 'string') return '';
+                    return text
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+                }
+
+                logEntry.innerHTML = `
+                    <h3>Sync Attempt at ${new Date().toLocaleTimeString()}</h3>
+                    <h4>Request</h4>
+                    <p><strong>URL:</strong> ${event.data.request.url}</p>
+                    <p><strong>Method:</strong> ${event.data.request.method}</p>
+                    <h4>Response</h4>
+                    <p><strong>Status:</strong> ${event.data.response.status} ${event.data.response.statusText}</p>
+                    <p><strong>OK:</strong> ${event.data.response.ok}</p>
+                    <p><strong>Headers:</strong></p>
+                    <pre>${JSON.stringify(event.data.response.headers, null, 2)}</pre>
+                    <p><strong>Body:</strong></p>
+                    <pre>${escapeHtml(event.data.response.body)}</pre>
+                `;
+                debugLog.prepend(logEntry);
+            }
+        });
+    }
+</script>
 </body>
 </html>
