@@ -846,8 +846,8 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed) return null;
-      const matchesId = parsed.id && parsed.id === currentTaskId;
-      const matchesRequest = parsed.requestId && parsed.requestId === currentTaskId;
+      const matchesId = parsed.id && String(parsed.id) === String(currentTaskId);
+      const matchesRequest = parsed.requestId && String(parsed.requestId) === String(currentTaskId);
       return (matchesId || matchesRequest) ? parsed : null;
     } catch (err) {
       return null;
