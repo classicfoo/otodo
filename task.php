@@ -767,7 +767,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     logOffline('debug', 'refreshOfflineCache: resolved request', { requestId, localId, payload, offlineMatch: summarizeOfflinePayload(offlineMatch) });
     const normalized = normalizeQueuedPayload({
       ...payload,
-      requestId: offlineMatch?.requestId || requestId,
+      requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
       localId: payload?.localId || offlineMatch?.localId || localId,
       id: (payload?.id && payload.id !== (offlineMatch?.requestId || requestId)) ? payload.id : (offlineMatch?.id || localId),
     });
@@ -1494,7 +1494,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
       return {
         ...payload,
-        requestId: offlineMatch?.requestId || requestId,
+        requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
         localId: payload?.localId || offlineMatch?.localId || localId,
         id: payload?.id || offlineMatch?.id || localId,
       };
@@ -1518,7 +1518,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         queued: true,
         offline: true,
         id: offlineMatch?.id || localId,
-        requestId: offlineMatch?.requestId || requestId,
+        requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
         localId: offlineMatch?.localId || localId,
         description: titleInput ? titleInput.value.trim() : '',
         due_date: dueValue,
