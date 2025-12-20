@@ -854,6 +854,31 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
   })();
 
+  const offlineEntryForTask = (() => {
+    const entries = readOfflineTasks();
+    return entries.find(entry => [entry.requestId, entry.id, entry.localId].includes(currentTaskId));
+  })();
+
+  const stableRequestId = queuedPayload?.requestId
+    || offlineEntryForTask?.requestId
+    || offlineEntryForTask?.id
+    || currentTaskId;
+
+  const stableLocalId = offlineEntryForTask?.localId
+    || queuedPayload?.localId
+    || (queuedPayload?.requestId && queuedPayload.requestId === queuedPayload.id ? queuedPayload.id : currentTaskId);
+
+  function withStableOfflineIds(payload = {}) {
+    const requestId = payload.requestId || stableRequestId;
+    const localId = payload.localId || stableLocalId || requestId;
+    return {
+      ...payload,
+      requestId,
+      id: payload.id || localId || requestId,
+      localId,
+    };
+  }
+
   const hashtagBadges = document.getElementById('hashtagBadges');
   const hashtagSuggestions = document.getElementById('hashtagSuggestions');
   const titleInputEl = form.querySelector('input[name="description"]');
@@ -1528,13 +1553,10 @@ $user_hashtags_json = json_encode($user_hashtags);
       const priorityVal = prioritySelect ? Number(prioritySelect.value) : 0;
       const normalizedPriority = Number.isFinite(priorityVal) ? priorityVal : 0;
 
-      return withResolvedIdentifiers({
+      return withStableOfflineIds({
         status: 'ok',
         queued: true,
         offline: true,
-        id: stableId,
-        requestId: stableRequestId,
-        localId: stableLocalId,
         description: titleInput ? titleInput.value.trim() : '',
         due_date: dueValue,
         due_label: dueMeta.label,
@@ -1568,18 +1590,18 @@ $user_hashtags_json = json_encode($user_hashtags);
             const isJson = (resp.headers.get('content-type') || '').includes('application/json');
             if (isJson) {
               const payload = await resp.clone().json();
-              if (payload && typeof payload === 'object') {
-                if (Array.isArray(payload.user_hashtags)) {
-                  replaceHashtagAutocomplete(payload.user_hashtags);
-                } else if (Array.isArray(payload.hashtags)) {
-                  mergeHashtagsIntoAutocomplete(payload.hashtags);
-                }
-                if (payload.queued || payload.offline) {
-                  refreshOfflineCache(withResolvedIdentifiers(payload));
+                if (payload && typeof payload === 'object') {
+                  if (Array.isArray(payload.user_hashtags)) {
+                    replaceHashtagAutocomplete(payload.user_hashtags);
+                  } else if (Array.isArray(payload.hashtags)) {
+                    mergeHashtagsIntoAutocomplete(payload.hashtags);
+                  }
+                  if (payload.queued || payload.offline) {
+                    refreshOfflineCache(withStableOfflineIds(payload));
+                  }
                 }
               }
-            }
-          } catch (err) {
+            } catch (err) {
             refreshOfflineCache(buildLocalPayload());
           }
         } else {
