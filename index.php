@@ -993,6 +993,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
     navigator.serviceWorker.addEventListener('message', event => {
       const data = event.data || {};
+
+      if (data.type === 'queue-state') {
+        if (!data.draining && (!Array.isArray(data.queue) || !data.queue.length)) {
+          clearOfflineTasksNotInQueue(data.queue || []);
+          if (taskListGroup) restoreOfflineTasks(taskListGroup);
+        }
+        return;
+      }
+
       if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
         const entry = data.entry || {};
         const isAddTask = entry.url?.includes('add_task.php');
@@ -1060,6 +1069,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
     let changed = false;
+    logOffline('debug', 'restoreOfflineTasks: hydrate start', {
+      action: 'hydrate:start',
+      count: stored.length,
+      payloads: stored.slice(0, 5),
+    });
     const normalized = stored.map(entry => {
       if (entry?.queued && looksLikeRequestId(entry.id)) {
         const newId = entry.localId || nextOfflineTaskId();
@@ -1085,6 +1099,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       if (existing) return;
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
+    });
+    logOffline('debug', 'restoreOfflineTasks: hydrate complete', {
+      action: 'hydrate:complete',
+      count: normalized.length,
+      payloads: normalized.slice(0, 5),
     });
   }
 
@@ -1211,9 +1230,64 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
   const OFFLINE_ID_COUNTER_KEY = 'offlineQueuedTaskCounter';
+  const OTODO_DEBUG_OFFLINE = Boolean(window?.OTODO_DEBUG_OFFLINE);
+
+  const truncateForOfflineLog = (value, max = 80) => {
+    if (typeof value !== 'string') return value;
+    return value.length > max ? `${value.slice(0, max)}…` : value;
+  };
+
+  function summarizeOfflinePayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') return payload;
+    return {
+      requestId: payload.requestId || payload.id,
+      id: payload.id,
+      localId: payload.localId,
+      description: truncateForOfflineLog(payload.description || '', 60),
+      detailsPreview: payload.details ? truncateForOfflineLog(String(payload.details), 80) : undefined,
+      hashtagsCount: Array.isArray(payload.hashtags) ? payload.hashtags.length : undefined,
+      priority: payload.priority,
+      done: payload.done,
+      queued: payload.queued,
+      offline: payload.offline,
+    };
+  }
+
+  function logOffline(level, message, meta = {}) {
+    if (!OTODO_DEBUG_OFFLINE || typeof console === 'undefined') return;
+    const safeMeta = { ...meta };
+    if (meta.payload) safeMeta.payload = summarizeOfflinePayload(meta.payload);
+    if (Array.isArray(meta.payloads)) safeMeta.payloads = meta.payloads.map(summarizeOfflinePayload);
+    safeMeta.requestId = meta.requestId || meta.payload?.requestId;
+    safeMeta.localId = meta.localId || meta.payload?.localId;
+    const logger = level === 'warn' ? console.warn : console.debug;
+    logger(`[offline] ${message}`, safeMeta);
+  }
 
   function looksLikeRequestId(value) {
     return typeof value === 'string' && value.length > 16 && value.includes('-');
+  }
+
+  function clearOfflineTasksNotInQueue(queueEntries = []) {
+    const allowedRequestIds = new Set((queueEntries || []).map(entry => entry?.id).filter(Boolean));
+    const existing = readOfflineTasks();
+    const removedIds = [];
+    const filtered = existing.filter(item => {
+      const keep = allowedRequestIds.has(item.requestId);
+      if (!keep && item?.requestId) removedIds.push(item.requestId);
+      return keep;
+    });
+
+    if (filtered.length !== existing.length) {
+      persistOfflineTasks(filtered);
+      removedIds.forEach(requestId => {
+        const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+        const queuedRow = document.querySelector(selector);
+        if (queuedRow) queuedRow.remove();
+      });
+    }
+
+    return filtered;
   }
 
   function nextOfflineTaskId() {
@@ -1230,6 +1304,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function readOfflineTasks() {
     try {
       const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      logOffline('debug', 'readOfflineTasks: loaded entries', { count: Array.isArray(stored) ? stored.length : 0 });
       return Array.isArray(stored) ? stored : [];
     } catch (err) {
       console.warn('Could not read offline tasks', err);
@@ -1240,6 +1315,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function persistOfflineTasks(tasks = []) {
     try {
       localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
+      logOffline('debug', 'persistOfflineTasks: wrote entries', { count: Array.isArray(tasks) ? tasks.length : 0 });
     } catch (err) {
       console.warn('Could not persist offline tasks', err);
     }
@@ -1247,6 +1323,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function saveOfflineTask(payload) {
     if (!payload?.requestId) return;
+    logOffline('debug', 'saveOfflineTask: start', {
+      action: 'save:start',
+      requestId: payload.requestId,
+      localId: payload.localId,
+      payload,
+    });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== payload.requestId);
     filtered.unshift(payload);
@@ -1256,6 +1338,12 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function updateOfflineTask(requestId, updates = {}) {
     if (!requestId) return null;
+    logOffline('debug', 'updateOfflineTask: start', {
+      action: 'update:start',
+      requestId,
+      localId: updates?.localId,
+      updates: summarizeOfflinePayload(updates),
+    });
     const existing = readOfflineTasks();
     let updatedEntry = null;
     const next = existing.map(item => {
@@ -1265,17 +1353,152 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
     if (updatedEntry) {
       persistOfflineTasks(next);
+      logOffline('debug', 'updateOfflineTask: updated entry', {
+        action: 'update:complete',
+        requestId,
+        localId: updatedEntry.localId,
+        payload: updatedEntry,
+        count: next.length,
+      });
       return updatedEntry;
     }
+    logOffline('warn', 'updateOfflineTask: no matching entry found', {
+      action: 'update:missing',
+      requestId,
+      count: existing.length,
+    });
     return null;
   }
 
   function removeOfflineTask(requestId) {
     if (!requestId) return;
     const existing = readOfflineTasks();
+    logOffline('debug', 'removeOfflineTask: start', {
+      action: 'remove:start',
+      requestId,
+      count: existing.length,
+    });
     const filtered = existing.filter(item => item.requestId !== requestId);
     if (filtered.length !== existing.length) {
       persistOfflineTasks(filtered);
+      logOffline('debug', 'removeOfflineTask: removed entry', {
+        action: 'remove:complete',
+        requestId,
+        count: filtered.length,
+      });
+    } else {
+      logOffline('warn', 'removeOfflineTask: no entry removed', {
+        action: 'remove:missing',
+        requestId,
+        count: existing.length,
+      });
+    }
+    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
+  }
+
+  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
+    if (!requestId || !serverPayload || !serverPayload.id) return;
+
+    removeOfflineTask(requestId);
+
+    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+    const taskEl = document.querySelector(selector);
+    if (!taskEl) return;
+
+    const normalizedPayload = {
+      ...serverPayload,
+      queued: false,
+      requestId,
+      id: serverPayload.id,
+      localId: serverPayload.id,
+    };
+
+    taskEl.dataset.requestId = '';
+    taskEl.dataset.taskId = String(serverPayload.id);
+    taskEl.dataset.localId = String(serverPayload.id);
+    taskEl.dataset.queued = 'false';
+    taskEl.classList.remove('opacity-75');
+    taskEl.removeAttribute('aria-disabled');
+    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
+
+    updateTaskRowUI(taskEl, normalizedPayload);
+
+    const star = taskEl.querySelector('.star-toggle');
+    if (star) {
+      star.dataset.id = String(serverPayload.id);
+      star.disabled = false;
+      bindStarButton(star);
+    }
+  }
+
+  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
+    if (!requestId || !serverPayload || !serverPayload.id) return;
+
+    removeOfflineTask(requestId);
+
+    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+    const taskEl = document.querySelector(selector);
+    if (!taskEl) return;
+
+    const normalizedPayload = {
+      ...serverPayload,
+      queued: false,
+      requestId,
+      id: serverPayload.id,
+      localId: serverPayload.id,
+    };
+
+    taskEl.dataset.requestId = '';
+    taskEl.dataset.taskId = String(serverPayload.id);
+    taskEl.dataset.localId = String(serverPayload.id);
+    taskEl.dataset.queued = 'false';
+    taskEl.classList.remove('opacity-75');
+    taskEl.removeAttribute('aria-disabled');
+    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
+
+    updateTaskRowUI(taskEl, normalizedPayload);
+
+    const star = taskEl.querySelector('.star-toggle');
+    if (star) {
+      star.dataset.id = String(serverPayload.id);
+      star.disabled = false;
+      bindStarButton(star);
+    }
+    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
+  }
+
+  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
+    if (!requestId || !serverPayload || !serverPayload.id) return;
+
+    removeOfflineTask(requestId);
+
+    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+    const taskEl = document.querySelector(selector);
+    if (!taskEl) return;
+
+    const normalizedPayload = {
+      ...serverPayload,
+      queued: false,
+      requestId,
+      id: serverPayload.id,
+      localId: serverPayload.id,
+    };
+
+    taskEl.dataset.requestId = '';
+    taskEl.dataset.taskId = String(serverPayload.id);
+    taskEl.dataset.localId = String(serverPayload.id);
+    taskEl.dataset.queued = 'false';
+    taskEl.classList.remove('opacity-75');
+    taskEl.removeAttribute('aria-disabled');
+    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
+
+    updateTaskRowUI(taskEl, normalizedPayload);
+
+    const star = taskEl.querySelector('.star-toggle');
+    if (star) {
+      star.dataset.id = String(serverPayload.id);
+      star.disabled = false;
+      bindStarButton(star);
     }
     window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
   }
@@ -1719,10 +1942,45 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
+  let taskListGroup = listGroup;
   const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
   let isFallbackSubmit = false;
   if (form && listGroup) {
-    restoreOfflineTasks(listGroup);
+    const restoreTasks = () => restoreOfflineTasks(taskListGroup || listGroup);
+
+    if (navigator.onLine && navigator.serviceWorker?.controller) {
+      const awaitQueueState = new Promise(resolve => {
+        let finished = false;
+        const handler = (event) => {
+          const payload = event.data || {};
+          if (payload.type === 'queue-state') {
+            finished = true;
+            navigator.serviceWorker.removeEventListener('message', handler);
+            if (!Array.isArray(payload.queue) || !payload.queue.length) {
+              clearOfflineTasksNotInQueue(payload.queue || []);
+            }
+            resolve(payload.queue || []);
+          }
+        };
+
+        navigator.serviceWorker.addEventListener('message', handler);
+
+        try {
+          navigator.serviceWorker.controller.postMessage({ type: 'get-queue' });
+        } catch (err) {}
+
+        setTimeout(() => {
+          if (!finished) {
+            navigator.serviceWorker.removeEventListener('message', handler);
+            resolve(null);
+          }
+        }, 1500);
+      });
+
+      awaitQueueState.then(() => restoreTasks());
+    } else {
+      restoreTasks();
+    }
     form.addEventListener('submit', function(e){
       if (isFallbackSubmit) return;
       e.preventDefault();

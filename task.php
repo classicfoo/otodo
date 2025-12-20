@@ -583,10 +583,44 @@ $user_hashtags_json = json_encode($user_hashtags);
   const userTimeZone = <?= json_encode($tz) ?> || 'UTC';
 
   const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
+  const OTODO_DEBUG_OFFLINE = Boolean(window?.OTODO_DEBUG_OFFLINE);
+
+  const truncateForOfflineLog = (value, max = 80) => {
+    if (typeof value !== 'string') return value;
+    return value.length > max ? `${value.slice(0, max)}…` : value;
+  };
+
+  function summarizeOfflinePayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') return payload;
+    return {
+      requestId: payload.requestId || payload.id,
+      id: payload.id,
+      localId: payload.localId,
+      description: truncateForOfflineLog(payload.description || '', 60),
+      detailsPreview: payload.details ? truncateForOfflineLog(String(payload.details), 80) : undefined,
+      hashtagsCount: Array.isArray(payload.hashtags) ? payload.hashtags.length : undefined,
+      priority: payload.priority,
+      done: payload.done,
+      queued: payload.queued,
+      offline: payload.offline,
+    };
+  }
+
+  function logOffline(level, message, meta = {}) {
+    if (!OTODO_DEBUG_OFFLINE || typeof console === 'undefined') return;
+    const safeMeta = { ...meta };
+    if (meta.payload) safeMeta.payload = summarizeOfflinePayload(meta.payload);
+    if (Array.isArray(meta.payloads)) safeMeta.payloads = meta.payloads.map(summarizeOfflinePayload);
+    safeMeta.requestId = meta.requestId || meta.payload?.requestId;
+    safeMeta.localId = meta.localId || meta.payload?.localId;
+    const logger = level === 'warn' ? console.warn : console.debug;
+    logger(`[offline] ${message}`, safeMeta);
+  }
 
   function readOfflineTasks() {
     try {
       const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      logOffline('debug', 'readOfflineTasks: loaded entries', { count: Array.isArray(stored) ? stored.length : 0 });
       return Array.isArray(stored) ? stored : [];
     } catch (err) {
       return [];
@@ -596,28 +630,36 @@ $user_hashtags_json = json_encode($user_hashtags);
   function persistOfflineTasks(tasks = []) {
     try {
       localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
+      logOffline('debug', 'persistOfflineTasks: wrote entries', { count: Array.isArray(tasks) ? tasks.length : 0, payloads: tasks.slice(0, 3) });
     } catch (err) {}
   }
 
   function removeOfflineTask(requestId) {
     if (!requestId) return;
+    logOffline('debug', 'removeOfflineTask: start', { requestId });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== requestId);
     if (filtered.length !== existing.length) {
       persistOfflineTasks(filtered);
+      logOffline('debug', 'removeOfflineTask: removed entry', { requestId, count: filtered.length });
+    } else {
+      logOffline('warn', 'removeOfflineTask: no entry removed', { requestId, count: existing.length });
     }
   }
 
   function saveOfflineTask(payload) {
     if (!payload?.requestId) return;
+    logOffline('debug', 'saveOfflineTask: start', { requestId: payload.requestId, payload });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== payload.requestId);
     filtered.unshift(payload);
     persistOfflineTasks(filtered);
+    logOffline('debug', 'saveOfflineTask: persisted payload', { requestId: payload.requestId, count: filtered.length, payload });
   }
 
   function updateOfflineTask(requestId, updates = {}) {
     if (!requestId) return null;
+    logOffline('debug', 'updateOfflineTask: start', { requestId, updates: summarizeOfflinePayload(updates) });
     const existing = readOfflineTasks();
     let updatedEntry = null;
     const next = existing.map(item => {
@@ -627,8 +669,10 @@ $user_hashtags_json = json_encode($user_hashtags);
     });
     if (updatedEntry) {
       persistOfflineTasks(next);
+      logOffline('debug', 'updateOfflineTask: updated entry', { requestId, payload: updatedEntry, count: next.length });
       return updatedEntry;
     }
+    logOffline('warn', 'updateOfflineTask: no matching entry found', { requestId, count: existing.length });
     return null;
   }
 
@@ -664,6 +708,12 @@ $user_hashtags_json = json_encode($user_hashtags);
     const requestId = payload.requestId || payload.id || '';
     const due = (payload.due_date || '').slice(0, 10);
     const dueMeta = payload.due_label || payload.due_class ? { label: payload.due_label, className: payload.due_class } : formatDue(due);
+    logOffline('debug', 'normalizeQueuedPayload: resolved identifiers', {
+      action: 'normalize:queued',
+      requestId,
+      localId: payload.localId || payload.id,
+      payload,
+    });
 
     return {
       status: payload.status || 'ok',
@@ -686,9 +736,53 @@ $user_hashtags_json = json_encode($user_hashtags);
     };
   }
 
+  function resolveOfflineIdentifiers(preferredRequestId, preferredLocalId) {
+    const candidateIds = Array.from(new Set([
+      preferredRequestId,
+      preferredLocalId,
+      currentTaskId,
+      queuedPayload?.id,
+      queuedPayload?.localId,
+      queuedPayload?.requestId,
+    ].filter(Boolean)));
+
+    const offlineMatch = readOfflineTasks().find(task => {
+      const taskIds = [task.requestId, task.id, task.localId].filter(Boolean);
+      return taskIds.some(id => candidateIds.includes(id));
+    });
+
+    const requestId = offlineMatch?.requestId
+      || queuedPayload?.requestId
+      || preferredRequestId
+      || queuedPayload?.id
+      || currentTaskId;
+
+    const localId = preferredLocalId
+      || offlineMatch?.localId
+      || offlineMatch?.id
+      || queuedPayload?.localId
+      || queuedPayload?.id
+      || currentTaskId;
+
+    return { requestId, localId, offlineMatch };
+  }
+
   function refreshOfflineCache(payload) {
     if (discardInProgress) return;
-    const normalized = normalizeQueuedPayload(payload);
+    const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+    logOffline('debug', 'refreshOfflineCache: resolved request', {
+      action: 'cache:resolve',
+      requestId,
+      localId,
+      payload,
+      offlineMatch: summarizeOfflinePayload(offlineMatch),
+    });
+    const normalized = normalizeQueuedPayload({
+      ...payload,
+      requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
+      localId: payload?.localId || offlineMatch?.localId || localId,
+      id: (payload?.id && payload.id !== (offlineMatch?.requestId || requestId)) ? payload.id : (offlineMatch?.id || localId),
+    });
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
     if (!updated) {
@@ -1433,7 +1527,21 @@ $user_hashtags_json = json_encode($user_hashtags);
     const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
     const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
 
+    const withResolvedIdentifiers = (payload = {}) => {
+      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+      return {
+        ...payload,
+        requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
+        localId: payload?.localId || offlineMatch?.localId || localId,
+        id: payload?.id || offlineMatch?.id || localId,
+      };
+    };
+
     const buildLocalPayload = () => {
+      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers();
+      const stableRequestId = offlineMatch?.requestId || queuedPayload?.requestId || requestId;
+      const stableLocalId = offlineMatch?.localId || localId;
+      const stableId = offlineMatch?.id || stableLocalId;
       const titleInput = form.querySelector('input[name="description"]');
       const dueInput = form.querySelector('input[name="due_date"]');
       const starredCheckbox = form.querySelector('input[name="starred"]');
