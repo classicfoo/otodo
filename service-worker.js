@@ -371,13 +371,31 @@ async function prefetchUrls(urls = []) {
   }
 }
 
+async function parseJsonResponse(response) {
+  if (!response) return null;
+
+  const contentType = response.headers?.get('content-type') || '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return null;
+  }
+
+  try {
+    const clone = response.clone();
+    return await clone.json();
+  } catch (error) {
+    console.warn('Failed to parse queued response body', error);
+    return null;
+  }
+}
+
 async function sendWithRetry(entry, attempts = 3) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await fetch(entry.url, toRequestInit(entry));
 
       if (response.ok) {
-        return { outcome: 'success', response };
+        const responseData = await parseJsonResponse(response);
+        return { outcome: 'success', response, responseData };
       }
 
       if (shouldDiscardOnConflict(response.status)) {
@@ -414,7 +432,7 @@ async function drainQueue() {
       if (result.outcome === 'success') {
         await deleteRequest(entry.id);
         console.info('Queued request sent successfully', { id: entry.id, url: entry.url });
-        await notifyClients({ type: 'queue-event', event: 'sent', entry });
+        await notifyClients({ type: 'queue-event', event: 'sent', entry, responseData: result.responseData });
         await broadcastQueueState({ draining: true });
       } else if (result.outcome === 'discard') {
         await deleteRequest(entry.id);
