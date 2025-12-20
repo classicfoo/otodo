@@ -686,9 +686,43 @@ $user_hashtags_json = json_encode($user_hashtags);
     };
   }
 
+  function resolveOfflineIdentifiers(preferredRequestId, preferredLocalId) {
+    const candidateIds = Array.from(new Set([
+      preferredRequestId,
+      preferredLocalId,
+      currentTaskId,
+      queuedPayload?.id,
+      queuedPayload?.localId,
+      queuedPayload?.requestId,
+    ].filter(Boolean)));
+
+    const offlineMatch = readOfflineTasks().find(task => {
+      const taskIds = [task.requestId, task.id, task.localId].filter(Boolean);
+      return taskIds.some(id => candidateIds.includes(id));
+    });
+
+    const requestId = queuedPayload?.requestId
+      || offlineMatch?.requestId
+      || preferredRequestId
+      || currentTaskId;
+
+    const localId = preferredLocalId
+      || offlineMatch?.localId
+      || offlineMatch?.id
+      || currentTaskId;
+
+    return { requestId, localId };
+  }
+
   function refreshOfflineCache(payload) {
     if (discardInProgress) return;
-    const normalized = normalizeQueuedPayload(payload);
+    const { requestId, localId } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+    const normalized = normalizeQueuedPayload({
+      ...payload,
+      requestId,
+      localId,
+      id: (payload?.id && payload.id !== requestId) ? payload.id : localId,
+    });
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
     if (!updated) {
@@ -1409,6 +1443,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
 
     const buildLocalPayload = () => {
+      const { requestId, localId } = resolveOfflineIdentifiers();
       const titleInput = form.querySelector('input[name="description"]');
       const dueInput = form.querySelector('input[name="due_date"]');
       const starredCheckbox = form.querySelector('input[name="starred"]');
@@ -1424,9 +1459,9 @@ $user_hashtags_json = json_encode($user_hashtags);
         status: 'ok',
         queued: true,
         offline: true,
-        id: currentTaskId,
-        requestId: currentTaskId,
-        localId: currentTaskId,
+        id: localId,
+        requestId,
+        localId,
         description: titleInput ? titleInput.value.trim() : '',
         due_date: dueValue,
         due_label: dueMeta.label,
