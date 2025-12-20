@@ -995,6 +995,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const data = event.data || {};
       if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
         const entry = data.entry || {};
+        if (data.event === 'sent' && data.responseData?.id && entry.url?.includes('add_task.php')) {
+          applyServerIdForQueuedTask(entry.id, data.responseData);
+        }
         if (entry.url && entry.id && entry.url.includes('add_task.php')) {
           removeOfflineTask(entry.id);
           const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
@@ -1240,6 +1243,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const filtered = existing.filter(item => item.requestId !== payload.requestId);
     filtered.unshift(payload);
     persistOfflineTasks(filtered);
+    window.dispatchEvent(new CustomEvent('offline-task-queued', { detail: payload }));
   }
 
   function updateOfflineTask(requestId, updates = {}) {
@@ -1264,6 +1268,42 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const filtered = existing.filter(item => item.requestId !== requestId);
     if (filtered.length !== existing.length) {
       persistOfflineTasks(filtered);
+    }
+    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
+  }
+
+  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
+    if (!requestId || !serverPayload || !serverPayload.id) return;
+
+    removeOfflineTask(requestId);
+
+    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
+    const taskEl = document.querySelector(selector);
+    if (!taskEl) return;
+
+    const normalizedPayload = {
+      ...serverPayload,
+      queued: false,
+      requestId,
+      id: serverPayload.id,
+      localId: serverPayload.id,
+    };
+
+    taskEl.dataset.requestId = '';
+    taskEl.dataset.taskId = String(serverPayload.id);
+    taskEl.dataset.localId = String(serverPayload.id);
+    taskEl.dataset.queued = 'false';
+    taskEl.classList.remove('opacity-75');
+    taskEl.removeAttribute('aria-disabled');
+    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
+
+    updateTaskRowUI(taskEl, normalizedPayload);
+
+    const star = taskEl.querySelector('.star-toggle');
+    if (star) {
+      star.dataset.id = String(serverPayload.id);
+      star.disabled = false;
+      bindStarButton(star);
     }
   }
 
@@ -1323,6 +1363,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       queued: true,
       requestId,
       localId: queuedId,
+      timestamp: Date.now(),
     };
   }
 
