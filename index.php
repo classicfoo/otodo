@@ -1061,6 +1061,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function restoreOfflineTasks(listGroupEl) {
     const stored = readOfflineTasks();
     let changed = false;
+    logOffline('debug', 'restoreOfflineTasks: hydrate start', { count: stored.length, payloads: stored.slice(0, 5) });
     const normalized = stored.map(entry => {
       if (entry?.queued && looksLikeRequestId(entry.id)) {
         const newId = entry.localId || nextOfflineTaskId();
@@ -1087,6 +1088,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const row = buildTaskRowFromPayload(payload);
       listGroupEl.prepend(row);
     });
+    logOffline('debug', 'restoreOfflineTasks: hydrate complete', { count: normalized.length, payloads: normalized.slice(0, 5) });
   }
 
   function isoDateFromToday(offset) {
@@ -1212,6 +1214,38 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
   const OFFLINE_ID_COUNTER_KEY = 'offlineQueuedTaskCounter';
+  const OTODO_DEBUG_OFFLINE = Boolean(window?.OTODO_DEBUG_OFFLINE);
+
+  const truncateForOfflineLog = (value, max = 80) => {
+    if (typeof value !== 'string') return value;
+    return value.length > max ? `${value.slice(0, max)}…` : value;
+  };
+
+  function summarizeOfflinePayload(payload = {}) {
+    if (!payload || typeof payload !== 'object') return payload;
+    return {
+      requestId: payload.requestId || payload.id,
+      id: payload.id,
+      localId: payload.localId,
+      description: truncateForOfflineLog(payload.description || '', 60),
+      detailsPreview: payload.details ? truncateForOfflineLog(String(payload.details), 80) : undefined,
+      hashtagsCount: Array.isArray(payload.hashtags) ? payload.hashtags.length : undefined,
+      priority: payload.priority,
+      done: payload.done,
+      queued: payload.queued,
+      offline: payload.offline,
+    };
+  }
+
+  function logOffline(level, message, meta = {}) {
+    if (!OTODO_DEBUG_OFFLINE || typeof console === 'undefined') return;
+    const safeMeta = { ...meta };
+    if (meta.payload) safeMeta.payload = summarizeOfflinePayload(meta.payload);
+    if (Array.isArray(meta.payloads)) safeMeta.payloads = meta.payloads.map(summarizeOfflinePayload);
+    safeMeta.requestId = meta.requestId || meta.payload?.requestId;
+    const logger = level === 'warn' ? console.warn : console.debug;
+    logger(`[offline] ${message}`, safeMeta);
+  }
 
   function looksLikeRequestId(value) {
     return typeof value === 'string' && value.length > 16 && value.includes('-');
@@ -1253,6 +1287,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function readOfflineTasks() {
     try {
       const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
+      logOffline('debug', 'readOfflineTasks: loaded entries', { count: Array.isArray(stored) ? stored.length : 0 });
       return Array.isArray(stored) ? stored : [];
     } catch (err) {
       console.warn('Could not read offline tasks', err);
@@ -1263,6 +1298,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   function persistOfflineTasks(tasks = []) {
     try {
       localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
+      logOffline('debug', 'persistOfflineTasks: wrote entries', { count: Array.isArray(tasks) ? tasks.length : 0 });
     } catch (err) {
       console.warn('Could not persist offline tasks', err);
     }
@@ -1270,15 +1306,18 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   function saveOfflineTask(payload) {
     if (!payload?.requestId) return;
+    logOffline('debug', 'saveOfflineTask: start', { requestId: payload.requestId, payload });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== payload.requestId);
     filtered.unshift(payload);
     persistOfflineTasks(filtered);
+    logOffline('debug', 'saveOfflineTask: persisted payload', { requestId: payload.requestId, count: filtered.length, payload });
     window.dispatchEvent(new CustomEvent('offline-task-queued', { detail: payload }));
   }
 
   function updateOfflineTask(requestId, updates = {}) {
     if (!requestId) return null;
+    logOffline('debug', 'updateOfflineTask: start', { requestId, updates: summarizeOfflinePayload(updates) });
     const existing = readOfflineTasks();
     let updatedEntry = null;
     const next = existing.map(item => {
@@ -1288,17 +1327,23 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
     if (updatedEntry) {
       persistOfflineTasks(next);
+      logOffline('debug', 'updateOfflineTask: updated entry', { requestId, payload: updatedEntry, count: next.length });
       return updatedEntry;
     }
+    logOffline('warn', 'updateOfflineTask: no matching entry found', { requestId, count: existing.length });
     return null;
   }
 
   function removeOfflineTask(requestId) {
     if (!requestId) return;
+    logOffline('debug', 'removeOfflineTask: start', { requestId });
     const existing = readOfflineTasks();
     const filtered = existing.filter(item => item.requestId !== requestId);
     if (filtered.length !== existing.length) {
       persistOfflineTasks(filtered);
+      logOffline('debug', 'removeOfflineTask: removed entry', { requestId, count: filtered.length });
+    } else {
+      logOffline('warn', 'removeOfflineTask: no entry removed', { requestId, count: existing.length });
     }
     window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
   }
