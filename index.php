@@ -1102,19 +1102,27 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       // Check multiple identifiers to find existing row
       const localId = payload.localId || payload.id || '';
       const taskId = payload.id || '';
-      const existing = listGroupEl.querySelector(
-        `[data-request-id="${CSS.escape(requestId)}"], ` +
-        `[data-local-id="${CSS.escape(localId)}"], ` +
-        `[data-task-id="${CSS.escape(taskId)}"]`
-      );
+      
+      // Try to find existing row by checking all possible identifier combinations
+      let existing = null;
+      const allPossibleIds = [requestId, localId, taskId].filter(Boolean);
+      
+      for (const checkId of allPossibleIds) {
+        existing = listGroupEl.querySelector(
+          `[data-request-id="${CSS.escape(checkId)}"], ` +
+          `[data-local-id="${CSS.escape(checkId)}"], ` +
+          `[data-task-id="${CSS.escape(checkId)}"]`
+        );
+        if (existing) break;
+      }
+      
       if (existing) {
-        // Update existing row attributes to ensure consistency
-        if (!existing.dataset.requestId && requestId) {
-          existing.dataset.requestId = requestId;
-        }
-        if (!existing.dataset.localId && localId) {
-          existing.dataset.localId = localId;
-        }
+        // Update existing row attributes to ensure consistency with latest payload
+        existing.dataset.requestId = requestId;
+        existing.dataset.localId = localId;
+        existing.dataset.taskId = taskId;
+        // Update the row UI to reflect any changes in the payload
+        updateTaskRowUI(existing, payload);
         return;
       }
       const row = buildTaskRowFromPayload(payload);

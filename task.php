@@ -784,11 +784,17 @@ $user_hashtags_json = json_encode($user_hashtags);
       payload,
       offlineMatch: summarizeOfflinePayload(offlineMatch),
     });
+    // Preserve the original requestId from payload if it exists, otherwise use resolved identifiers
+    const stableRequestId = payload?.requestId 
+      || offlineMatch?.requestId 
+      || offlineEntryForTask?.requestId 
+      || queuedPayload?.requestId 
+      || requestId;
     const normalized = normalizeQueuedPayload({
       ...payload,
-      requestId: offlineMatch?.requestId || offlineEntryForTask?.requestId || queuedPayload?.requestId || requestId,
+      requestId: stableRequestId,
       localId: payload?.localId || offlineMatch?.localId || offlineEntryForTask?.localId || localId,
-      id: (payload?.id && payload.id !== (offlineMatch?.requestId || offlineEntryForTask?.requestId || requestId)) ? payload.id : (offlineMatch?.id || offlineEntryForTask?.id || localId),
+      id: (payload?.id && payload.id !== stableRequestId) ? payload.id : (offlineMatch?.id || offlineEntryForTask?.id || localId),
     });
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
@@ -849,7 +855,13 @@ $user_hashtags_json = json_encode($user_hashtags);
   let discardInProgress = false;
   const offlineEntryForTask = (() => {
     const entries = readOfflineTasks();
-    return entries.find(entry => [entry.requestId, entry.id, entry.localId].includes(currentTaskId));
+    const currentIdStr = String(currentTaskId);
+    return entries.find(entry => {
+      const entryIds = [entry.requestId, entry.id, entry.localId]
+        .filter(Boolean)
+        .map(id => String(id));
+      return entryIds.includes(currentIdStr);
+    });
   })();
 
   const queuedPayload = (() => {
@@ -858,9 +870,11 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed) {
-          const matchesId = parsed.id && String(parsed.id) === String(currentTaskId);
-          const matchesRequest = parsed.requestId && String(parsed.requestId) === String(currentTaskId);
-          if (matchesId || matchesRequest) {
+          const currentIdStr = String(currentTaskId);
+          const matchesId = parsed.id && String(parsed.id) === currentIdStr;
+          const matchesRequest = parsed.requestId && String(parsed.requestId) === currentIdStr;
+          const matchesLocalId = parsed.localId && String(parsed.localId) === currentIdStr;
+          if (matchesId || matchesRequest || matchesLocalId) {
             return parsed;
           }
         }
@@ -984,6 +998,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     const dueInput = form.querySelector('input[name="due_date"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsField = document.getElementById('detailsField');
+    const detailsWrapper = document.getElementById('detailsInput');
+    const detailsTextarea = detailsWrapper ? detailsWrapper.querySelector('textarea') : null;
 
     if (titleInput && typeof payload.description === 'string') {
       titleInput.value = payload.description;
@@ -997,6 +1014,15 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     if (starredCheckbox && payload.starred !== undefined && payload.starred !== null) {
       starredCheckbox.checked = !!payload.starred;
+    }
+    if (detailsField && typeof payload.details === 'string') {
+      detailsField.value = payload.details;
+      if (detailsTextarea) {
+        detailsTextarea.value = payload.details;
+      }
+      if (detailsWrapper && typeof updateDetails === 'function') {
+        updateDetails();
+      }
     }
 
     if (Array.isArray(payload.hashtags) && payload.hashtags.length) {
@@ -1316,6 +1342,11 @@ $user_hashtags_json = json_encode($user_hashtags);
   renderHashtagBadges();
         return val;
       };
+    }
+    
+    // Re-hydrate queued task after editor is initialized to ensure details field is set
+    if (queuedPayload && isOfflineTask) {
+      hydrateQueuedTask(queuedPayload);
     }
   }
 
