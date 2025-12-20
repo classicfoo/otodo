@@ -719,12 +719,12 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   function refreshOfflineCache(payload) {
     if (discardInProgress) return;
-    const { requestId, localId } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+    const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
     const normalized = normalizeQueuedPayload({
       ...payload,
-      requestId,
-      localId,
-      id: (payload?.id && payload.id !== requestId) ? payload.id : localId,
+      requestId: offlineMatch?.requestId || requestId,
+      localId: payload?.localId || offlineMatch?.localId || localId,
+      id: (payload?.id && payload.id !== (offlineMatch?.requestId || requestId)) ? payload.id : (offlineMatch?.id || localId),
     });
     if (!normalized || !normalized.requestId) return;
     const updated = updateOfflineTask(normalized.requestId, normalized);
@@ -1446,12 +1446,17 @@ $user_hashtags_json = json_encode($user_hashtags);
     const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
 
     const withResolvedIdentifiers = (payload = {}) => {
-      const { requestId, localId } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
-      return { ...payload, requestId, localId: payload?.localId || localId };
+      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
+      return {
+        ...payload,
+        requestId: offlineMatch?.requestId || requestId,
+        localId: payload?.localId || offlineMatch?.localId || localId,
+        id: payload?.id || offlineMatch?.id || localId,
+      };
     };
 
     const buildLocalPayload = () => {
-      const { requestId, localId } = resolveOfflineIdentifiers();
+      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers();
       const titleInput = form.querySelector('input[name="description"]');
       const dueInput = form.querySelector('input[name="due_date"]');
       const starredCheckbox = form.querySelector('input[name="starred"]');
@@ -1467,9 +1472,9 @@ $user_hashtags_json = json_encode($user_hashtags);
         status: 'ok',
         queued: true,
         offline: true,
-        id: localId,
-        requestId,
-        localId,
+        id: offlineMatch?.id || localId,
+        requestId: offlineMatch?.requestId || requestId,
+        localId: offlineMatch?.localId || localId,
         description: titleInput ? titleInput.value.trim() : '',
         due_date: dueValue,
         due_label: dueMeta.label,
