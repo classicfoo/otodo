@@ -536,22 +536,41 @@ async function handleNonGetRequest(event) {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    precacheCoreAssets()
+    (async () => {
+      await precacheCoreAssets().catch(() => {});
+      if (self.skipWaiting) {
+        await self.skipWaiting();
+      }
+    })()
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    Promise.all([
-      caches.keys().then(keys => Promise.all(
-        keys
-          .filter(key => !key.startsWith(`${CACHE_BASE}::`))
-          .map(key => caches.delete(key))
-      )),
-      drainQueue().catch(() => {}),
-      self.clients.claim(),
-      notifyClients({ type: 'request-client-connectivity' }),
-    ])
+    (async () => {
+      try {
+        await Promise.all([
+          caches.keys().then(keys => Promise.all(
+            keys
+              .filter(key => !key.startsWith(`${CACHE_BASE}::`))
+              .map(key => caches.delete(key))
+          )),
+          drainQueue().catch(() => {}),
+        ]);
+      } catch (error) {
+        console.warn('Activation maintenance failed', error);
+      }
+
+      if (self.clients && typeof self.clients.claim === 'function') {
+        try {
+          await self.clients.claim();
+        } catch (error) {
+          console.warn('clients.claim failed', error);
+        }
+      }
+
+      await notifyClients({ type: 'request-client-connectivity' });
+    })()
   );
 });
 
