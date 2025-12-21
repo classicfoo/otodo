@@ -534,6 +534,8 @@ self.addEventListener('activate', event => {
           .map(key => caches.delete(key))
       )),
       drainQueue().catch(() => {}),
+      self.clients.claim(),
+      notifyClients({ type: 'request-client-connectivity' }),
     ])
   );
 });
