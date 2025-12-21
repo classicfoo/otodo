@@ -26,9 +26,13 @@ let activeUserScope = {
   userId: null,
   offlineMode: false,
 };
+let lastClientOnline = null;
 
 function isOffline() {
-  return activeUserScope.offlineMode === true || (self.navigator && self.navigator.onLine === false);
+  if (activeUserScope.offlineMode === true) return true;
+  if (lastClientOnline === false) return true;
+  if (lastClientOnline === true) return false;
+  return self.navigator && self.navigator.onLine === false;
 }
 
 function offlineNavigationResponse() {
@@ -311,11 +315,14 @@ self.addEventListener('message', event => {
         method: 'POST',
         body: body,
     });
-    
+
     event.waitUntil(handleNonGetRequest({ request: request }));
   } else if (data.type === 'set-user') {
     const previousSession = activeUserScope.sessionId;
     const previousUserId = activeUserScope.userId;
+    if (typeof data.online === 'boolean') {
+      lastClientOnline = data.online;
+    }
     activeUserScope = {
       sessionId: data.sessionId || null,
       userId: data.userId || null,
@@ -334,6 +341,10 @@ self.addEventListener('message', event => {
 
     if (previousSession && previousSession !== currentSession) {
       notifyClients({ type: 'user-session-changed', sessionId: currentSession }).catch(() => {});
+    }
+  } else if (data.type === 'client-connectivity') {
+    if (typeof data.online === 'boolean') {
+      lastClientOnline = data.online;
     }
   }
 });
