@@ -28,6 +28,16 @@ let activeUserScope = {
 };
 let lastClientOnline = null;
 
+function updateOfflineFromClient(onlineValue, offlineModeFlag) {
+  if (typeof onlineValue === 'boolean') {
+    lastClientOnline = onlineValue;
+  }
+
+  if (typeof onlineValue === 'boolean' || typeof offlineModeFlag === 'boolean') {
+    activeUserScope.offlineMode = offlineModeFlag === true || onlineValue === false;
+  }
+}
+
 function isOffline() {
   if (activeUserScope.offlineMode === true) return true;
   if (lastClientOnline === false) return true;
@@ -320,13 +330,11 @@ self.addEventListener('message', event => {
   } else if (data.type === 'set-user') {
     const previousSession = activeUserScope.sessionId;
     const previousUserId = activeUserScope.userId;
-    if (typeof data.online === 'boolean') {
-      lastClientOnline = data.online;
-    }
+    updateOfflineFromClient(data.online, data.offlineMode);
     activeUserScope = {
       sessionId: data.sessionId || null,
       userId: data.userId || null,
-      offlineMode: data.offlineMode === true,
+      offlineMode: activeUserScope.offlineMode,
     };
     const currentSession = activeUserScope.sessionId || 'anon';
 
@@ -344,7 +352,7 @@ self.addEventListener('message', event => {
     }
   } else if (data.type === 'client-connectivity') {
     if (typeof data.online === 'boolean') {
-      lastClientOnline = data.online;
+      updateOfflineFromClient(data.online, data.offlineMode);
     }
   }
 });

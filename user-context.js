@@ -13,6 +13,7 @@
     navigator.serviceWorker.controller.postMessage({
       type: 'client-connectivity',
       online: onlineState,
+      offlineMode: onlineState === false,
     });
   }
 
@@ -23,6 +24,7 @@
       sessionId: readSessionId(),
       userId: typeof window !== 'undefined' ? (window.otodoUserId ?? null) : null,
       online: navigator.onLine,
+      offlineMode: navigator.onLine === false,
     });
   }
 
