@@ -38,11 +38,15 @@ function updateOfflineFromClient(onlineValue, offlineModeFlag) {
   }
 }
 
+function markOnlineFromNetwork() {
+  updateOfflineFromClient(true, false);
+}
+
 function isOffline() {
   if (activeUserScope.offlineMode === true) return true;
   if (lastClientOnline === false) return true;
   if (lastClientOnline === true) return false;
-  return self.navigator && self.navigator.onLine === false;
+  return false;
 }
 
 function offlineNavigationResponse() {
@@ -521,6 +525,9 @@ async function handleNonGetRequest(event) {
       throw new Error('offline-mode');
     }
     const liveResponse = await fetch(event.request);
+    if (liveResponse && liveResponse.ok) {
+      markOnlineFromNetwork();
+    }
     return liveResponse;
   } catch (error) {
     return queueOfflineRequest(error);
@@ -582,6 +589,9 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            markOnlineFromNetwork();
+          }
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
             event.waitUntil(
@@ -606,6 +616,9 @@ self.addEventListener('fetch', event => {
     matchUserCache(event.request).then(response => {
       const fetchPromise = fetch(event.request)
         .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            markOnlineFromNetwork();
+          }
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseClone = networkResponse.clone();
             getUserCache(event.request).then(cache => cache.put(event.request, responseClone));
