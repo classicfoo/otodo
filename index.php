@@ -1744,10 +1744,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const taskId = taskEl.dataset.taskId;
     const requestId = taskEl.dataset.requestId;
     const localId = taskEl.dataset.localId;
-    if (taskId || !requestId) return;
-
-    e.preventDefault();
-    const payload = findQueuedTaskPayload(requestId) || {
+    if (requestId.startsWith('queued-')) {
+      const payload = findQueuedTaskPayload(requestId) || {
       requestId,
       id: localId || requestId,
       description: taskEl.querySelector('.task-title')?.textContent?.trim() || '',
@@ -1761,6 +1759,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     };
 
     openTaskEditorFromPayload(payload);
+    }
+    else {
+      e.preventDefault();
+    }    
   });
 
   function setActiveOption(group, value) {
@@ -2039,44 +2041,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
           form.reset();
         }
       });
-    });
-  }
-</script>
-<div class="container mt-5">
-    <h2>Debug Log</h2>
-    <div id="debug-log" style="background: #eee; padding: 1rem; border-radius: 5px; max-height: 400px; overflow-y: scroll; font-family: monospace;"></div>
-</div>
-<script>
-  if (navigator.serviceWorker) {
-    navigator.serviceWorker.addEventListener('message', event => {
-      const debugLog = document.getElementById('debug-log');
-      if (debugLog) {
-        const entry = document.createElement('pre');
-        entry.style.borderBottom = '1px solid #ccc';
-        entry.style.marginBottom = '1rem';
-        entry.style.paddingBottom = '1rem';
-        entry.textContent = JSON.stringify(event.data, null, 2);
-        debugLog.prepend(entry);
-      }
-    });
-  }
-</script>
-<div class="container mt-5">
-    <h2>Debug Log</h2>
-    <div id="debug-log" style="background: #eee; padding: 1rem; border-radius: 5px; max-height: 400px; overflow-y: scroll; font-family: monospace;"></div>
-</div>
-<script>
-  if (navigator.serviceWorker) {
-    navigator.serviceWorker.addEventListener('message', event => {
-      const debugLog = document.getElementById('debug-log');
-      if (debugLog) {
-        const entry = document.createElement('pre');
-        entry.style.borderBottom = '1px solid #ccc';
-        entry.style.marginBottom = '1rem';
-        entry.style.paddingBottom = '1rem';
-        entry.textContent = JSON.stringify(event.data, null, 2);
-        debugLog.prepend(entry);
-      }
     });
   }
 </script>
