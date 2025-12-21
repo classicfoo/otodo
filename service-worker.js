@@ -26,9 +26,27 @@ let activeUserScope = {
   userId: null,
   offlineMode: false,
 };
+let lastClientOnline = null;
+
+function updateOfflineFromClient(onlineValue, offlineModeFlag) {
+  if (typeof onlineValue === 'boolean') {
+    lastClientOnline = onlineValue;
+  }
+
+  if (typeof onlineValue === 'boolean' || typeof offlineModeFlag === 'boolean') {
+    activeUserScope.offlineMode = offlineModeFlag === true || onlineValue === false;
+  }
+}
+
+function markOnlineFromNetwork() {
+  updateOfflineFromClient(true, false);
+}
 
 function isOffline() {
-  return activeUserScope.offlineMode === true || (self.navigator && self.navigator.onLine === false);
+  if (activeUserScope.offlineMode === true) return true;
+  if (lastClientOnline === false) return true;
+  if (lastClientOnline === true) return false;
+  return false;
 }
 
 function offlineNavigationResponse() {
@@ -311,15 +329,16 @@ self.addEventListener('message', event => {
         method: 'POST',
         body: body,
     });
-    
+
     event.waitUntil(handleNonGetRequest({ request: request }));
   } else if (data.type === 'set-user') {
     const previousSession = activeUserScope.sessionId;
     const previousUserId = activeUserScope.userId;
+    updateOfflineFromClient(data.online, data.offlineMode);
     activeUserScope = {
       sessionId: data.sessionId || null,
       userId: data.userId || null,
-      offlineMode: data.offlineMode === true,
+      offlineMode: activeUserScope.offlineMode,
     };
     const currentSession = activeUserScope.sessionId || 'anon';
 
@@ -334,6 +353,10 @@ self.addEventListener('message', event => {
 
     if (previousSession && previousSession !== currentSession) {
       notifyClients({ type: 'user-session-changed', sessionId: currentSession }).catch(() => {});
+    }
+  } else if (data.type === 'client-connectivity') {
+    if (typeof data.online === 'boolean') {
+      updateOfflineFromClient(data.online, data.offlineMode);
     }
   }
 });
@@ -502,6 +525,9 @@ async function handleNonGetRequest(event) {
       throw new Error('offline-mode');
     }
     const liveResponse = await fetch(event.request);
+    if (liveResponse && liveResponse.ok) {
+      markOnlineFromNetwork();
+    }
     return liveResponse;
   } catch (error) {
     return queueOfflineRequest(error);
@@ -510,20 +536,41 @@ async function handleNonGetRequest(event) {
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    precacheCoreAssets()
+    (async () => {
+      await precacheCoreAssets().catch(() => {});
+      if (self.skipWaiting) {
+        await self.skipWaiting();
+      }
+    })()
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    Promise.all([
-      caches.keys().then(keys => Promise.all(
-        keys
-          .filter(key => !key.startsWith(`${CACHE_BASE}::`))
-          .map(key => caches.delete(key))
-      )),
-      drainQueue().catch(() => {}),
-    ])
+    (async () => {
+      try {
+        await Promise.all([
+          caches.keys().then(keys => Promise.all(
+            keys
+              .filter(key => !key.startsWith(`${CACHE_BASE}::`))
+              .map(key => caches.delete(key))
+          )),
+          drainQueue().catch(() => {}),
+        ]);
+      } catch (error) {
+        console.warn('Activation maintenance failed', error);
+      }
+
+      if (self.clients && typeof self.clients.claim === 'function') {
+        try {
+          await self.clients.claim();
+        } catch (error) {
+          console.warn('clients.claim failed', error);
+        }
+      }
+
+      await notifyClients({ type: 'request-client-connectivity' });
+    })()
   );
 });
 
@@ -535,6 +582,23 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(event.request.url);
+  const isConnectivityProbe =
+    event.request.method === 'HEAD' && url.pathname.endsWith('/sync-status.js');
+
+  if (isConnectivityProbe) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.ok) {
+            markOnlineFromNetwork();
+          }
+          return response;
+        })
+        .catch(() => Response.error())
+    );
+    return;
+  }
+
   const sessionFromRequest = deriveSessionIdFromRequest(event.request);
   if (sessionFromRequest && sessionFromRequest !== activeUserScope.sessionId) {
     activeUserScope.sessionId = sessionFromRequest;
@@ -561,6 +625,9 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            markOnlineFromNetwork();
+          }
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();
             event.waitUntil(
@@ -585,6 +652,9 @@ self.addEventListener('fetch', event => {
     matchUserCache(event.request).then(response => {
       const fetchPromise = fetch(event.request)
         .then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            markOnlineFromNetwork();
+          }
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseClone = networkResponse.clone();
             getUserCache(event.request).then(cache => cache.put(event.request, responseClone));
