@@ -69,6 +69,21 @@
     }
   });
 
+  if (navigator.serviceWorker.controller) {
+    postUserScope();
+  }
+
+  window.addEventListener('online', () => postConnectivity(true));
+  window.addEventListener('offline', () => postConnectivity(false));
+
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (!event.data || !event.data.type) return;
+    if (event.data.type === 'request-client-connectivity') {
+      postUserScope();
+      postConnectivity();
+    }
+  });
+
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (navigator.serviceWorker.controller) {
       postUserScope();
