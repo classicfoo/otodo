@@ -582,6 +582,23 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(event.request.url);
+  const isConnectivityProbe =
+    event.request.method === 'HEAD' && url.pathname.endsWith('/sync-status.js');
+
+  if (isConnectivityProbe) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.ok) {
+            markOnlineFromNetwork();
+          }
+          return response;
+        })
+        .catch(() => Response.error())
+    );
+    return;
+  }
+
   const sessionFromRequest = deriveSessionIdFromRequest(event.request);
   if (sessionFromRequest && sessionFromRequest !== activeUserScope.sessionId) {
     activeUserScope.sessionId = sessionFromRequest;

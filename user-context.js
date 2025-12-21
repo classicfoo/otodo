@@ -27,8 +27,18 @@
   }
 
   async function checkConnectivity() {
+    const cacheBuster = Date.now();
     try {
-      await fetch('/sync-status.js', { method: 'HEAD', cache: 'no-store', credentials: 'include' });
+      const response = await fetch(`/sync-status.js?probe=${cacheBuster}`, {
+        method: 'HEAD',
+        cache: 'no-store',
+        credentials: 'include',
+      });
+
+      if (!response || !response.ok) {
+        throw new Error('connectivity-probe-failed');
+      }
+
       updateConnectivity(true);
       return true;
     } catch (error) {
