@@ -1674,12 +1674,15 @@ $user_hashtags_json = json_encode($user_hashtags);
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
-  window.addEventListener('beforeunload', function(){
-    if (discardInProgress) return;
-    if (timer) {
-      sendSave(true);
-    }
-  });
+    window.addEventListener('beforeunload', function(){
+      if (discardInProgress) return;
+      // Flush any pending autosave before navigating away, even if the timer
+      // hasn’t fired yet (common when working offline).
+      if (timer || pendingSaveBlocked) {
+        clearSaveTimer();
+        sendSave(true);
+      }
+    });
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
