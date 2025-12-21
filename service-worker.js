@@ -44,7 +44,10 @@ function offlineNavigationResponse() {
     `<p style="margin:0 0 12px;font-size:0.95rem;">You're offline and this page wasn't saved for offline use. ` +
     `Reconnect to load it, then it will be available even without a connection.</p>` +
     `<p style="margin:0;font-size:0.9rem;color:#6c757d;">Tip: open tasks while online to refresh the offline cache.</p></div></body></html>`,
-    { status: 503, headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' } },
+    {
+      status: 200,
+      headers: { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' },
+    },
   );
 }
 
