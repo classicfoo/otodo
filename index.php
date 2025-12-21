@@ -293,9 +293,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
 <div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
     <div class="offcanvas-header d-flex align-items-start justify-content-between">
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
             <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
             <span class="badge bg-success-subtle text-success" id="connection-status" aria-live="polite">Online</span>
+            <span class="badge bg-warning-subtle text-warning" id="service-worker-status" aria-live="polite">Checking…</span>
         </div>
         <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
