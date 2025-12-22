@@ -23,6 +23,22 @@
     return text.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
   }
 
+  function linkifyMarkdown(text = '') {
+    const replacements = [];
+    let linkIndex = 0;
+
+    const withPlaceholders = (text || '').replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_, label, url) {
+      const placeholder = `__MARKDOWN_LINK_${linkIndex++}__`;
+      replacements.push({
+        placeholder: placeholder,
+        html: `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer noopener" class="inline-link">${escapeHtml(label)}</a>`
+      });
+      return placeholder;
+    });
+
+    return { text: withPlaceholders, replacements: replacements };
+  }
+
   function buildDateRegexes(dateFormats = []) {
     if (!Array.isArray(dateFormats)) {
       return [];
@@ -93,7 +109,8 @@
   }
 
   function highlightHtml(text = '', dateRegexes = []) {
-    const escaped = escapeHtml(text);
+    const linkified = linkifyMarkdown(text);
+    const escaped = escapeHtml(linkified.text);
     const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
     const withDates = Array.isArray(dateRegexes) && dateRegexes.length
       ? dateRegexes.reduce(function(prev, regex) {
@@ -106,7 +123,12 @@
           });
         }, withHashtags)
       : withHashtags;
-    return withDates.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
+    const withLinks = linkified.replacements.reduce(function(prev, replacement) {
+      if (!replacement || !replacement.placeholder) return prev;
+      const placeholderRegex = new RegExp(escapeRegex(replacement.placeholder), 'g');
+      return prev.replace(placeholderRegex, replacement.html || '');
+    }, withDates);
+    return withLinks.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
       const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
       return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
     });
