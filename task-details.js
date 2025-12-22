@@ -286,22 +286,94 @@
       return normalized.split('\n').map(linkify).join('<br>');
     }
 
-    function renderPreview(text) {
+    function renderPreview(text, rawText) {
       const highlighted = highlightHtml(text, dateRegexes);
-      preview.innerHTML = wrapLinesWithColors(highlighted, text, lineRules);
+      preview.innerHTML = wrapLinesWithColors(highlighted, rawText, lineRules);
+    }
+
+    function stripMarkdownLinks(text) {
+      if (!text) return '';
+      return text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1');
+    }
+
+    function getCaretIndex() {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return null;
+      const range = selection.getRangeAt(0);
+      const preRange = range.cloneRange();
+      preRange.selectNodeContents(editable);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      return preRange.toString().length;
+    }
+
+    function restoreCaret(index) {
+      if (index === null || index === undefined) return;
+      const selection = window.getSelection();
+      if (!selection) return;
+
+      const walker = document.createTreeWalker(
+        editable,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: function(node) {
+            if (node.nodeType === 3) return NodeFilter.FILTER_ACCEPT;
+            if (node.nodeName === 'BR') return NodeFilter.FILTER_ACCEPT;
+            return NodeFilter.FILTER_SKIP;
+          }
+        }
+      );
+
+      let remaining = index;
+      let node;
+      while ((node = walker.nextNode())) {
+        if (node.nodeType === 3) {
+          const len = node.nodeValue.length;
+          if (remaining <= len) {
+            const range = document.createRange();
+            range.setStart(node, remaining);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return;
+          }
+          remaining -= len;
+        } else if (node.nodeName === 'BR') {
+          if (remaining === 0) {
+            const range = document.createRange();
+            range.setStartBefore(node);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return;
+          }
+          remaining -= 1;
+        }
+      }
+
+      const fallbackRange = document.createRange();
+      fallbackRange.selectNodeContents(editable);
+      fallbackRange.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(fallbackRange);
     }
 
     function syncDetails() {
+      const wasFocused = document.activeElement === editable;
+      const caretIndex = wasFocused ? getCaretIndex() : null;
       const text = htmlToText(editable.innerHTML);
       const capitalized = applyCapitalization(text, capitalizeSentences, lineRules);
       const renderedHtml = textToHtml(capitalized);
 
       if (editable.innerHTML !== renderedHtml) {
         editable.innerHTML = renderedHtml;
+        if (wasFocused) {
+          restoreCaret(caretIndex);
+        }
       }
 
       detailsField.value = capitalized;
-      renderPreview(capitalized);
+      const previewText = stripMarkdownLinks(capitalized);
+      renderPreview(previewText, previewText);
       return capitalized;
     }
 

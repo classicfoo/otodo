@@ -38,6 +38,20 @@ describe('task details editor behaviors', () => {
     expect(hidden.value).toBe('visit [Docs](https://example.com) or https://open.ai');
   });
 
+  test('preview hides markdown syntax while keeping link text visible', () => {
+    const details = document.getElementById('detailsInput');
+    const editable = details.querySelector('[contenteditable="true"]');
+    const hidden = document.getElementById('detailsField');
+    initTaskDetailsEditor(details, hidden, jest.fn());
+
+    editable.textContent = 'find [Docs](https://example.com)';
+    editable.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const preview = details.querySelector('code');
+    expect(preview.textContent).toContain('find Docs');
+    expect(preview.textContent).not.toContain('[');
+  });
+
   test('rendered preview lines stay aligned with editor lines', () => {
     const details = document.getElementById('detailsInput');
     const editable = details.querySelector('[contenteditable="true"]');
@@ -111,6 +125,29 @@ describe('task details editor behaviors', () => {
 
     expect(hidden.value).toBe('start paste');
     expect(saveSpy).toHaveBeenCalled();
+  });
+
+  test('caret position is preserved when syncing transformed content', () => {
+    const details = document.getElementById('detailsInput');
+    const editable = details.querySelector('[contenteditable="true"]');
+    const hidden = document.getElementById('detailsField');
+    initTaskDetailsEditor(details, hidden, jest.fn());
+
+    editable.innerHTML = 'test<div><br></div>';
+    editable.focus();
+    const range = document.createRange();
+    range.setStart(editable.firstChild, 4);
+    range.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    editable.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const updatedSelection = window.getSelection();
+    expect(updatedSelection.anchorNode.nodeValue).toContain('test');
+    expect(updatedSelection.anchorOffset).toBe(4);
+    expect(editable.innerHTML).toContain('<br>');
   });
 
   test('custom rules and text color settings are applied', () => {
