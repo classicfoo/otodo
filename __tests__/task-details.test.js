@@ -291,6 +291,50 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).toContain('<span class="inline-date">1 Jan 2026</span>');
   });
 
+  test('links render with hyperlink controls and support editing', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+
+    const editor = initTaskDetailsEditor(details, hidden, saveSpy);
+
+    textarea.value = 'Visit https://example.com for details';
+    editor.updateDetails();
+
+    const link = details.querySelector('.details-link');
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe('https://example.com');
+
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => {});
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    expect(openSpy).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer');
+    openSpy.mockRestore();
+
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(textarea.selectionStart).toBe(textarea.value.indexOf('https://example.com'));
+    expect(textarea.selectionEnd).toBe(textarea.selectionStart + 'https://example.com'.length);
+
+    link.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    const menuButton = details.querySelector('.link-edit-trigger');
+    expect(menuButton).not.toBeNull();
+    menuButton.click();
+
+    const textInput = details.querySelector('.link-text-input');
+    const urlInput = details.querySelector('.link-url-input');
+    expect(textInput).not.toBeNull();
+    expect(urlInput).not.toBeNull();
+
+    textInput.value = 'Docs';
+    urlInput.value = 'docs.example.com';
+    const form = details.querySelector('.link-edit-form');
+    form.dispatchEvent(new Event('submit', { bubbles: true }));
+
+    expect(textarea.value).toContain('[Docs](http://docs.example.com)');
+    expect(hidden.value).toContain('[Docs](http://docs.example.com)');
+    expect(saveSpy).toHaveBeenCalled();
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
