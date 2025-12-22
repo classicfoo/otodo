@@ -206,9 +206,9 @@
       return { updateDetails: function() { return ''; } };
     }
 
-    const textarea = details.querySelector('textarea');
+    const editable = details.querySelector('[contenteditable="true"]');
     const preview = details.querySelector('code');
-    if (!textarea || !preview) {
+    if (!editable || !preview) {
       return { updateDetails: function() { return ''; } };
     }
 
@@ -216,21 +216,74 @@
     const lineRules = pickRules(options.lineRules);
     const capitalizeSentences = !!options.capitalizeSentences;
     const dateRegexes = buildDateRegexes(options.dateFormats);
-    const normalizedExpanders = Array.isArray(options.textExpanders)
-      ? options.textExpanders.filter(function(entry) {
-          return entry && typeof entry.shortcut === 'string' && typeof entry.expansion === 'string';
-        }).map(function(entry) {
-          return {
-            shortcut: entry.shortcut.trim(),
-            expansion: entry.expansion.trim()
-          };
-        }).filter(function(entry) {
-          return entry.shortcut && entry.expansion;
-        })
-      : [];
 
     if (options.textColor) {
       details.style.setProperty('--details-text-color', options.textColor);
+    }
+
+    function htmlToText(html) {
+      const container = document.createElement('div');
+      container.innerHTML = html || '';
+      const parts = [];
+
+      function walk(node) {
+        if (!node) return;
+        if (node.nodeType === 3) {
+          parts.push(node.nodeValue);
+          return;
+        }
+        if (node.nodeName === 'BR') {
+          parts.push('\n');
+          return;
+        }
+        if (node.nodeName === 'A') {
+          const href = node.getAttribute('href') || '';
+          const text = node.textContent || '';
+          if (href) {
+            parts.push('[' + text + '](' + href + ')');
+          } else {
+            parts.push(text);
+          }
+          return;
+        }
+
+        const isBlock = node.nodeName === 'DIV' || node.nodeName === 'P';
+        if (isBlock) {
+          parts.push('\n');
+        }
+        Array.prototype.forEach.call(node.childNodes || [], walk);
+        if (isBlock) {
+          parts.push('\n');
+        }
+      }
+
+      Array.prototype.forEach.call(container.childNodes || [], walk);
+      return normalizeNewlines(parts.join('')).replace(/\n{3,}/g, '\n\n');
+    }
+
+    function textToHtml(text) {
+      const normalized = normalizeNewlines(text || '');
+      const linkPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+
+      function linkify(segment) {
+        let lastIndex = 0;
+        let result = '';
+        let match;
+        while ((match = linkPattern.exec(segment))) {
+          const before = segment.slice(lastIndex, match.index);
+          result += escapeHtml(before);
+          if (match[1] && match[2]) {
+            result += '<a href="' + escapeHtml(match[2]) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(match[1]) + '</a>';
+          } else if (match[3]) {
+            result += '<a href="' + escapeHtml(match[3]) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(match[3]) + '</a>';
+          }
+          lastIndex = match.index + match[0].length;
+        }
+        result += escapeHtml(segment.slice(lastIndex));
+        return result;
+      }
+
+      return normalized.split('\n').map(linkify).join('<br>');
     }
 
     function renderPreview(text) {
@@ -239,17 +292,12 @@
     }
 
     function syncDetails() {
-      const selectionStart = textarea.selectionStart;
-      const selectionEnd = textarea.selectionEnd;
-      const text = normalizeNewlines(textarea.value || '');
+      const text = htmlToText(editable.innerHTML);
       const capitalized = applyCapitalization(text, capitalizeSentences, lineRules);
+      const renderedHtml = textToHtml(capitalized);
 
-      if (capitalized !== text) {
-        textarea.value = capitalized;
-        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-          textarea.selectionStart = selectionStart;
-          textarea.selectionEnd = selectionEnd;
-        }
+      if (editable.innerHTML !== renderedHtml) {
+        editable.innerHTML = renderedHtml;
       }
 
       detailsField.value = capitalized;
@@ -257,336 +305,64 @@
       return capitalized;
     }
 
-    function insertAtSelection(text) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const value = textarea.value || '';
-      const nextValue = value.slice(0, start) + text + value.slice(end);
-      textarea.value = nextValue;
-      const nextPos = start + text.length;
-      textarea.selectionStart = textarea.selectionEnd = nextPos;
-      return nextValue;
-    }
-
-    const expanderSuggestions = document.createElement('div');
-    expanderSuggestions.className = 'expander-suggestions d-none';
-    details.appendChild(expanderSuggestions);
-    let activeExpanderIndex = -1;
-
-    function getCaretPositionRect(target) {
-      if (!target || typeof target.selectionStart !== 'number') return null;
-
-      const baseRect = target.getBoundingClientRect();
-      const mirror = document.createElement('div');
-      const computed = window.getComputedStyle(target);
-      const properties = [
-        'boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-        'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-        'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight',
-        'textTransform', 'textDecoration', 'textAlign', 'tabSize', 'whiteSpace', 'wordBreak', 'overflowWrap'
-      ];
-
-      properties.forEach(function(prop) {
-        mirror.style[prop] = computed[prop];
-      });
-
-      mirror.style.position = 'absolute';
-      mirror.style.visibility = 'hidden';
-      mirror.style.whiteSpace = 'pre-wrap';
-      mirror.style.wordWrap = 'break-word';
-      mirror.style.overflow = 'auto';
-      mirror.style.left = (baseRect.left + window.scrollX) + 'px';
-      mirror.style.top = (baseRect.top + window.scrollY) + 'px';
-      mirror.textContent = (target.value || '').slice(0, target.selectionStart);
-
-      const caretSpan = document.createElement('span');
-      caretSpan.textContent = '\u200b';
-      mirror.appendChild(caretSpan);
-
-      document.body.appendChild(mirror);
-      const caretRect = caretSpan.getBoundingClientRect();
-      document.body.removeChild(mirror);
-
-      return {
-        left: caretRect.left + window.scrollX,
-        right: caretRect.right + window.scrollX,
-        top: caretRect.top + window.scrollY,
-        bottom: caretRect.bottom + window.scrollY,
-        width: baseRect.width
-      };
-    }
-
-    function positionExpanderSuggestions() {
-      const caretRect = getCaretPositionRect(textarea);
-      if (!caretRect) return;
-      const containerRect = details.getBoundingClientRect();
-      const left = caretRect.left - (containerRect.left + window.scrollX);
-      const top = caretRect.bottom - (containerRect.top + window.scrollY) + 6;
-      expanderSuggestions.style.left = left + 'px';
-      expanderSuggestions.style.top = top + 'px';
-      const width = Math.max(240, Math.min(420, caretRect.width));
-      expanderSuggestions.style.width = width + 'px';
-    }
-
-    function hideExpanderSuggestions() {
-      expanderSuggestions.classList.add('d-none');
-      activeExpanderIndex = -1;
-    }
-
-    function setActiveExpander(idx) {
-      const buttons = Array.from(expanderSuggestions.querySelectorAll('button'));
-      if (!buttons.length) return;
-      activeExpanderIndex = Math.max(0, Math.min(idx, buttons.length - 1));
-      buttons.forEach(function(btn, index) {
-        btn.classList.toggle('active', index === activeExpanderIndex);
-      });
-    }
-
-    function replaceTokenWithExpansion(tokenRange, expansion) {
-      const value = textarea.value || '';
-      const start = tokenRange.start;
-      const end = tokenRange.end;
-      textarea.value = value.slice(0, start) + expansion + value.slice(end);
-      const nextPos = start + expansion.length;
-      textarea.selectionStart = textarea.selectionEnd = nextPos;
-      const updated = syncDetails();
-      queueSave();
-      return updated;
-    }
-
-    function acceptActiveExpander(tokenRange) {
-      const buttons = Array.from(expanderSuggestions.querySelectorAll('button'));
-      if (!buttons.length || activeExpanderIndex === -1) return false;
-      const btn = buttons[Math.max(0, Math.min(activeExpanderIndex, buttons.length - 1))];
-      const expansion = btn.dataset.expansion;
-      if (typeof expansion !== 'string') return false;
-      replaceTokenWithExpansion(tokenRange, expansion);
-      hideExpanderSuggestions();
-      return true;
-    }
-
-    function renderExpanderSuggestions(matches, tokenRange) {
-      expanderSuggestions.innerHTML = '';
-      if (!matches.length) {
-        hideExpanderSuggestions();
-        return;
+    function openAnchorFromEvent(event) {
+      const target = event.target;
+      if (!target || target.nodeName !== 'A') return;
+      if (event.metaKey || event.ctrlKey) {
+        event.preventDefault();
+        window.open(target.getAttribute('href'), '_blank', 'noopener');
       }
-      matches.forEach(function(match, idx) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-light btn-sm w-100 text-start';
-        btn.textContent = match.shortcut + ' → ' + match.expansion;
-        btn.dataset.expansion = match.expansion;
-        btn.addEventListener('click', function() {
-          replaceTokenWithExpansion(tokenRange, match.expansion);
-          hideExpanderSuggestions();
-        });
-        expanderSuggestions.appendChild(btn);
-        if (idx === 0) {
-          setActiveExpander(0);
-        }
-      });
-      expanderSuggestions.classList.remove('d-none');
-      positionExpanderSuggestions();
     }
 
-    function findCurrentToken() {
-      const pos = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : 0;
-      const value = textarea.value || '';
-      let start = pos;
-      while (start > 0 && !/\s/.test(value[start - 1])) {
-        start--;
-      }
-      let end = pos;
-      while (end < value.length && !/\s/.test(value[end])) {
-        end++;
-      }
-      const text = value.slice(start, end);
-      return { text: text, start: start, end: end };
-    }
-
-    function updateExpanderSuggestions() {
-      if (!normalizedExpanders.length) {
-        hideExpanderSuggestions();
-        return;
-      }
-      const token = findCurrentToken();
-      const tokenText = token.text || '';
-      if (!tokenText) {
-        hideExpanderSuggestions();
-        return;
-      }
-      const lower = tokenText.toLowerCase();
-      const matches = normalizedExpanders
-        .filter(function(entry) {
-          return entry.shortcut.toLowerCase().startsWith(lower);
-        })
-        .sort(function(a, b) {
-          const aCaseSensitivePrefix = a.shortcut.startsWith(tokenText);
-          const bCaseSensitivePrefix = b.shortcut.startsWith(tokenText);
-          if (aCaseSensitivePrefix !== bCaseSensitivePrefix) {
-            return aCaseSensitivePrefix ? -1 : 1;
-          }
-          return a.shortcut.localeCompare(b.shortcut);
-        });
-      if (!matches.length || (matches.length === 1 && matches[0].shortcut.toLowerCase() === lower)) {
-        hideExpanderSuggestions();
-        return;
-      }
-      renderExpanderSuggestions(matches, token);
-    }
-
-    textarea.addEventListener('input', function() {
+    function editAnchor(event) {
+      const target = event.target;
+      if (!target || target.nodeName !== 'A') return;
+      event.preventDefault();
+      const currentText = target.textContent || '';
+      const currentHref = target.getAttribute('href') || '';
+      const nextText = window.prompt('Link text', currentText);
+      if (nextText === null) return;
+      const nextHref = window.prompt('Link URL', currentHref);
+      if (nextHref === null) return;
+      target.textContent = nextText;
+      target.setAttribute('href', nextHref);
+      target.setAttribute('target', '_blank');
+      target.setAttribute('rel', 'noopener noreferrer');
       syncDetails();
       queueSave();
-      updateExpanderSuggestions();
-    });
-    textarea.addEventListener('blur', hideExpanderSuggestions);
+    }
 
-    textarea.addEventListener('click', updateExpanderSuggestions);
-    textarea.addEventListener('keyup', function(e) {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        updateExpanderSuggestions();
-      }
-    });
-    textarea.addEventListener('blur', hideExpanderSuggestions);
+    function handleInput() {
+      syncDetails();
+      queueSave();
+    }
 
-    textarea.addEventListener('click', updateExpanderSuggestions);
-    textarea.addEventListener('keyup', function(e) {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        updateExpanderSuggestions();
-      }
-    });
-    textarea.addEventListener('blur', hideExpanderSuggestions);
-
-    textarea.addEventListener('scroll', function() {
-      preview.parentElement.scrollTop = textarea.scrollTop;
-      preview.parentElement.scrollLeft = textarea.scrollLeft;
-    });
-
-    textarea.addEventListener('paste', function(e) {
+    editable.addEventListener('input', handleInput);
+    editable.addEventListener('blur', handleInput);
+    editable.addEventListener('click', openAnchorFromEvent);
+    editable.addEventListener('contextmenu', editAnchor);
+    editable.addEventListener('paste', function(e) {
+      if (!e.clipboardData) return;
       e.preventDefault();
-      const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
-      insertAtSelection(text);
-      syncDetails();
-      queueSave();
-    });
-
-    textarea.addEventListener('keydown', function(e) {
-      if (!expanderSuggestions.classList.contains('d-none')) {
-        const tokenRange = findCurrentToken();
-        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          const delta = e.key === 'ArrowDown' ? 1 : -1;
-          setActiveExpander(activeExpanderIndex + delta);
-          return;
-        }
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          const accepted = acceptActiveExpander(tokenRange);
-          if (accepted) {
-            e.preventDefault();
-            return;
-          }
-        }
-        if (e.key === 'Escape' || e.key === 'Esc') {
-          hideExpanderSuggestions();
-          return;
+      const text = e.clipboardData.getData('text/plain');
+      if (typeof document.execCommand === 'function') {
+        document.execCommand('insertText', false, text);
+      } else {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(text));
+          selection.collapseToEnd();
+        } else {
+          editable.textContent = (editable.textContent || '') + text;
         }
       }
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-
-        if (start === end && !e.shiftKey) {
-          insertAtSelection('\t');
-          syncDetails();
-          queueSave();
-          return;
-        }
-
-        const value = textarea.value || '';
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        const lineEndIndex = value.indexOf('\n', end);
-        const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
-
-        const selectedLines = value.slice(lineStart, lineEnd).split('\n');
-
-        if (e.shiftKey) {
-          let totalRemoved = 0;
-          let firstLineRemoved = 0;
-          const outdented = selectedLines.map(function(line, index) {
-            const match = line.match(/^(\t| {1,4})/);
-            if (match) {
-              const removed = match[0].length;
-              totalRemoved += removed;
-              if (index === 0) {
-                firstLineRemoved = removed;
-              }
-              return line.slice(removed);
-            }
-            return line;
-          }).join('\n');
-
-          textarea.value = value.slice(0, lineStart) + outdented + value.slice(lineEnd);
-          const nextStart = Math.max(lineStart, start - firstLineRemoved);
-          const nextEnd = Math.max(nextStart, end - totalRemoved);
-          textarea.selectionStart = nextStart;
-          textarea.selectionEnd = nextEnd;
-        } else {
-          const indented = selectedLines.map(function(line) { return '\t' + line; }).join('\n');
-          textarea.value = value.slice(0, lineStart) + indented + value.slice(lineEnd);
-          const nextStart = start + 1;
-          const nextEnd = end + selectedLines.length;
-          textarea.selectionStart = nextStart;
-          textarea.selectionEnd = nextEnd;
-        }
-
-        syncDetails();
-        queueSave();
-      } else if (e.key === 'Home' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        const caret = textarea.selectionStart;
-        const value = textarea.value || '';
-        const lineStart = value.lastIndexOf('\n', caret - 1) + 1;
-        const lineEnd = value.indexOf('\n', lineStart);
-        const endIndex = lineEnd === -1 ? value.length : lineEnd;
-        let firstVisible = lineStart;
-        while (firstVisible < endIndex && (value[firstVisible] === ' ' || value[firstVisible] === '\t')) {
-          firstVisible += 1;
-        }
-        const target = caret !== firstVisible ? firstVisible : lineStart;
-
-        if (e.shiftKey) {
-          const anchor = textarea.selectionEnd;
-          textarea.selectionStart = Math.min(anchor, target);
-          textarea.selectionEnd = Math.max(anchor, target);
-        } else {
-          textarea.selectionStart = textarea.selectionEnd = target;
-        }
-      } else if (e.key === ' ') {
-        const start = textarea.selectionStart;
-        if (start > 0 && textarea.selectionStart === textarea.selectionEnd && textarea.value[start - 1] === ' ') {
-          e.preventDefault();
-          textarea.selectionStart = start - 1;
-          textarea.selectionEnd = start;
-          insertAtSelection('\t');
-          syncDetails();
-          queueSave();
-        }
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const start = textarea.selectionStart;
-        const value = textarea.value || '';
-        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-        const currentLine = value.slice(lineStart, start);
-        const leading = (currentLine.match(/^[\t ]*/) || [''])[0];
-        insertAtSelection('\n' + leading);
-        syncDetails();
-        queueSave();
-      }
+      handleInput();
     });
 
+    const initialValue = detailsField.value || '';
+    editable.innerHTML = textToHtml(initialValue);
     syncDetails();
 
     return { updateDetails: syncDetails };
