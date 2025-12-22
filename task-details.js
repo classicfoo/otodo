@@ -291,6 +291,7 @@
     const lineRules = pickRules(options.lineRules);
     const capitalizeSentences = !!options.capitalizeSentences;
     const dateRegexes = buildDateRegexes(options.dateFormats);
+    let currentLinkRanges = [];
     const normalizedExpanders = Array.isArray(options.textExpanders)
       ? options.textExpanders.filter(function(entry) {
           return entry && typeof entry.shortcut === 'string' && typeof entry.expansion === 'string';
@@ -362,7 +363,15 @@
       activeLinkRange = null;
     }
 
+    function findLinkAtPosition(position) {
+      if (!Array.isArray(currentLinkRanges)) return null;
+      return currentLinkRanges.find(function(link) {
+        return position >= link.start && position <= link.end;
+      }) || null;
+    }
+
     function renderPreview(text) {
+      currentLinkRanges = findLinks(text);
       const highlighted = highlightHtml(text, dateRegexes);
       preview.innerHTML = wrapLinesWithColors(highlighted, text, lineRules);
     }
@@ -732,6 +741,18 @@
       }
     });
 
+    textarea.addEventListener('click', function(e) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      const caret = textarea.selectionStart;
+      const activeLink = findLinkAtPosition(caret);
+      if (!activeLink) return;
+      e.preventDefault();
+      const href = normalizeUrl(activeLink.href || activeLink.display || '');
+      if (href) {
+        window.open(href, '_blank', 'noopener,noreferrer');
+      }
+    });
+
     preview.addEventListener('contextmenu', function(e) {
       const linkEl = e.target.closest('.details-link');
       if (!linkEl) return;
@@ -751,8 +772,31 @@
       linkContextMenu.classList.remove('d-none');
     });
 
+    textarea.addEventListener('contextmenu', function(e) {
+      const caret = textarea.selectionStart;
+      const activeLink = findLinkAtPosition(caret);
+      if (!activeLink) {
+        hideContextMenu();
+        hideEditor();
+        return;
+      }
+      e.preventDefault();
+      activeLinkRange = {
+        start: activeLink.start,
+        end: activeLink.end,
+        display: activeLink.display,
+        href: normalizeUrl(activeLink.href || activeLink.display || ''),
+        point: { x: e.pageX, y: e.pageY }
+      };
+      textarea.selectionStart = activeLink.start;
+      textarea.selectionEnd = activeLink.end;
+      linkContextMenu.style.left = e.pageX + 'px';
+      linkContextMenu.style.top = e.pageY + 'px';
+      linkContextMenu.classList.remove('d-none');
+    });
+
     document.addEventListener('click', function(e) {
-      if (!linkContextMenu.contains(e.target) && !preview.contains(e.target)) {
+      if (!linkContextMenu.contains(e.target) && !preview.contains(e.target) && e.target !== textarea) {
         hideContextMenu();
         hideEditor();
       }
