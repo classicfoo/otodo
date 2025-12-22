@@ -332,6 +332,11 @@ $user_hashtags_json = json_encode($user_hashtags);
             box-shadow: 0 0 0 1px var(--inline-date-border);
             padding: 0;
         }
+        .inline-link {
+            color: #0d6efd;
+            text-decoration: underline;
+            text-decoration-thickness: from-font;
+        }
         .expander-suggestions {
             position: absolute;
             left: 0;

@@ -291,6 +291,21 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).toContain('<span class="inline-date">1 Jan 2026</span>');
   });
 
+  test('markdown links are converted into anchored URLs', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Visit [Google](https://www.google.com.au) and [Docs](http://example.com/path).';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    expect(preview.innerHTML).toContain('<a href="https://www.google.com.au" target="_blank" rel="noreferrer noopener" class="inline-link">Google</a>');
+    expect(preview.innerHTML).toContain('<a href="http://example.com/path" target="_blank" rel="noreferrer noopener" class="inline-link">Docs</a>');
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
