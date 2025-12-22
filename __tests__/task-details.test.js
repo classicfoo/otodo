@@ -335,6 +335,33 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('link editor stays open while interacting with form controls', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Visit https://example.com for details';
+    editor.updateDetails();
+
+    const link = details.querySelector('.details-link');
+    expect(link).not.toBeNull();
+
+    link.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    const menuButton = details.querySelector('.link-edit-trigger');
+    expect(menuButton).not.toBeNull();
+    menuButton.click();
+
+    const editorContainer = details.querySelector('.link-editor');
+    const textInput = details.querySelector('.link-text-input');
+    expect(editorContainer.classList.contains('d-none')).toBe(false);
+
+    textInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(editorContainer.classList.contains('d-none')).toBe(false);
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

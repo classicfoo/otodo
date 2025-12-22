@@ -796,7 +796,7 @@
     });
 
     document.addEventListener('click', function(e) {
-      if (!linkContextMenu.contains(e.target) && !preview.contains(e.target) && e.target !== textarea) {
+      if (!linkContextMenu.contains(e.target) && !linkEditor.contains(e.target) && !preview.contains(e.target) && e.target !== textarea) {
         hideContextMenu();
         hideEditor();
       }
