@@ -242,7 +242,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             font-family: monospace;
             cursor: text;
         }
-        .prism-editor__textarea,
+        .prism-editor__editable,
         .prism-editor__preview {
             grid-area: 1 / 1 / 2 / 2;
             font-family: inherit;
@@ -250,7 +250,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             line-height: 1.5;
             tab-size: 4;
         }
-        .prism-editor__textarea {
+        .prism-editor__editable {
             width: 100%;
             min-height: calc(1lh + 1.5rem);
             height: auto;
@@ -259,7 +259,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             border: none;
             padding: 0.75rem;
             background: transparent;
-            color: transparent;
+            color: var(--details-text-color, var(--bs-body-color));
             caret-color: var(--details-text-color, var(--bs-body-color));
             overflow: hidden;
             white-space: pre-wrap;
@@ -267,6 +267,10 @@ $user_hashtags_json = json_encode($user_hashtags);
             outline: none;
             z-index: 1;
             cursor: text;
+        }
+        .prism-editor__editable a {
+            color: #0d6efd;
+            text-decoration: underline;
         }
         .prism-editor__preview {
             position: relative;
@@ -427,7 +431,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         <div class="mb-3">
             <label class="form-label">Description</label>
             <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
-                <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                <div contenteditable="true" class="prism-editor__editable task-details-input" spellcheck="false"></div>
                 <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
             </div>
             <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
