@@ -94,7 +94,10 @@
 
   function highlightHtml(text = '', dateRegexes = []) {
     const escaped = escapeHtml(text);
-    const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
+    const withLinks = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_, label, url) {
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    });
+    const withHashtags = withLinks.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
     const withDates = Array.isArray(dateRegexes) && dateRegexes.length
       ? dateRegexes.reduce(function(prev, regex) {
           if (!(regex instanceof RegExp)) {
