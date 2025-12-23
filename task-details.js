@@ -474,15 +474,29 @@
       queueSave();
       updateExpanderSuggestions();
     });
-    textarea.addEventListener('focus', function() {
-      details.classList.add('is-editing');
-    });
     textarea.addEventListener('blur', hideExpanderSuggestions);
-    textarea.addEventListener('blur', function() {
-      details.classList.remove('is-editing');
-    });
 
-    textarea.addEventListener('click', updateExpanderSuggestions);
+    function findLinkAtPoint(x, y) {
+      const previousPointerEvents = textarea.style.pointerEvents;
+      textarea.style.pointerEvents = 'none';
+      const element = document.elementFromPoint(x, y);
+      textarea.style.pointerEvents = previousPointerEvents;
+      if (!element) {
+        return null;
+      }
+      return element.closest ? element.closest('a.inline-link') : null;
+    }
+
+    textarea.addEventListener('click', function(event) {
+      const link = findLinkAtPoint(event.clientX, event.clientY);
+      if (link && link.href) {
+        window.open(link.href, '_blank', 'noopener');
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      updateExpanderSuggestions();
+    });
     textarea.addEventListener('keyup', function(e) {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         updateExpanderSuggestions();
@@ -501,14 +515,6 @@
     textarea.addEventListener('scroll', function() {
       preview.parentElement.scrollTop = textarea.scrollTop;
       preview.parentElement.scrollLeft = textarea.scrollLeft;
-    });
-
-    preview.addEventListener('click', function(event) {
-      if (event.target && event.target.closest('a')) {
-        return;
-      }
-      details.classList.add('is-editing');
-      textarea.focus();
     });
 
     textarea.addEventListener('paste', function(e) {

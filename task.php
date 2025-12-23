@@ -266,24 +266,17 @@ $user_hashtags_json = json_encode($user_hashtags);
             overflow-wrap: break-word;
             outline: none;
             z-index: 1;
-            pointer-events: none;
             cursor: text;
         }
         .prism-editor__preview {
             position: relative;
             margin: 0;
-            pointer-events: auto;
+            pointer-events: none;
             white-space: pre-wrap;
             overflow-wrap: break-word;
             overflow: hidden;
             padding: 0.75rem;
-            z-index: 2;
-        }
-        .prism-editor.is-editing .prism-editor__textarea {
-            pointer-events: auto;
-        }
-        .prism-editor.is-editing .prism-editor__preview {
-            pointer-events: none;
+            z-index: 0;
         }
         .prism-editor__preview code {
             display: block;
