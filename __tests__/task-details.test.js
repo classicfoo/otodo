@@ -304,4 +304,62 @@ describe('task details editor behaviors', () => {
     expect(textarea.value).toBe('  T Task\nnote only\nN Note');
     expect(hidden.value).toBe('  T Task\nnote only\nN Note');
   });
+
+  test('markdown links include a hidden raw span without changing the visible link', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Check [Docs](https://example.com) for updates.';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    const link = preview.querySelector('a.details-link');
+    const rawSpan = preview.querySelector('span.details-link-raw');
+
+    expect(link).not.toBeNull();
+    expect(link.textContent).toBe('Docs');
+    expect(link.getAttribute('href')).toBe('https://example.com');
+    expect(rawSpan).not.toBeNull();
+    expect(rawSpan.textContent).toBe('[Docs](https://example.com)');
+    expect(link.nextElementSibling).toBe(rawSpan);
+  });
+
+  test('hidden raw span has zero layout footprint and link interactions still target details-link', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Visit [Docs](https://example.com).';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    const link = preview.querySelector('a.details-link');
+    const rawSpan = preview.querySelector('span.details-link-raw');
+
+    expect(rawSpan.hasAttribute('hidden')).toBe(true);
+    expect(rawSpan.classList.contains('details-link-raw')).toBe(true);
+    expect(rawSpan.style.display).toBe('inline-block');
+    expect(rawSpan.style.width).toBe('0px');
+    expect(rawSpan.style.height).toBe('0px');
+    expect(rawSpan.style.overflow).toBe('hidden');
+    expect(rawSpan.style.pointerEvents).toBe('none');
+    expect(rawSpan.style.position).toBe('absolute');
+
+    let clickTarget = null;
+    preview.addEventListener('click', (event) => {
+      clickTarget = event.target.closest('.details-link');
+    });
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    expect(clickTarget).toBe(link);
+
+    let contextTarget = null;
+    preview.addEventListener('contextmenu', (event) => {
+      contextTarget = event.target.closest('.details-link');
+    });
+    link.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    expect(contextTarget).toBe(link);
+  });
 });

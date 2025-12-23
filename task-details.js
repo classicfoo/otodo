@@ -92,7 +92,7 @@
     });
   }
 
-  function highlightHtml(text = '', dateRegexes = []) {
+  function highlightInlineText(text = '', dateRegexes = []) {
     const escaped = escapeHtml(text);
     const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
     const withDates = Array.isArray(dateRegexes) && dateRegexes.length
@@ -110,6 +110,36 @@
       const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
       return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
     });
+  }
+
+  function highlightHtml(text = '', dateRegexes = []) {
+    const linkPattern = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+    let lastIndex = 0;
+    let output = '';
+    let match;
+
+    while ((match = linkPattern.exec(text))) {
+      const before = text.slice(lastIndex, match.index);
+      if (before) {
+        output += highlightInlineText(before, dateRegexes);
+      }
+
+      const linkText = match[1];
+      const href = match[2];
+      const raw = match[0];
+      const highlightedText = highlightInlineText(linkText, dateRegexes);
+      const hiddenStyle = 'display:inline-block;width:0;height:0;overflow:hidden;pointer-events:none;position:absolute;';
+      output += '<a class="details-link" href="' + escapeHtml(href) + '">' + highlightedText + '</a>' +
+        '<span class="details-link-raw" hidden style="' + hiddenStyle + '">' + escapeHtml(raw) + '</span>';
+      lastIndex = linkPattern.lastIndex;
+    }
+
+    const remaining = text.slice(lastIndex);
+    if (remaining) {
+      output += highlightInlineText(remaining, dateRegexes);
+    }
+
+    return output;
   }
 
   function pickRules(lineRules) {
