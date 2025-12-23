@@ -266,17 +266,24 @@ $user_hashtags_json = json_encode($user_hashtags);
             overflow-wrap: break-word;
             outline: none;
             z-index: 1;
+            pointer-events: none;
             cursor: text;
         }
         .prism-editor__preview {
             position: relative;
             margin: 0;
-            pointer-events: none;
+            pointer-events: auto;
             white-space: pre-wrap;
             overflow-wrap: break-word;
             overflow: hidden;
             padding: 0.75rem;
-            z-index: 0;
+            z-index: 2;
+        }
+        .prism-editor.is-editing .prism-editor__textarea {
+            pointer-events: auto;
+        }
+        .prism-editor.is-editing .prism-editor__preview {
+            pointer-events: none;
         }
         .prism-editor__preview code {
             display: block;
@@ -331,6 +338,12 @@ $user_hashtags_json = json_encode($user_hashtags);
             background: var(--inline-date-background);
             box-shadow: 0 0 0 1px var(--inline-date-border);
             padding: 0;
+        }
+        .inline-link {
+            color: var(--bs-link-color, #0d6efd);
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
         }
         .expander-suggestions {
             position: absolute;

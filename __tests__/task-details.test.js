@@ -291,6 +291,22 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).toContain('<span class="inline-date">1 Jan 2026</span>');
   });
 
+  test('urls render as hyperlinks without wrapping hashtags inside the link', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Docs https://example.com/#section and www.example.org/docs.';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    expect(preview.innerHTML).toContain('<a class="inline-link" href="https://example.com/#section" target="_blank" rel="noopener noreferrer">https://example.com/#section</a>');
+    expect(preview.innerHTML).toContain('<a class="inline-link" href="https://www.example.org/docs" target="_blank" rel="noopener noreferrer">www.example.org/docs</a>');
+    expect(preview.innerHTML).not.toContain('inline-hashtag">#section</span>');
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');
