@@ -312,6 +312,13 @@ $user_hashtags_json = json_encode($user_hashtags);
         .prism-editor .token.attr-value {
             color: #0d6efd;
         }
+        .details-link-markdown {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            visibility: hidden;
+        }
         .inline-hashtag {
             position: relative;
             color: var(--inline-hashtag-color);
