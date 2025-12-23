@@ -93,23 +93,51 @@
   }
 
   function highlightHtml(text = '', dateRegexes = []) {
-    const escaped = escapeHtml(text);
-    const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
-    const withDates = Array.isArray(dateRegexes) && dateRegexes.length
-      ? dateRegexes.reduce(function(prev, regex) {
-          if (!(regex instanceof RegExp)) {
-            return prev;
-          }
-          return prev.replace(regex, function(match) {
-            const normalized = capitalizeMonths(match);
-            return '<span class="inline-date">' + normalized + '</span>';
-          });
-        }, withHashtags)
-      : withHashtags;
-    return withDates.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
-      const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
-      return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
-    });
+    function applyInlineHighlights(value) {
+      const escaped = escapeHtml(value);
+      const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
+      const withDates = Array.isArray(dateRegexes) && dateRegexes.length
+        ? dateRegexes.reduce(function(prev, regex) {
+            if (!(regex instanceof RegExp)) {
+              return prev;
+            }
+            return prev.replace(regex, function(match) {
+              const normalized = capitalizeMonths(match);
+              return '<span class="inline-date">' + normalized + '</span>';
+            });
+          }, withHashtags)
+        : withHashtags;
+      return withDates.replace(/(&lt;\/?)([a-zA-Z0-9-]+)([^&]*?)(&gt;)/g, function(_, open, tag, attrs, close) {
+        const highlightedAttrs = (attrs || '').replace(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)(\s*=\s*)("[^"]*"|[^\s"'<>]+)/g, '<span class="token attr-name">$1</span>$2<span class="token attr-value">$3</span>');
+        return '<span class="token tag">' + open + '<span class="token tag-name">' + tag + '</span>' + highlightedAttrs + close + '</span>';
+      });
+    }
+
+    const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let output = '';
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkPattern.exec(text))) {
+      const start = match.index;
+      const end = start + match[0].length;
+      const before = text.slice(lastIndex, start);
+      const linkText = match[1];
+      const linkUrl = match[2];
+      const escapedUrl = escapeHtml(linkUrl);
+      const escapedMarkdown = escapeHtml(match[0]);
+      const linkHtml =
+        '<a class="details-link" href="' + escapedUrl + '" data-link-start="' + start + '" data-link-end="' + end + '">' +
+        applyInlineHighlights(linkText) +
+        '</a>' +
+        '<span class="details-link-markdown" hidden aria-hidden="true">' + escapedMarkdown + '</span>';
+
+      output += applyInlineHighlights(before) + linkHtml;
+      lastIndex = end;
+    }
+
+    output += applyInlineHighlights(text.slice(lastIndex));
+    return output;
   }
 
   function pickRules(lineRules) {

@@ -304,4 +304,52 @@ describe('task details editor behaviors', () => {
     expect(textarea.value).toBe('  T Task\nnote only\nN Note');
     expect(hidden.value).toBe('  T Task\nnote only\nN Note');
   });
+
+  test('markdown links render with hidden markdown span and link mapping attributes', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'See [Docs](https://example.com) now.';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    const link = preview.querySelector('.details-link');
+    const hiddenSpan = preview.querySelector('.details-link-markdown');
+
+    expect(link).not.toBeNull();
+    expect(hiddenSpan).not.toBeNull();
+    expect(link.textContent).toBe('Docs');
+    expect(link.getAttribute('href')).toBe('https://example.com');
+    expect(hiddenSpan.hasAttribute('hidden')).toBe(true);
+    expect(hiddenSpan.getAttribute('aria-hidden')).toBe('true');
+    expect(hiddenSpan.textContent).toBe('[Docs](https://example.com)');
+
+    const linkStart = textarea.value.indexOf('[Docs](https://example.com)');
+    const linkEnd = linkStart + '[Docs](https://example.com)'.length;
+    expect(link.dataset.linkStart).toBe(String(linkStart));
+    expect(link.dataset.linkEnd).toBe(String(linkEnd));
+  });
+
+  test('rendered link text hides raw markdown while keeping context text intact', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Before [Site](https://example.com) after';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    const link = preview.querySelector('.details-link');
+    const hiddenSpan = preview.querySelector('.details-link-markdown');
+
+    expect(link.textContent).toBe('Site');
+    expect(link.textContent).not.toContain('[');
+    expect(link.textContent).not.toContain(']');
+    expect(link.textContent).not.toContain('(');
+    expect(link.textContent).not.toContain(')');
+    expect(hiddenSpan.textContent).toBe('[Site](https://example.com)');
+  });
 });
