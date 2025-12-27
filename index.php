@@ -13,7 +13,6 @@ $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority,
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
 $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
 $task_ids = array_column($tasks, 'id');
 $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
@@ -66,7 +65,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             padding-left: 0.5rem;
             padding-right: 0.5rem;
         }
-        .priority-text { text-align: center; min-width: 70px; }
+        .priority-text {
+            text-align: center;
+            min-width: 70px;
+            max-width: 70px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .star-toggle {
             min-width: 44px;
             display: inline-flex;
@@ -235,7 +241,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 padding-left: 0.3rem;
                 padding-right: 0.3rem;
             }
-            .priority-text { min-width: 44px; }
+            .priority-text {
+                min-width: 44px;
+                max-width: 44px;
+            }
             .star-toggle { min-width: 40px; }
             .task-star { padding: 0; }
             .task-search.expanded { width: min(280px, 70vw); }
@@ -376,10 +385,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     <?php else: ?>
                         <span class="due-date-badge"></span>
                     <?php endif; ?>
-                    <span class="small priority-text <?=$priority_classes[$p]?>" aria-label="<?=htmlspecialchars($priority_labels[$p])?>">
-                        <span class="d-none d-md-inline"><?=$priority_labels[$p]?></span>
-                        <span class="d-inline d-md-none"><?=$priority_labels_short[$p]?></span>
-                    </span>
+                    <span class="small priority-text <?=$priority_classes[$p]?>" aria-label="<?=htmlspecialchars($priority_labels[$p])?>"><?=$priority_labels[$p]?></span>
                     <button type="button" class="task-star star-toggle <?php if (!empty($task['starred'])) echo 'starred'; ?>" data-id="<?=$task['id']?>" aria-pressed="<?=!empty($task['starred']) ? 'true' : 'false'?>" aria-label="<?=!empty($task['starred']) ? 'Unstar task' : 'Star task'?>">
                         <span class="star-icon" aria-hidden="true"><?=!empty($task['starred']) ? '★' : '☆'?></span>
                         <span class="visually-hidden"><?=!empty($task['starred']) ? 'Starred' : 'Not starred'?></span>
@@ -1030,7 +1036,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
-  const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
 
   function renderDueBadge(badge, label, className = '') {
     if (!badge) return;
@@ -1049,8 +1054,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (!el) return;
     const numericPriority = typeof priorityValue === 'number' ? priorityValue : Number(priorityValue || 0);
     const fullLabel = label || priorityLabels[numericPriority] || priorityLabels[0];
-    const shortLabel = priorityLabelsShort[numericPriority] || fullLabel;
-    el.innerHTML = `<span class="d-none d-md-inline">${fullLabel}</span><span class="d-inline d-md-none">${shortLabel}</span>`;
+    el.textContent = fullLabel;
     el.className = `small priority-text ${className || priorityClasses[numericPriority] || priorityClasses[0]}`.trim();
     el.setAttribute('aria-label', fullLabel);
   }
