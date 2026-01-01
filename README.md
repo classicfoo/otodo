@@ -39,13 +39,3 @@ Use the included `.github/workflows/deploy.yml` workflow to deploy automatically
 4. For manual runs (e.g., urgent hotfixes), open **Actions → Deploy via lftp → Run workflow** to trigger `workflow_dispatch`.
 
 If you prefer SSH-based deployment instead of FTP/SFTP mirroring, you can adapt the deploy step to use `ssh` and run your server-side deploy script with the same secrets approach.
-
-## Offline debug logging
-
-To see the new offline storage traces while testing, open your browser's developer tools console and enable the flag before exercising offline actions:
-
-```js
-window.OTODO_DEBUG_OFFLINE = true;
-```
-
-Reload the page after setting the flag. The offline storage helpers in `index.php` and `task.php` will emit `console.debug`/`console.warn` messages (prefixed with `[offline]`) showing request IDs, payload summaries, and read/write outcomes. Disable the flag (or refresh without setting it) to silence the logs for normal browsing.
