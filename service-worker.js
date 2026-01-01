@@ -220,7 +220,6 @@ async function enqueueRequest(request) {
 
 async function deleteRequest(id) {
   const db = await openDatabase();
-  await notifyClients({ type: 'debug-delete', id: id, timestamp: Date.now() });
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
     tx.oncomplete = () => resolve();
@@ -575,7 +574,6 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  notifyClients({ type: 'debug-fetch-event', method: event.request.method, url: event.request.url });
   if (event.request.method !== 'GET') {
     event.respondWith(handleNonGetRequest(event));
     return;
