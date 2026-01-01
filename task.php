@@ -474,8 +474,6 @@ $user_hashtags_json = json_encode($user_hashtags);
     <div class="offcanvas-header d-flex align-items-start justify-content-between">
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
-            <span class="badge bg-success-subtle text-success" id="connection-status" aria-live="polite">Online</span>
-            <span class="badge bg-warning-subtle text-warning" id="service-worker-status" aria-live="polite">Checking…</span>
         </div>
         <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
     </div>
@@ -487,7 +485,6 @@ $user_hashtags_json = json_encode($user_hashtags);
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
-        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -543,9 +540,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     </form>
 </div>
 <script src="prevent-save-shortcut.js"></script>
+<script src="offline-cleanup.js"></script>
 <script src="sync-status.js"></script>
 <script src="sync-queue-ui.js"></script>
-<script src="offline-prefetch.js"></script>
 <script src="task-details.js"></script>
 <script src="/assets/vanilla-ui.js"></script>
 <script>
@@ -1687,7 +1684,5 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
-<script src="user-context.js"></script>
-<script src="sw-register.js"></script>
 </body>
 </html>
