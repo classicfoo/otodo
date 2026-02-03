@@ -22,7 +22,7 @@ $id = $is_numeric_id ? (int)$raw_id : $raw_id;
 
 $task = null;
 if ($is_numeric_id) {
-    $stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
+    $stmt = $db->prepare('SELECT id, description, due_date, details, description_archive, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
     $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
     $task = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$task) {
@@ -35,6 +35,7 @@ if ($is_numeric_id) {
         'description' => '',
         'due_date' => null,
         'details' => '',
+        'description_archive' => '',
         'priority' => 0,
         'done' => 0,
         'starred' => 0,
@@ -76,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
+    $description_archive = trim($_POST['description_archive'] ?? '');
     $priority = (int)($_POST['priority'] ?? 0);
     if ($priority < 0 || $priority > 3) {
         $priority = 0;
@@ -124,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $hashtags = collect_hashtags_from_texts($description, $details);
+        $hashtags = collect_hashtags_from_texts($description, $details, $description_archive);
 
         header('Content-Type: application/json');
         echo json_encode([
@@ -143,24 +145,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'starred' => $starred,
             'done' => $done,
             'details' => $details,
+            'description_archive' => $description_archive,
             'hashtags' => $hashtags,
             'user_hashtags' => $user_hashtags,
         ]);
         exit();
     }
 
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, description_archive = :description_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
+        ':description_archive' => $description_archive !== '' ? $description_archive : null,
         ':priority' => $priority,
         ':done' => $done,
         ':starred' => $starred,
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
-    $hashtags = collect_hashtags_from_texts($description, $details);
+    $hashtags = collect_hashtags_from_texts($description, $details, $description_archive);
     sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
     header('Content-Type: application/json');
     $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
@@ -441,6 +445,17 @@ $user_hashtags_json = json_encode($user_hashtags);
         .task-actions-dropdown .dropdown-menu.show {
             display: block;
         }
+        .editor-tabs {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .editor-tab-panel {
+            display: none;
+        }
+        .editor-tab-panel.active {
+            display: block;
+        }
         .task-nav-buttons .btn {
             min-width: 90px;
         }
@@ -526,11 +541,24 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
-                <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
-                <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+            <div class="editor-tabs mb-2" role="tablist" aria-label="Description tabs">
+                <button type="button" class="btn btn-sm btn-primary editor-tab-btn active" data-tab-target="detailsPanel" role="tab" aria-controls="detailsPanel" aria-selected="true">Description</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary editor-tab-btn" data-tab-target="archivePanel" role="tab" aria-controls="archivePanel" aria-selected="false">Archive</button>
             </div>
-            <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
+            <div id="detailsPanel" class="editor-tab-panel active" role="tabpanel">
+                <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                    <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                    <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                </div>
+                <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
+            </div>
+            <div id="archivePanel" class="editor-tab-panel" role="tabpanel">
+                <div id="archiveInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                    <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['description_archive'] ?? '')?></textarea>
+                    <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                </div>
+                <input type="hidden" name="description_archive" id="descriptionArchiveField" value="<?=htmlspecialchars($task['description_archive'] ?? '')?>">
+            </div>
         </div>
         <div class="d-flex align-items-center gap-2 task-nav-buttons">
             <a href="index.php" class="btn btn-secondary px-4" id="backToList">Back</a>
@@ -680,6 +708,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       done: payload.done ? 1 : 0,
       hashtags: Array.isArray(payload.hashtags) ? payload.hashtags : [],
       details: payload.details || '',
+      description_archive: payload.description_archive || '',
     };
   }
 
@@ -855,6 +884,8 @@ $user_hashtags_json = json_encode($user_hashtags);
   const titleInputEl = form.querySelector('input[name="description"]');
   const detailsFieldHidden = document.getElementById('detailsField');
   const detailsTextarea = document.querySelector('#detailsInput textarea');
+  const archiveFieldHidden = document.getElementById('descriptionArchiveField');
+  const archiveTextarea = document.querySelector('#archiveInput textarea');
   const taskHashtags = <?= $task_hashtags_json ?: '[]' ?>;
   const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
   let activeHashtagTarget = null;
@@ -902,6 +933,8 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     const detailsValue = detailsFieldHidden ? detailsFieldHidden.value : (detailsTextarea ? detailsTextarea.value : '');
     extractHashtags(detailsValue).forEach(tag => tags.add(tag));
+    const archiveValue = archiveFieldHidden ? archiveFieldHidden.value : (archiveTextarea ? archiveTextarea.value : '');
+    extractHashtags(archiveValue).forEach(tag => tags.add(tag));
     return Array.from(tags);
   }
 
@@ -941,6 +974,9 @@ $user_hashtags_json = json_encode($user_hashtags);
     const detailsField = document.getElementById('detailsField');
     const detailsWrapper = document.getElementById('detailsInput');
     const detailsTextarea = detailsWrapper ? detailsWrapper.querySelector('textarea') : null;
+    const archiveField = document.getElementById('descriptionArchiveField');
+    const archiveWrapper = document.getElementById('archiveInput');
+    const archiveTextarea = archiveWrapper ? archiveWrapper.querySelector('textarea') : null;
 
     if (titleInput && typeof payload.description === 'string') {
       titleInput.value = payload.description;
@@ -964,6 +1000,15 @@ $user_hashtags_json = json_encode($user_hashtags);
         updateDetails();
       }
     }
+    if (archiveField && typeof payload.description_archive === 'string') {
+      archiveField.value = payload.description_archive;
+      if (archiveTextarea) {
+        archiveTextarea.value = payload.description_archive;
+      }
+      if (archiveWrapper && typeof updateArchiveDetails === 'function') {
+        updateArchiveDetails();
+      }
+    }
 
     if (Array.isArray(payload.hashtags) && payload.hashtags.length) {
       replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || []), ...payload.hashtags]);
@@ -984,6 +1029,12 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     if (detailsFieldHidden && detailsTextarea) {
       detailsFieldHidden.value = detailsTextarea.value || '';
+    }
+    if (archiveTextarea) {
+      archiveTextarea.value = (archiveTextarea.value || '').replace(pattern, '');
+    }
+    if (archiveFieldHidden && archiveTextarea) {
+      archiveFieldHidden.value = archiveTextarea.value || '';
     }
     renderHashtagBadges();
     scheduleSave();
@@ -1077,7 +1128,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function hasUnfinishedHashtag() {
-    const inputs = [titleInputEl, detailsTextarea];
+    const inputs = [titleInputEl, detailsTextarea, archiveTextarea];
     return inputs.some(el => {
       const active = detectActiveHashtag(el);
       return active && active.query !== undefined && active.query.length > 0;
@@ -1197,12 +1248,14 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   bindHashtagListeners(titleInputEl);
   bindHashtagListeners(detailsTextarea);
+  bindHashtagListeners(archiveTextarea);
 
   document.addEventListener('click', (event) => {
     if (!hashtagSuggestions || hashtagSuggestions.classList.contains('d-none')) return;
     if (hashtagSuggestions.contains(event.target)) return;
     if (titleInputEl && titleInputEl === event.target) return;
     if (detailsTextarea && detailsTextarea === event.target) return;
+    if (archiveTextarea && archiveTextarea === event.target) return;
     hideHashtagSuggestions();
   });
 
@@ -1241,15 +1294,18 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   let updateDetails;
-  const details = document.getElementById('detailsInput');
-  const detailsField = document.getElementById('detailsField');
-  if (details && detailsField && window.initTaskDetailsEditor) {
+  let updateArchiveDetails;
+
+  function readEditorSettings(editorEl) {
+    if (!editorEl) {
+      return { rules: [], dateFormats: [], textExpanders: [], capitalizeSentences: false, textColor: undefined };
+    }
     let rules = [];
-    const capitalizeSentences = details.dataset.capitalizeSentences === 'true';
     let dateFormats = [];
     let textExpanders = [];
+    const capitalizeSentences = editorEl.dataset.capitalizeSentences === 'true';
     try {
-      rules = JSON.parse(details.dataset.lineRules || '[]');
+      rules = JSON.parse(editorEl.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
         rules = [];
       }
@@ -1257,7 +1313,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       rules = [];
     }
     try {
-      dateFormats = JSON.parse(details.dataset.dateFormats || '[]');
+      dateFormats = JSON.parse(editorEl.dataset.dateFormats || '[]');
       if (!Array.isArray(dateFormats)) {
         dateFormats = [];
       }
@@ -1265,35 +1321,81 @@ $user_hashtags_json = json_encode($user_hashtags);
       dateFormats = [];
     }
     try {
-      textExpanders = JSON.parse(details.dataset.textExpanders || '[]');
+      textExpanders = JSON.parse(editorEl.dataset.textExpanders || '[]');
       if (!Array.isArray(textExpanders)) {
         textExpanders = [];
       }
     } catch (err) {
       textExpanders = [];
     }
-    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
-      lineRules: rules,
-      textColor: details.dataset.textColor,
-      capitalizeSentences: capitalizeSentences,
-      dateFormats: dateFormats,
-      textExpanders: textExpanders
+    return {
+      rules,
+      dateFormats,
+      textExpanders,
+      capitalizeSentences,
+      textColor: editorEl.dataset.textColor
+    };
+  }
+
+  function initEditor(editorEl, fieldEl, setUpdate) {
+    if (!editorEl || !fieldEl || !window.initTaskDetailsEditor) {
+      return;
+    }
+    const settings = readEditorSettings(editorEl);
+    const editor = initTaskDetailsEditor(editorEl, fieldEl, scheduleSave, {
+      lineRules: settings.rules,
+      textColor: settings.textColor,
+      capitalizeSentences: settings.capitalizeSentences,
+      dateFormats: settings.dateFormats,
+      textExpanders: settings.textExpanders
     });
     if (editor && typeof editor.updateDetails === 'function') {
       const baseUpdate = editor.updateDetails;
-      updateDetails = function() {
+      setUpdate(function() {
         const val = baseUpdate();
-  renderHashtagBadges();
+        renderHashtagBadges();
         return val;
-      };
-    }
-    
-    // Re-hydrate queued task after editor is initialized to ensure details field is set
-    const payloadToRehydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
-    if (payloadToRehydrate && isOfflineTask) {
-      hydrateQueuedTask(payloadToRehydrate);
+      });
     }
   }
+
+  const details = document.getElementById('detailsInput');
+  const detailsField = document.getElementById('detailsField');
+  initEditor(details, detailsField, (fn) => { updateDetails = fn; });
+
+  const archive = document.getElementById('archiveInput');
+  const archiveField = document.getElementById('descriptionArchiveField');
+  initEditor(archive, archiveField, (fn) => { updateArchiveDetails = fn; });
+
+  // Re-hydrate queued task after editors are initialized to ensure fields are set
+  const payloadToRehydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
+  if (payloadToRehydrate && isOfflineTask) {
+    hydrateQueuedTask(payloadToRehydrate);
+  }
+
+  const tabButtons = Array.from(document.querySelectorAll('.editor-tab-btn'));
+  const tabPanels = Array.from(document.querySelectorAll('.editor-tab-panel'));
+
+  function activateTab(targetId) {
+    tabButtons.forEach((button) => {
+      const isActive = button.dataset.tabTarget === targetId;
+      button.classList.toggle('btn-primary', isActive);
+      button.classList.toggle('btn-outline-secondary', !isActive);
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle('active', panel.id === targetId);
+    });
+  }
+
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.dataset.tabTarget;
+      if (!targetId) return;
+      activateTab(targetId);
+    });
+  });
 
   const taskReloadKey = 'taskListNeedsReload';
 
@@ -1338,6 +1440,8 @@ $user_hashtags_json = json_encode($user_hashtags);
     const starredCheckbox = form.querySelector('input[name="starred"]');
     const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
+    const archiveWrapper = document.getElementById('archiveInput');
+    const archiveField = form.querySelector('input[name="description_archive"]');
 
     recordPendingUpdate({
       description: titleInput ? titleInput.value.trim() : undefined,
@@ -1346,6 +1450,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       priority: prioritySelect ? Number(prioritySelect.value) : undefined,
       starred: starredCheckbox ? starredCheckbox.checked : undefined,
       details: detailsField ? detailsField.value : undefined,
+      description_archive: archiveField ? archiveField.value : undefined,
       hashtags: currentHashtags()
     });
   }
@@ -1360,7 +1465,10 @@ $user_hashtags_json = json_encode($user_hashtags);
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
+    const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
+    const archiveField = form.querySelector('input[name="description_archive"]');
+    const archiveWrapper = document.getElementById('archiveInput');
 
     if (titleInput && typeof pending.description === 'string') {
       titleInput.value = pending.description;
@@ -1390,6 +1498,18 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
         if (typeof updateDetails === 'function') {
           updateDetails();
+        }
+      }
+    }
+    if (archiveField && typeof pending.description_archive === 'string') {
+      archiveField.value = pending.description_archive;
+      if (archiveWrapper) {
+        const archiveTextarea = archiveWrapper.querySelector('textarea');
+        if (archiveTextarea) {
+          archiveTextarea.value = pending.description_archive;
+        }
+        if (typeof updateArchiveDetails === 'function') {
+          updateArchiveDetails();
         }
       }
     }
@@ -1516,6 +1636,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   function sendSave(immediate = false) {
     if (discardInProgress) return;
     if (updateDetails) updateDetails();
+    if (updateArchiveDetails) updateArchiveDetails();
     const data = new FormData(form);
     const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
     const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
@@ -1539,6 +1660,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       const dueInput = form.querySelector('input[name="due_date"]');
       const starredCheckbox = form.querySelector('input[name="starred"]');
       const detailsField = form.querySelector('input[name="details"]');
+      const archiveField = form.querySelector('input[name="description_archive"]');
       const prioritySelect = form.querySelector('select[name="priority"]');
       const dueValue = dueInput ? (dueInput.value || '').slice(0, 10) : '';
       const dueMeta = formatDue(dueValue);
@@ -1561,6 +1683,7 @@ $user_hashtags_json = json_encode($user_hashtags);
         done: false,
         hashtags: currentHashtags(),
         details: detailsField ? detailsField.value : '',
+        description_archive: archiveField ? archiveField.value : '',
       });
     };
 
