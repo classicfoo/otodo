@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
+$stmt = $db->prepare('SELECT id, description, due_date, details, details_archive, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
 $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
@@ -66,17 +66,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
+    $details_archive = trim($_POST['details_archive'] ?? '');
     $priority = (int)($_POST['priority'] ?? 0);
     if ($priority < 0 || $priority > 3) {
         $priority = 0;
     }
     $done = isset($_POST['done']) ? 1 : 0;
     $starred = isset($_POST['starred']) ? 1 : 0;
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, details_archive = :details_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
+        ':details_archive' => $details_archive !== '' ? $details_archive : null,
         ':priority' => $priority,
         ':done' => $done,
         ':starred' => $starred,
@@ -432,11 +434,30 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
-                <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
-                <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+            <ul class="nav nav-tabs" id="detailsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="description-tab" data-bs-toggle="tab" data-bs-target="#description-tab-pane" type="button" role="tab" aria-controls="description-tab-pane" aria-selected="true">Description</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="archive-tab" data-bs-toggle="tab" data-bs-target="#archive-tab-pane" type="button" role="tab" aria-controls="archive-tab-pane" aria-selected="false">Archive</button>
+                </li>
+            </ul>
+            <div class="tab-content pt-3" id="detailsTabsContent">
+                <div class="tab-pane fade show active" id="description-tab-pane" role="tabpanel" aria-labelledby="description-tab">
+                    <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                        <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                        <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                    </div>
+                    <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
+                </div>
+                <div class="tab-pane fade" id="archive-tab-pane" role="tabpanel" aria-labelledby="archive-tab">
+                    <div id="archiveInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                        <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details_archive'] ?? '')?></textarea>
+                        <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                    </div>
+                    <input type="hidden" name="details_archive" id="archiveField" value="<?=htmlspecialchars($task['details_archive'] ?? '')?>">
+                </div>
             </div>
-            <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
         </div>
         <div class="d-flex align-items-center gap-2">
             <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
@@ -826,15 +847,16 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   let updateDetails;
+  let updateArchiveDetails;
   const details = document.getElementById('detailsInput');
   const detailsField = document.getElementById('detailsField');
-  if (details && detailsField && window.initTaskDetailsEditor) {
+  function readEditorOptions(wrapper) {
     let rules = [];
-    const capitalizeSentences = details.dataset.capitalizeSentences === 'true';
+    const capitalizeSentences = wrapper.dataset.capitalizeSentences === 'true';
     let dateFormats = [];
     let textExpanders = [];
     try {
-      rules = JSON.parse(details.dataset.lineRules || '[]');
+      rules = JSON.parse(wrapper.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
         rules = [];
       }
@@ -842,7 +864,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       rules = [];
     }
     try {
-      dateFormats = JSON.parse(details.dataset.dateFormats || '[]');
+      dateFormats = JSON.parse(wrapper.dataset.dateFormats || '[]');
       if (!Array.isArray(dateFormats)) {
         dateFormats = [];
       }
@@ -850,27 +872,40 @@ $user_hashtags_json = json_encode($user_hashtags);
       dateFormats = [];
     }
     try {
-      textExpanders = JSON.parse(details.dataset.textExpanders || '[]');
+      textExpanders = JSON.parse(wrapper.dataset.textExpanders || '[]');
       if (!Array.isArray(textExpanders)) {
         textExpanders = [];
       }
     } catch (err) {
       textExpanders = [];
     }
-    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, {
+    return {
       lineRules: rules,
-      textColor: details.dataset.textColor,
+      textColor: wrapper.dataset.textColor,
       capitalizeSentences: capitalizeSentences,
       dateFormats: dateFormats,
       textExpanders: textExpanders
-    });
+    };
+  }
+
+  if (details && detailsField && window.initTaskDetailsEditor) {
+    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, readEditorOptions(details));
     if (editor && typeof editor.updateDetails === 'function') {
       const baseUpdate = editor.updateDetails;
       updateDetails = function() {
         const val = baseUpdate();
-  renderHashtagBadges();
+        renderHashtagBadges();
         return val;
       };
+    }
+  }
+
+  const archive = document.getElementById('archiveInput');
+  const archiveField = document.getElementById('archiveField');
+  if (archive && archiveField && window.initTaskDetailsEditor) {
+    const archiveEditor = initTaskDetailsEditor(archive, archiveField, scheduleSave, readEditorOptions(archive));
+    if (archiveEditor && typeof archiveEditor.updateDetails === 'function') {
+      updateArchiveDetails = archiveEditor.updateDetails;
     }
   }
 
@@ -917,6 +952,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     const starredCheckbox = form.querySelector('input[name="starred"]');
     const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
+    const archiveField = form.querySelector('input[name="details_archive"]');
 
     recordPendingUpdate({
       description: titleInput ? titleInput.value.trim() : undefined,
@@ -925,6 +961,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       priority: prioritySelect ? Number(prioritySelect.value) : undefined,
       starred: starredCheckbox ? starredCheckbox.checked : undefined,
       details: detailsField ? detailsField.value : undefined,
+      details_archive: archiveField ? archiveField.value : undefined,
       hashtags: currentHashtags()
     });
   }
@@ -940,6 +977,8 @@ $user_hashtags_json = json_encode($user_hashtags);
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
     const detailsField = form.querySelector('input[name="details"]');
+    const archiveField = form.querySelector('input[name="details_archive"]');
+    const archiveWrapper = document.getElementById('archiveInput');
 
     if (titleInput && typeof pending.description === 'string') {
       titleInput.value = pending.description;
@@ -969,6 +1008,18 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
         if (typeof updateDetails === 'function') {
           updateDetails();
+        }
+      }
+    }
+    if (archiveField && typeof pending.details_archive === 'string') {
+      archiveField.value = pending.details_archive;
+      if (archiveWrapper) {
+        const archiveTextarea = archiveWrapper.querySelector('textarea');
+        if (archiveTextarea) {
+          archiveTextarea.value = pending.details_archive;
+        }
+        if (typeof updateArchiveDetails === 'function') {
+          updateArchiveDetails();
         }
       }
     }
@@ -1048,6 +1099,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   function sendSave(immediate = false) {
     if (updateDetails) updateDetails();
+    if (updateArchiveDetails) updateArchiveDetails();
     const data = new FormData(form);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);

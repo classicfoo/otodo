@@ -40,6 +40,7 @@ function get_db() {
             description TEXT NOT NULL,
             due_date TEXT,
             details TEXT,
+            details_archive TEXT,
             priority INTEGER NOT NULL DEFAULT 2,
             starred INTEGER NOT NULL DEFAULT 0,
             done INTEGER NOT NULL DEFAULT 0,
@@ -69,6 +70,9 @@ function get_db() {
         }
         if (!in_array('details', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN details TEXT');
+        }
+        if (!in_array('details_archive', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN details_archive TEXT');
         }
         if (!in_array('priority', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
