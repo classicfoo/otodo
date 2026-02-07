@@ -313,7 +313,7 @@
         const clean = trailingMatch ? trailingMatch[1] : raw;
         const start = match.index;
         const end = start + clean.length;
-        if (clean && position >= start && position <= end) {
+        if (clean && position >= start && position < end) {
           const href = clean.startsWith('http://') || clean.startsWith('https://')
             ? clean
             : ('https://' + clean);
@@ -543,7 +543,7 @@
       }
       const pos = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : 0;
       const value = textarea.value || '';
-      const hit = findUrlAtPosition(value, pos) || findUrlAtPosition(value, Math.max(0, pos - 1));
+      const hit = findUrlAtPosition(value, pos);
       if (!hit) {
         hideLinkActions();
         return;
