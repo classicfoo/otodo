@@ -32,7 +32,7 @@ try {
     $tzObj = new DateTimeZone('UTC');
 }
 $today = new DateTime('today', $tzObj);
-$overdue_stmt = $db->prepare('SELECT id, due_date, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
+$overdue_stmt = $db->prepare('SELECT id, due_date, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, starred DESC, id DESC');
 $overdue_stmt->execute([':uid' => $_SESSION['user_id']]);
 $overdue_rows = $overdue_stmt->fetchAll(PDO::FETCH_ASSOC);
 $overdue_ids = [];

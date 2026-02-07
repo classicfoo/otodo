@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, starred DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -830,10 +830,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function compareTaskRows(a, b) {
-    const aStarred = rowSortValueInt(a, 'starred');
-    const bStarred = rowSortValueInt(b, 'starred');
-    if (aStarred !== bStarred) return bStarred - aStarred;
-
     const aDue = rowSortValueDate(a);
     const bDue = rowSortValueDate(b);
     if (aDue === null && bDue !== null) return 1;
@@ -843,6 +839,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const aPriority = rowSortValueInt(a, 'priority');
     const bPriority = rowSortValueInt(b, 'priority');
     if (aPriority !== bPriority) return bPriority - aPriority;
+
+    const aStarred = rowSortValueInt(a, 'starred');
+    const bStarred = rowSortValueInt(b, 'starred');
+    if (aStarred !== bStarred) return bStarred - aStarred;
 
     const aId = rowSortValueInt(a, 'taskId');
     const bId = rowSortValueInt(b, 'taskId');
