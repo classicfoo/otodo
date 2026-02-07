@@ -8,16 +8,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, starred DESC, id DESC');
-
-$stmt->execute([':uid' => $_SESSION['user_id']]);
-$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
-$priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
-$task_ids = array_column($tasks, 'id');
-$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
-
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
     $tzObj = new DateTimeZone($tz);
@@ -28,6 +18,35 @@ $today = new DateTime('today', $tzObj);
 $tomorrow = (clone $today)->modify('+1 day');
 $todayFmt = $today->format('Y-m-d');
 $tomorrowFmt = $tomorrow->format('Y-m-d');
+
+$stmt = $db->prepare("
+    SELECT id, description, due_date, details, done, priority, starred
+    FROM tasks
+    WHERE user_id = :uid AND done = 0
+    ORDER BY
+        CASE
+            WHEN due_date IS NULL OR due_date = '' THEN 0
+            WHEN due_date < :today THEN 1
+            WHEN due_date = :today THEN 2
+            WHEN due_date = :tomorrow THEN 3
+            ELSE 4
+        END,
+        priority DESC,
+        starred DESC,
+        id DESC
+");
+
+$stmt->execute([
+    ':uid' => $_SESSION['user_id'],
+    ':today' => $todayFmt,
+    ':tomorrow' => $tomorrowFmt,
+]);
+$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
+$priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
+$task_ids = array_column($tasks, 'id');
+$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -824,17 +843,26 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
   }
 
+  function dueStatusBucket(row) {
+    const due = rowSortValueDate(row);
+    if (!due) return 0;
+    const today = toIsoDate(0);
+    const tomorrow = toIsoDate(1);
+    if (due < today) return 1;
+    if (due === today) return 2;
+    if (due === tomorrow) return 3;
+    return 4;
+  }
+
   function rowSortValueInt(row, key) {
     const value = Number(row.dataset[key] || 0);
     return Number.isFinite(value) ? value : 0;
   }
 
   function compareTaskRows(a, b) {
-    const aDue = rowSortValueDate(a);
-    const bDue = rowSortValueDate(b);
-    if (aDue === null && bDue !== null) return 1;
-    if (aDue !== null && bDue === null) return -1;
-    if (aDue !== null && bDue !== null && aDue !== bDue) return aDue < bDue ? -1 : 1;
+    const aBucket = dueStatusBucket(a);
+    const bBucket = dueStatusBucket(b);
+    if (aBucket !== bBucket) return aBucket - bBucket;
 
     const aPriority = rowSortValueInt(a, 'priority');
     const bPriority = rowSortValueInt(b, 'priority');
