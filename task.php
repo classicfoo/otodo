@@ -270,6 +270,15 @@ $user_hashtags_json = json_encode($user_hashtags);
             z-index: 1;
             cursor: text;
         }
+        .prism-editor__textarea::selection {
+            background: rgba(13, 110, 253, 0.28);
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+        }
+        .prism-editor__textarea::-moz-selection {
+            background: rgba(13, 110, 253, 0.28);
+            color: transparent;
+        }
         .prism-editor__preview {
             position: relative;
             margin: 0;
