@@ -270,6 +270,15 @@ $user_hashtags_json = json_encode($user_hashtags);
             z-index: 1;
             cursor: text;
         }
+        .prism-editor__textarea::selection {
+            background: rgba(13, 110, 253, 0.28);
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+        }
+        .prism-editor__textarea::-moz-selection {
+            background: rgba(13, 110, 253, 0.28);
+            color: transparent;
+        }
         .prism-editor__preview {
             position: relative;
             margin: 0;
@@ -340,6 +349,23 @@ $user_hashtags_json = json_encode($user_hashtags);
             text-decoration-thickness: 1px;
             text-underline-offset: 2px;
         }
+        .link-actions-popover {
+            position: fixed;
+            z-index: 2000;
+            min-width: 190px;
+            max-width: min(320px, calc(100vw - 1rem));
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.14);
+            padding: 0.4rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .link-actions-popover .btn {
+            text-align: left;
+        }
         .expander-suggestions {
             position: absolute;
             left: 0;
@@ -360,7 +386,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             background-color: #e7f1ff;
         }
     </style>
-    <title>Task Details</title>
+    <title>Otodo - Task Details</title>
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">

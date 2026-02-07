@@ -43,6 +43,25 @@ describe('task details editor behaviors', () => {
     expect(saveSpy).toHaveBeenCalled();
   });
 
+  test('tab key does not insert when keydown was already handled', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+    const saveSpy = jest.fn();
+    initTaskDetailsEditor(details, hidden, saveSpy);
+
+    textarea.value = 'task';
+    textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    event.preventDefault();
+    textarea.dispatchEvent(event);
+
+    expect(textarea.value).toBe('task');
+    expect(hidden.value).toBe('');
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
   test('tab indents all selected lines and preserves selection range', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

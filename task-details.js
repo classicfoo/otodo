@@ -301,10 +301,46 @@
       return nextValue;
     }
 
+    function findUrlAtPosition(value, position) {
+      if (typeof value !== 'string' || typeof position !== 'number') {
+        return null;
+      }
+      const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+      let match;
+      while ((match = urlPattern.exec(value))) {
+        const raw = match[0];
+        const trailingMatch = raw.match(/^(.*?)([)\].,!?;:]+)$/);
+        const clean = trailingMatch ? trailingMatch[1] : raw;
+        const start = match.index;
+        const end = start + clean.length;
+        if (clean && position >= start && position < end) {
+          const href = clean.startsWith('http://') || clean.startsWith('https://')
+            ? clean
+            : ('https://' + clean);
+          return { href: href, text: clean };
+        }
+      }
+      return null;
+    }
+
     const expanderSuggestions = document.createElement('div');
     expanderSuggestions.className = 'expander-suggestions d-none';
     details.appendChild(expanderSuggestions);
     let activeExpanderIndex = -1;
+    const linkActions = document.createElement('div');
+    linkActions.className = 'link-actions-popover d-none';
+    const openLinkBtn = document.createElement('button');
+    openLinkBtn.type = 'button';
+    openLinkBtn.className = 'btn btn-sm btn-primary';
+    openLinkBtn.textContent = 'Open link in new tab';
+    const cancelLinkBtn = document.createElement('button');
+    cancelLinkBtn.type = 'button';
+    cancelLinkBtn.className = 'btn btn-sm btn-outline-secondary';
+    cancelLinkBtn.textContent = 'Cancel';
+    linkActions.appendChild(openLinkBtn);
+    linkActions.appendChild(cancelLinkBtn);
+    document.body.appendChild(linkActions);
+    let activeLinkHref = '';
 
     function getCaretPositionRect(target) {
       if (!target || typeof target.selectionStart !== 'number') return null;
@@ -364,6 +400,28 @@
     function hideExpanderSuggestions() {
       expanderSuggestions.classList.add('d-none');
       activeExpanderIndex = -1;
+    }
+
+    function hideLinkActions() {
+      activeLinkHref = '';
+      openLinkBtn.dataset.href = '';
+      linkActions.classList.add('d-none');
+    }
+
+    function showLinkActions(href, clientX, clientY) {
+      if (!href) {
+        hideLinkActions();
+        return;
+      }
+      activeLinkHref = href;
+      openLinkBtn.dataset.href = href;
+      const maxLeft = Math.max(8, window.innerWidth - 220);
+      const maxTop = Math.max(8, window.innerHeight - 96);
+      const left = Math.min(Math.max(8, clientX + 8), maxLeft);
+      const top = Math.min(Math.max(8, clientY + 8), maxTop);
+      linkActions.style.left = left + 'px';
+      linkActions.style.top = top + 'px';
+      linkActions.classList.remove('d-none');
     }
 
     function setActiveExpander(idx) {
@@ -473,28 +531,36 @@
       syncDetails();
       queueSave();
       updateExpanderSuggestions();
+      hideLinkActions();
     });
     textarea.addEventListener('blur', hideExpanderSuggestions);
 
-    textarea.addEventListener('click', updateExpanderSuggestions);
+    textarea.addEventListener('click', function(event) {
+      updateExpanderSuggestions();
+      if (textarea.selectionStart !== textarea.selectionEnd) {
+        hideLinkActions();
+        return;
+      }
+      const pos = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : 0;
+      const value = textarea.value || '';
+      const hit = findUrlAtPosition(value, pos);
+      if (!hit) {
+        hideLinkActions();
+        return;
+      }
+      showLinkActions(hit.href, event.clientX, event.clientY);
+    });
+
     textarea.addEventListener('keyup', function(e) {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         updateExpanderSuggestions();
       }
     });
-    textarea.addEventListener('blur', hideExpanderSuggestions);
-
-    textarea.addEventListener('click', updateExpanderSuggestions);
-    textarea.addEventListener('keyup', function(e) {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        updateExpanderSuggestions();
-      }
-    });
-    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('scroll', function() {
       preview.parentElement.scrollTop = textarea.scrollTop;
       preview.parentElement.scrollLeft = textarea.scrollLeft;
+      hideLinkActions();
     });
 
     textarea.addEventListener('paste', function(e) {
@@ -506,6 +572,12 @@
     });
 
     textarea.addEventListener('keydown', function(e) {
+      if (e.defaultPrevented) {
+        return;
+      }
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        hideLinkActions();
+      }
       if (!expanderSuggestions.classList.contains('d-none')) {
         const tokenRange = findCurrentToken();
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -619,6 +691,28 @@
         queueSave();
       }
     });
+
+    openLinkBtn.addEventListener('click', function() {
+      const href = openLinkBtn.dataset.href || activeLinkHref;
+      if (!href) return;
+      const opened = window.open(href, '_blank', 'noopener,noreferrer');
+      if (opened && typeof opened.focus === 'function') {
+        opened.focus();
+      }
+      hideLinkActions();
+    });
+
+    cancelLinkBtn.addEventListener('click', hideLinkActions);
+
+    document.addEventListener('click', function(event) {
+      if (linkActions.classList.contains('d-none')) return;
+      if (linkActions.contains(event.target)) return;
+      if (event.target === textarea) return;
+      hideLinkActions();
+    });
+
+    window.addEventListener('resize', hideLinkActions);
+    window.addEventListener('scroll', hideLinkActions, { passive: true });
 
     syncDetails();
 
