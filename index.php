@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY starred DESC, due_date IS NULL, due_date, priority DESC, id DESC');
 
 $stmt->execute([':uid' => $_SESSION['user_id']]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -359,7 +359,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 }
             ?>
             <?php $hashtags = $task_hashtags[$task['id']] ?? []; $hashtag_text = implode(' ', array_map(function($tag){ return '#'.$tag; }, $hashtags)); ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-starred="<?=!empty($task['starred']) ? '1' : '0'?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
                 <div class="task-main">
                     <div class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                     <div class="task-hashtags">
@@ -819,6 +819,45 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
   }
 
+  function rowSortValueDate(row) {
+    const raw = (row.dataset.dueDate || '').slice(0, 10);
+    return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+  }
+
+  function rowSortValueInt(row, key) {
+    const value = Number(row.dataset[key] || 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function compareTaskRows(a, b) {
+    const aStarred = rowSortValueInt(a, 'starred');
+    const bStarred = rowSortValueInt(b, 'starred');
+    if (aStarred !== bStarred) return bStarred - aStarred;
+
+    const aDue = rowSortValueDate(a);
+    const bDue = rowSortValueDate(b);
+    if (aDue === null && bDue !== null) return 1;
+    if (aDue !== null && bDue === null) return -1;
+    if (aDue !== null && bDue !== null && aDue !== bDue) return aDue < bDue ? -1 : 1;
+
+    const aPriority = rowSortValueInt(a, 'priority');
+    const bPriority = rowSortValueInt(b, 'priority');
+    if (aPriority !== bPriority) return bPriority - aPriority;
+
+    const aId = rowSortValueInt(a, 'taskId');
+    const bId = rowSortValueInt(b, 'taskId');
+    return bId - aId;
+  }
+
+  function reorderTaskRows() {
+    const list = document.querySelector('.container .list-group');
+    if (!list) return;
+    const rows = Array.from(list.querySelectorAll('.task-row'));
+    if (!rows.length) return;
+    rows.sort(compareTaskRows);
+    rows.forEach(row => list.appendChild(row));
+  }
+
   function enqueuePendingStar(id, starred) {
     const entry = { id: Number(id), starred: starred ? 1 : 0, at: Date.now() };
     pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(id) && item.starred === entry.starred));
@@ -858,7 +897,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Update failed');
         const btn = findStarButton(entry.id);
-        if (btn) setStarAppearance(btn, json.starred);
+        if (btn) {
+          setStarAppearance(btn, json.starred);
+          const row = btn.closest('.task-row');
+          if (row) {
+            row.dataset.starred = json.starred ? '1' : '0';
+            reorderTaskRows();
+          }
+        }
         recordStarOverride(entry.id, json.starred);
         clearMatchingOverride(entry.id, json.starred);
         clearPendingUpTo(entry);
@@ -879,6 +925,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
 
       setStarAppearance(this, next);
+      const row = this.closest('.task-row');
+      if (row) {
+        row.dataset.starred = next ? '1' : '0';
+        reorderTaskRows();
+      }
       const queued = enqueuePendingStar(id, next);
 
       sendStarUpdate(queued).catch(() => {});
@@ -893,8 +944,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (pending && override) return pending.at >= override.at ? pending : override;
         return pending || override || null;
       })();
-      if (chosen) setStarAppearance(btn, chosen.starred);
+      if (chosen) {
+        setStarAppearance(btn, chosen.starred);
+        const row = btn.closest('.task-row');
+        if (row) row.dataset.starred = chosen.starred ? '1' : '0';
+      }
     });
+    reorderTaskRows();
   }
 
   function flushPendingStars() {
@@ -929,6 +985,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (payload.priority !== undefined && payload.priority !== null) {
       taskEl.dataset.priority = payload.priority;
     }
+    if (payload.starred !== undefined && payload.starred !== null) {
+      taskEl.dataset.starred = payload.starred ? '1' : '0';
+    }
     if (payload.due_date !== undefined && payload.due_date !== null) {
       taskEl.dataset.dueDate = payload.due_date;
     }
@@ -950,6 +1009,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         : Number(taskEl.dataset.priority || 0);
       renderPriorityText(priorityEl, priorityVal, payload.priority_label, payload.priority_class);
     }
+    reorderTaskRows();
   }
 
   const deletedTaskKey = 'deletedTaskIds';
@@ -1092,6 +1152,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
       }
       if (typeof update.starred === 'boolean') {
+        row.dataset.starred = update.starred ? '1' : '0';
         const starBtn = row.querySelector('.task-star');
         if (starBtn) {
           starBtn.classList.toggle('starred', update.starred);
@@ -1121,6 +1182,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
 
     if (changed) {
+      reorderTaskRows();
       writePendingUpdates(remaining);
       if (window.applyTaskSearchFilter) {
         const currentQuery = window.getTaskSearchValue ? window.getTaskSearchValue() : '';
@@ -1324,8 +1386,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
       tempItem.dataset.hashtags = '';
+      tempItem.dataset.starred = '0';
       tempItem.innerHTML = `<div class="task-main"><div class="task-title">${description}</div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
+      reorderTaskRows();
 
       if (window.applyTaskSearchFilter) {
         window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
@@ -1374,6 +1438,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         tempItem.dataset.taskId = json.id;
         tempItem.dataset.dueDate = json.due_date || '';
         tempItem.dataset.priority = json.priority ?? '0';
+        tempItem.dataset.starred = json.starred ? '1' : '0';
+        reorderTaskRows();
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
