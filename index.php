@@ -409,7 +409,6 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
     </div>
 </div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
 <script>
     (function() {

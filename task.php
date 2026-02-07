@@ -1185,6 +1185,5 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
-<script src="sw-register.js"></script>
 </body>
 </html>

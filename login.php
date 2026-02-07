@@ -67,6 +67,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <p>Don't have an account? <a href="register.php">Register</a></p>
 </div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="sw-register.js"></script>
 </body>
 </html>
