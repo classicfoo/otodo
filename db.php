@@ -4,12 +4,20 @@ session_start();
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $databaseFile = __DIR__ . '/.database.sqlite';
+        $dataDir = __DIR__ . '/data';
+        $databaseFile = $dataDir . '/.database.sqlite';
         $legacyDatabaseFile = __DIR__ . '/database.sqlite';
         $previousHiddenFile = __DIR__ . '/.database.sql';
+        $previousHiddenSqliteFile = __DIR__ . '/.database.sqlite';
+
+        if (!is_dir($dataDir)) {
+            mkdir($dataDir, 0775, true);
+        }
 
         if (!file_exists($databaseFile)) {
-            if (file_exists($previousHiddenFile)) {
+            if (file_exists($previousHiddenSqliteFile)) {
+                rename($previousHiddenSqliteFile, $databaseFile);
+            } elseif (file_exists($previousHiddenFile)) {
                 rename($previousHiddenFile, $databaseFile);
             } elseif (file_exists($legacyDatabaseFile)) {
                 rename($legacyDatabaseFile, $databaseFile);

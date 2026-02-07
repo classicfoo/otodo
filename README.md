@@ -23,7 +23,7 @@ A simple PHP online todo list application with user authentication and SQLite st
    ```
 3. Open <http://localhost:8000/login.php> in your browser to register and start using the app.
 
-The application will create a hidden `.database.sqlite` file in the project directory on first run.
+The application will create a hidden `data/.database.sqlite` file on first run.
 
 ## Automated Deployment with GitHub Actions
 
