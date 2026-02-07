@@ -3,7 +3,7 @@ name: Deploy to InfinityFree (FTP)
 on:
   push:
     branches:
-      - prod
+      - feature/task-priority-resort
   workflow_dispatch:
     
 jobs:
