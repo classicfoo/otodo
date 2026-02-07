@@ -33,10 +33,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/styles/vanilla.css">
-    <script>
-        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
-    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Completed Tasks</title>
     <style>
         .empty-state { color: #6c757d; }
@@ -49,30 +46,28 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
-        <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
-            <span class="navbar-toggler-icon"><span></span></span>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+            <span class="navbar-toggler-icon"></span>
         </button>
     </div>
     </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
-    <div class="offcanvas-header d-flex align-items-start justify-content-between">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
-        </div>
-        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
-            <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
-            <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
-            <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
-<div id="view-root" data-view-root data-view="completed">
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Completed Tasks</h5>
@@ -143,16 +138,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
     <?php endif; ?>
 </div>
-</div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="offline-cleanup.js"></script>
+<script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
-<script src="sync-queue-ui.js"></script>
-<script src="app-api.js"></script>
-<script src="app-router.js"></script>
-<script src="/assets/vanilla-ui.js"></script>
-<script>
-window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
-</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+

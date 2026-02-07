@@ -44,11 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/styles/vanilla.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Register</title>
-    <script>
-        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
-    </script>
 </head>
 <body class="bg-light">
 <div class="container py-5">
@@ -70,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <p>Already have an account? <a href="login.php">Login</a></p>
 </div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="user-context.js"></script>
 <script src="sw-register.js"></script>
 </body>
 </html>

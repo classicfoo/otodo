@@ -11,160 +11,81 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$raw_id = isset($_GET['id']) ? trim($_GET['id']) : '';
-if ($raw_id === '') {
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$stmt = $db->prepare('SELECT id, description, due_date, details, details_archive, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
+$stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
+$task = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$task) {
     header('Location: index.php');
     exit();
 }
-$is_numeric_id = ctype_digit($raw_id);
-$is_offline_task = !$is_numeric_id && $raw_id !== '';
-$id = $is_numeric_id ? (int)$raw_id : $raw_id;
 
-$task = null;
-if ($is_numeric_id) {
-    $stmt = $db->prepare('SELECT id, description, due_date, details, description_archive, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
-    $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
-    $task = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$task) {
-        header('Location: index.php');
-        exit();
-    }
-} else {
-    $task = [
-        'id' => $id ?: 0,
-        'description' => '',
-        'due_date' => null,
-        'details' => '',
-        'description_archive' => '',
-        'priority' => 0,
-        'done' => 0,
-        'starred' => 0,
-    ];
-}
-
-$task_hashtags = $is_numeric_id ? get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']) : [];
+$task_hashtags = get_task_hashtags($db, (int)$task['id'], (int)$_SESSION['user_id']);
 $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
 
+// Match the main task list ordering and overdue determination so the Next button
+// walks overdue tasks consistently.
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
     $tzObj = new DateTimeZone($tz);
 } catch (Exception $e) {
     $tzObj = new DateTimeZone('UTC');
 }
-$today = (new DateTime('today', $tzObj))->format('Y-m-d');
-$overdue_stmt = $db->prepare('SELECT id FROM tasks WHERE user_id = :uid AND done = 0 AND due_date IS NOT NULL AND due_date < :today ORDER BY starred DESC, due_date, priority DESC, id DESC');
-$overdue_stmt->execute([':uid' => $_SESSION['user_id'], ':today' => $today]);
-$overdue_ids = $overdue_stmt->fetchAll(PDO::FETCH_COLUMN);
-$next_task_id = null;
-$current_task_id = (int)$task['id'];
-$found_current = false;
-foreach ($overdue_ids as $overdue_id) {
-    $overdue_id = (int)$overdue_id;
-    if ($found_current) {
-        $next_task_id = $overdue_id;
-        break;
+$today = new DateTime('today', $tzObj);
+$overdue_stmt = $db->prepare('SELECT id, due_date, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
+$overdue_stmt->execute([':uid' => $_SESSION['user_id']]);
+$overdue_rows = $overdue_stmt->fetchAll(PDO::FETCH_ASSOC);
+$overdue_ids = [];
+foreach ($overdue_rows as $row) {
+    $rawDue = $row['due_date'] ?? '';
+    if ($rawDue === '' || $rawDue === null) {
+        continue;
     }
-    if ($overdue_id === $current_task_id) {
-        $found_current = true;
+    try {
+        $dueDate = new DateTime($rawDue, $tzObj);
+        if ($dueDate < $today) {
+            $overdue_ids[] = (int)$row['id'];
+        }
+    } catch (Exception $e) {
+        // Ignore unparsable dates for overdue navigation.
     }
 }
-
-if ($next_task_id === null && !$found_current && count($overdue_ids) > 0) {
-    $next_task_id = (int)$overdue_ids[0];
+$next_task_id = null;
+$current_task_id = (int)$task['id'];
+$overdue_count = count($overdue_ids);
+if ($overdue_count > 0) {
+    $current_index = array_search($current_task_id, $overdue_ids, true);
+    if ($current_index === false) {
+        $next_task_id = (int)$overdue_ids[0];
+    } else {
+        $next_task_id = (int)$overdue_ids[($current_index + 1) % $overdue_count];
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = ucwords(strtolower(trim($_POST['description'] ?? '')));
     $due_date = trim($_POST['due_date'] ?? '');
     $details = trim($_POST['details'] ?? '');
-    $description_archive = trim($_POST['description_archive'] ?? '');
+    $details_archive = trim($_POST['details_archive'] ?? '');
     $priority = (int)($_POST['priority'] ?? 0);
     if ($priority < 0 || $priority > 3) {
         $priority = 0;
     }
     $done = isset($_POST['done']) ? 1 : 0;
     $starred = isset($_POST['starred']) ? 1 : 0;
-
-    if ($is_offline_task) {
-        $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-        $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
-
-        $tz = $_SESSION['location'] ?? 'UTC';
-        try {
-            $tzObj = new DateTimeZone($tz);
-        } catch (Exception $e) {
-            $tzObj = new DateTimeZone('UTC');
-        }
-
-        $today = new DateTime('today', $tzObj);
-        $tomorrow = (clone $today)->modify('+1 day');
-        $todayFmt = $today->format('Y-m-d');
-        $tomorrowFmt = $tomorrow->format('Y-m-d');
-        $due_label = '';
-        $due_class = '';
-
-        if ($due_date !== '') {
-            try {
-                $dueDateObj = new DateTime($due_date, $tzObj);
-                $dueFmt = $dueDateObj->format('Y-m-d');
-                if ($dueFmt === $todayFmt) {
-                    $due_label = 'Today';
-                    $due_class = 'bg-success-subtle text-success';
-                } elseif ($dueFmt === $tomorrowFmt) {
-                    $due_label = 'Tomorrow';
-                    $due_class = 'bg-primary-subtle text-primary';
-                } elseif ($dueDateObj < $today) {
-                    $due_label = 'Overdue';
-                    $due_class = 'bg-danger-subtle text-danger';
-                } else {
-                    $due_label = 'Later';
-                    $due_class = 'bg-primary-subtle text-primary';
-                }
-            } catch (Exception $e) {
-                $due_label = '';
-                $due_class = '';
-            }
-        }
-
-        $hashtags = collect_hashtags_from_texts($description, $details, $description_archive);
-
-        header('Content-Type: application/json');
-        echo json_encode([
-            'status' => 'ok',
-            'queued' => true,
-            'offline' => true,
-            'id' => $id,
-            'requestId' => $id,
-            'description' => $description,
-            'due_date' => $due_date !== '' ? $due_date : null,
-            'due_label' => $due_label,
-            'due_class' => $due_class,
-            'priority' => $priority,
-            'priority_label' => $priority_labels[$priority] ?? 'None',
-            'priority_class' => $priority_classes[$priority] ?? 'text-secondary',
-            'starred' => $starred,
-            'done' => $done,
-            'details' => $details,
-            'description_archive' => $description_archive,
-            'hashtags' => $hashtags,
-            'user_hashtags' => $user_hashtags,
-        ]);
-        exit();
-    }
-
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, description_archive = :description_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
+    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, details_archive = :details_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
     $stmt->execute([
         ':description' => $description,
         ':due_date' => $due_date !== '' ? $due_date : null,
         ':details' => $details !== '' ? $details : null,
-        ':description_archive' => $description_archive !== '' ? $description_archive : null,
+        ':details_archive' => $details_archive !== '' ? $details_archive : null,
         ':priority' => $priority,
         ':done' => $done,
         ':starred' => $starred,
         ':id' => $id,
         ':uid' => $_SESSION['user_id'],
     ]);
-    $hashtags = collect_hashtags_from_texts($description, $details, $description_archive);
+    $hashtags = collect_hashtags_from_texts($description, $details);
     sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
     header('Content-Type: application/json');
     $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
@@ -214,10 +135,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/styles/vanilla.css">
-    <script>
-        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
-    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
             --inline-hashtag-color: <?=$hashtag_color_attr?>;
@@ -416,6 +334,12 @@ $user_hashtags_json = json_encode($user_hashtags);
             box-shadow: 0 0 0 1px var(--inline-date-border);
             padding: 0;
         }
+        .inline-link {
+            color: var(--bs-link-color, #0d6efd);
+            text-decoration: underline;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
         .expander-suggestions {
             position: absolute;
             left: 0;
@@ -435,30 +359,6 @@ $user_hashtags_json = json_encode($user_hashtags);
         .expander-suggestions .btn.active {
             background-color: #e7f1ff;
         }
-        .task-actions-toggle {
-            line-height: 1;
-        }
-        .task-actions-dropdown .dropdown-menu {
-            display: none;
-            min-width: 160px;
-        }
-        .task-actions-dropdown .dropdown-menu.show {
-            display: block;
-        }
-        .editor-tabs {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        .editor-tab-panel {
-            display: none;
-        }
-        .editor-tab-panel.active {
-            display: block;
-        }
-        .task-nav-buttons .btn {
-            min-width: 90px;
-        }
     </style>
     <title>Task Details</title>
 </head>
@@ -468,29 +368,21 @@ $user_hashtags_json = json_encode($user_hashtags);
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
         <div class="d-flex align-items-center gap-2">
-            <div class="dropdown task-actions-dropdown">
-                <button class="btn btn-outline-secondary btn-sm task-actions-toggle" type="button" id="taskActionsToggle" aria-expanded="false" aria-haspopup="true">
-                    <span class="visually-hidden">Task actions</span>
-                    <span aria-hidden="true">&hellip;</span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end" id="taskActionsMenu" aria-labelledby="taskActionsToggle">
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm" type="button" id="taskMenu" data-bs-toggle="dropdown" aria-expanded="false">&#x2026;</button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskMenu">
                     <li><a class="dropdown-item text-danger" id="taskDeleteLink" href="delete_task.php?id=<?=$task['id']?>">Delete</a></li>
                 </ul>
             </div>
-            <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
-                <span class="navbar-toggler-icon"><span></span></span>
-            </button>
         </div>
 
     </div>
 </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
-    <div class="offcanvas-header d-flex align-items-start justify-content-between">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
-        </div>
-        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
@@ -500,6 +392,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
 <div class="container">
@@ -541,38 +434,42 @@ $user_hashtags_json = json_encode($user_hashtags);
         </div>
         <div class="mb-3">
             <label class="form-label">Description</label>
-            <div class="editor-tabs mb-2" role="tablist" aria-label="Description tabs">
-                <button type="button" class="btn btn-sm btn-primary editor-tab-btn active" data-tab-target="detailsPanel" role="tab" aria-controls="detailsPanel" aria-selected="true">Description</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary editor-tab-btn" data-tab-target="archivePanel" role="tab" aria-controls="archivePanel" aria-selected="false">Archive</button>
-            </div>
-            <div id="detailsPanel" class="editor-tab-panel active" role="tabpanel">
-                <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
-                    <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
-                    <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+            <ul class="nav nav-tabs" id="detailsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="description-tab" data-bs-toggle="tab" data-bs-target="#description-tab-pane" type="button" role="tab" aria-controls="description-tab-pane" aria-selected="true">Description</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="archive-tab" data-bs-toggle="tab" data-bs-target="#archive-tab-pane" type="button" role="tab" aria-controls="archive-tab-pane" aria-selected="false">Archive</button>
+                </li>
+            </ul>
+            <div class="tab-content pt-3" id="detailsTabsContent">
+                <div class="tab-pane fade show active" id="description-tab-pane" role="tabpanel" aria-labelledby="description-tab">
+                    <div id="detailsInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                        <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details'] ?? '')?></textarea>
+                        <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                    </div>
+                    <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
                 </div>
-                <input type="hidden" name="details" id="detailsField" value="<?=htmlspecialchars($task['details'] ?? '')?>">
-            </div>
-            <div id="archivePanel" class="editor-tab-panel" role="tabpanel">
-                <div id="archiveInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
-                    <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['description_archive'] ?? '')?></textarea>
-                    <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                <div class="tab-pane fade" id="archive-tab-pane" role="tabpanel" aria-labelledby="archive-tab">
+                    <div id="archiveInput" class="prism-editor" data-language="html" data-line-rules="<?=$line_rules_json?>" data-text-color="<?=$details_color_attr?>" data-capitalize-sentences="<?=$capitalize_sentences_attr?>" data-date-formats="<?=$date_formats_attr?>" data-text-expanders="<?=$text_expanders_attr?>" style="--details-text-color: <?=$details_color_attr?>;">
+                        <textarea class="prism-editor__textarea" spellcheck="false"><?=htmlspecialchars($task['details_archive'] ?? '')?></textarea>
+                        <pre class="prism-editor__preview"><code class="language-markup"></code></pre>
+                    </div>
+                    <input type="hidden" name="details_archive" id="archiveField" value="<?=htmlspecialchars($task['details_archive'] ?? '')?>">
                 </div>
-                <input type="hidden" name="description_archive" id="descriptionArchiveField" value="<?=htmlspecialchars($task['description_archive'] ?? '')?>">
             </div>
         </div>
-        <div class="d-flex align-items-center gap-2 task-nav-buttons">
-            <a href="index.php" class="btn btn-secondary px-4" id="backToList">Back</a>
-            <button type="button" class="btn btn-primary px-4" id="nextTaskBtn">Next</button>
+        <div class="d-flex align-items-center gap-2">
+            <a href="index.php" class="btn btn-secondary" id="backToList">Back</a>
+            <button type="button" class="btn btn-primary" id="nextTaskBtn">Next</button>
         </div>
         <p class="text-muted mt-2 d-none" id="nextTaskMessage"></p>
     </form>
 </div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="offline-cleanup.js"></script>
 <script src="sync-status.js"></script>
-<script src="sync-queue-ui.js"></script>
 <script src="task-details.js"></script>
-<script src="/assets/vanilla-ui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
   const select = document.querySelector('select[name="priority"]');
@@ -602,290 +499,17 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   const backLink = document.getElementById('backToList');
   const deleteLink = document.getElementById('taskDeleteLink');
-  const taskActionsToggle = document.getElementById('taskActionsToggle');
-  const taskActionsMenu = document.getElementById('taskActionsMenu');
-  const currentTaskId = <?=json_encode($task['id'])?>;
-  const isOfflineTask = <?= $is_offline_task ? 'true' : 'false' ?>;
-  const userTimeZone = <?= json_encode($tz) ?> || 'UTC';
-
-  const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
-
-  function readOfflineTasks() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch (err) {
-      return [];
-    }
-  }
-
-  function persistOfflineTasks(tasks = []) {
-    try {
-      localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
-    } catch (err) {}
-  }
-
-  function removeOfflineTask(requestId) {
-    if (!requestId) return;
-    const existing = readOfflineTasks();
-    const filtered = existing.filter(item => item.requestId !== requestId);
-    if (filtered.length !== existing.length) {
-      persistOfflineTasks(filtered);
-    }
-  }
-
-  function saveOfflineTask(payload) {
-    if (!payload?.requestId) return;
-    const existing = readOfflineTasks();
-    const filtered = existing.filter(item => item.requestId !== payload.requestId);
-    filtered.unshift(payload);
-    persistOfflineTasks(filtered);
-  }
-
-  function updateOfflineTask(requestId, updates = {}) {
-    if (!requestId) return null;
-    const existing = readOfflineTasks();
-    let updatedEntry = null;
-    const next = existing.map(item => {
-      if (item.requestId !== requestId) return item;
-      updatedEntry = { ...item, ...updates, requestId: item.requestId };
-      return updatedEntry;
-    });
-    if (updatedEntry) {
-      persistOfflineTasks(next);
-      return updatedEntry;
-    }
-    return null;
-  }
-
-  function toIsoDate(offsetDays = 0) {
-    const parts = (typeof Intl !== 'undefined' && Intl.DateTimeFormat && userTimeZone)
-      ? new Intl.DateTimeFormat('en-CA', { timeZone: userTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-          .formatToParts(new Date())
-          .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {})
-      : null;
-
-    const baseDate = parts?.year
-      ? new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`)
-      : new Date();
-
-    baseDate.setHours(0, 0, 0, 0);
-    baseDate.setDate(baseDate.getDate() + offsetDays);
-    return baseDate.toISOString().slice(0, 10);
-  }
-
-  function formatDue(dateStr) {
-    if (!dateStr) return { label: '', className: '' };
-    const today = toIsoDate(0);
-    const tomorrow = toIsoDate(1);
-
-    if (dateStr === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
-    if (dateStr === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
-    if (dateStr < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
-    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
-  }
-
-  function normalizeQueuedPayload(payload = {}) {
-    if (!payload) return null;
-    const requestId = payload.requestId || payload.id || '';
-    const due = (payload.due_date || '').slice(0, 10);
-    const dueMeta = payload.due_label || payload.due_class ? { label: payload.due_label, className: payload.due_class } : formatDue(due);
-    return {
-      status: payload.status || 'ok',
-      queued: true,
-      offline: true,
-      id: payload.id || requestId,
-      requestId,
-      localId: payload.localId || payload.id || requestId,
-      description: payload.description || '',
-      due_date: due,
-      due_label: dueMeta.label,
-      due_class: dueMeta.className,
-      priority: Number(payload.priority || 0),
-      priority_label: payload.priority_label || 'None',
-      priority_class: payload.priority_class || 'text-secondary',
-      starred: payload.starred ? 1 : 0,
-      done: payload.done ? 1 : 0,
-      hashtags: Array.isArray(payload.hashtags) ? payload.hashtags : [],
-      details: payload.details || '',
-      description_archive: payload.description_archive || '',
-    };
-  }
-
-  function resolveOfflineIdentifiers(preferredRequestId, preferredLocalId) {
-    const candidateIds = Array.from(new Set([
-      preferredRequestId,
-      preferredLocalId,
-      currentTaskId,
-      queuedPayload?.id,
-      queuedPayload?.localId,
-      queuedPayload?.requestId,
-      offlineEntryForTask?.requestId,
-      offlineEntryForTask?.id,
-      offlineEntryForTask?.localId,
-    ].filter(Boolean)));
-
-    const offlineMatch = readOfflineTasks().find(task => {
-      const taskIds = [task.requestId, task.id, task.localId].filter(Boolean);
-      return taskIds.some(id => candidateIds.includes(id));
-    });
-
-    const requestId = offlineMatch?.requestId
-      || offlineEntryForTask?.requestId
-      || queuedPayload?.requestId
-      || preferredRequestId
-      || offlineEntryForTask?.id
-      || queuedPayload?.id
-      || currentTaskId;
-
-    const localId = preferredLocalId
-      || offlineMatch?.localId
-      || offlineMatch?.id
-      || offlineEntryForTask?.localId
-      || offlineEntryForTask?.id
-      || queuedPayload?.localId
-      || queuedPayload?.id
-      || currentTaskId;
-
-    return { requestId, localId, offlineMatch: offlineMatch || offlineEntryForTask };
-  }
-
-  function refreshOfflineCache(payload) {
-    if (discardInProgress) return;
-    const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
-    // Preserve the original requestId from payload if it exists, otherwise use resolved identifiers
-    const stableRequestId = payload?.requestId 
-      || offlineMatch?.requestId 
-      || offlineEntryForTask?.requestId 
-      || queuedPayload?.requestId 
-      || requestId;
-    const normalized = normalizeQueuedPayload({
-      ...payload,
-      requestId: stableRequestId,
-      localId: payload?.localId || offlineMatch?.localId || offlineEntryForTask?.localId || localId,
-      id: (payload?.id && payload.id !== stableRequestId) ? payload.id : (offlineMatch?.id || offlineEntryForTask?.id || localId),
-    });
-    if (!normalized || !normalized.requestId) return;
-    const updated = updateOfflineTask(normalized.requestId, normalized);
-    if (!updated) {
-      saveOfflineTask(normalized);
-    }
-    try {
-      sessionStorage.setItem('queuedTaskEditPayload', JSON.stringify(normalized));
-    } catch (err) {}
-  }
-
-  const doneCheckboxEl = document.querySelector('input[name="done"]');
-
-  if (doneCheckboxEl && isOfflineTask) {
-    doneCheckboxEl.disabled = true;
-    doneCheckboxEl.closest('label')?.classList.add('text-muted');
-  }
-
-  function closeTaskActionsMenu() {
-    if (taskActionsMenu) {
-      taskActionsMenu.classList.remove('show');
-    }
-    if (taskActionsToggle) {
-      taskActionsToggle.setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  if (taskActionsToggle && taskActionsMenu) {
-    taskActionsToggle.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const isOpen = taskActionsMenu.classList.contains('show');
-      if (isOpen) {
-        closeTaskActionsMenu();
-      } else {
-        taskActionsMenu.classList.add('show');
-        taskActionsToggle.setAttribute('aria-expanded', 'true');
-        taskActionsToggle.focus({ preventScroll: true });
-      }
-    });
-
-    document.addEventListener('click', (event) => {
-      if (!taskActionsMenu.contains(event.target) && event.target !== taskActionsToggle) {
-        closeTaskActionsMenu();
-      }
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' || event.key === 'Esc') {
-        closeTaskActionsMenu();
-      }
-    });
-  }
+  const currentTaskId = <?=$task['id']?>;
 
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
-  let pendingSaveBlocked = false;
-  let discardInProgress = false;
-  const offlineEntryForTask = (() => {
-    const entries = readOfflineTasks();
-    const currentIdStr = String(currentTaskId);
-    return entries.find(entry => {
-      const entryIds = [entry.requestId, entry.id, entry.localId]
-        .filter(Boolean)
-        .map(id => String(id));
-      return entryIds.includes(currentIdStr);
-    });
-  })();
-
-  const queuedPayload = (() => {
-    try {
-      const raw = sessionStorage.getItem('queuedTaskEditPayload');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed) {
-          const currentIdStr = String(currentTaskId);
-          const matchesId = parsed.id && String(parsed.id) === currentIdStr;
-          const matchesRequest = parsed.requestId && String(parsed.requestId) === currentIdStr;
-          const matchesLocalId = parsed.localId && String(parsed.localId) === currentIdStr;
-          if (matchesId || matchesRequest || matchesLocalId) {
-            return parsed;
-          }
-        }
-      }
-    } catch (err) {
-      // Fall through to localStorage fallback
-    }
-    
-    // Fall back to localStorage if sessionStorage is empty or doesn't match
-    if (isOfflineTask && offlineEntryForTask) {
-      return offlineEntryForTask;
-    }
-    return null;
-  })();
-
-  const stableRequestId = queuedPayload?.requestId
-    || offlineEntryForTask?.requestId
-    || offlineEntryForTask?.id
-    || currentTaskId;
-
-  const stableLocalId = offlineEntryForTask?.localId
-    || queuedPayload?.localId
-    || (queuedPayload?.requestId && queuedPayload.requestId === queuedPayload.id ? queuedPayload.id : currentTaskId);
-
-  function withStableOfflineIds(payload = {}) {
-    const requestId = payload.requestId || stableRequestId;
-    const localId = payload.localId || stableLocalId || requestId;
-    return {
-      ...payload,
-      requestId,
-      id: payload.id || localId || requestId,
-      localId,
-    };
-  }
 
   const hashtagBadges = document.getElementById('hashtagBadges');
   const hashtagSuggestions = document.getElementById('hashtagSuggestions');
   const titleInputEl = form.querySelector('input[name="description"]');
   const detailsFieldHidden = document.getElementById('detailsField');
   const detailsTextarea = document.querySelector('#detailsInput textarea');
-  const archiveFieldHidden = document.getElementById('descriptionArchiveField');
-  const archiveTextarea = document.querySelector('#archiveInput textarea');
   const taskHashtags = <?= $task_hashtags_json ?: '[]' ?>;
   const userHashtags = <?= $user_hashtags_json ?: '[]' ?>;
   let activeHashtagTarget = null;
@@ -911,9 +535,6 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   const allHashtags = new Set();
   replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || [])]);
-  if (queuedPayload && Array.isArray(queuedPayload.hashtags)) {
-    mergeHashtagsIntoAutocomplete(queuedPayload.hashtags);
-  }
 
   function extractHashtags(text) {
     if (!text) return [];
@@ -933,8 +554,6 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     const detailsValue = detailsFieldHidden ? detailsFieldHidden.value : (detailsTextarea ? detailsTextarea.value : '');
     extractHashtags(detailsValue).forEach(tag => tags.add(tag));
-    const archiveValue = archiveFieldHidden ? archiveFieldHidden.value : (archiveTextarea ? archiveTextarea.value : '');
-    extractHashtags(archiveValue).forEach(tag => tags.add(tag));
     return Array.from(tags);
   }
 
@@ -965,58 +584,6 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
   }
 
-  function hydrateQueuedTask(payload) {
-    if (!payload) return;
-    const titleInput = form.querySelector('input[name="description"]');
-    const dueInput = form.querySelector('input[name="due_date"]');
-    const prioritySelect = form.querySelector('select[name="priority"]');
-    const starredCheckbox = form.querySelector('input[name="starred"]');
-    const detailsField = document.getElementById('detailsField');
-    const detailsWrapper = document.getElementById('detailsInput');
-    const detailsTextarea = detailsWrapper ? detailsWrapper.querySelector('textarea') : null;
-    const archiveField = document.getElementById('descriptionArchiveField');
-    const archiveWrapper = document.getElementById('archiveInput');
-    const archiveTextarea = archiveWrapper ? archiveWrapper.querySelector('textarea') : null;
-
-    if (titleInput && typeof payload.description === 'string') {
-      titleInput.value = payload.description;
-    }
-    if (dueInput) {
-      dueInput.value = (payload.due_date || '').slice(0, 10);
-    }
-    if (prioritySelect && payload.priority !== undefined && payload.priority !== null) {
-      prioritySelect.value = String(payload.priority);
-      prioritySelect.dispatchEvent(new Event('change'));
-    }
-    if (starredCheckbox && payload.starred !== undefined && payload.starred !== null) {
-      starredCheckbox.checked = !!payload.starred;
-    }
-    if (detailsField && typeof payload.details === 'string') {
-      detailsField.value = payload.details;
-      if (detailsTextarea) {
-        detailsTextarea.value = payload.details;
-      }
-      if (detailsWrapper && typeof updateDetails === 'function') {
-        updateDetails();
-      }
-    }
-    if (archiveField && typeof payload.description_archive === 'string') {
-      archiveField.value = payload.description_archive;
-      if (archiveTextarea) {
-        archiveTextarea.value = payload.description_archive;
-      }
-      if (archiveWrapper && typeof updateArchiveDetails === 'function') {
-        updateArchiveDetails();
-      }
-    }
-
-    if (Array.isArray(payload.hashtags) && payload.hashtags.length) {
-      replaceHashtagAutocomplete([...(taskHashtags || []), ...(userHashtags || []), ...payload.hashtags]);
-    }
-
-    renderHashtagBadges();
-  }
-
   function removeHashtag(tag) {
     const normalized = normalizeHashtag(tag);
     if (!normalized) return;
@@ -1029,12 +596,6 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
     if (detailsFieldHidden && detailsTextarea) {
       detailsFieldHidden.value = detailsTextarea.value || '';
-    }
-    if (archiveTextarea) {
-      archiveTextarea.value = (archiveTextarea.value || '').replace(pattern, '');
-    }
-    if (archiveFieldHidden && archiveTextarea) {
-      archiveFieldHidden.value = archiveTextarea.value || '';
     }
     renderHashtagBadges();
     scheduleSave();
@@ -1128,7 +689,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function hasUnfinishedHashtag() {
-    const inputs = [titleInputEl, detailsTextarea, archiveTextarea];
+    const inputs = [titleInputEl, detailsTextarea];
     return inputs.some(el => {
       const active = detectActiveHashtag(el);
       return active && active.query !== undefined && active.query.length > 0;
@@ -1206,11 +767,6 @@ $user_hashtags_json = json_encode($user_hashtags);
     return true;
   }
 
-  // Hydrate with queuedPayload or fallback to offlineEntryForTask
-  const payloadToHydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
-  if (payloadToHydrate) {
-    hydrateQueuedTask(payloadToHydrate);
-  }
   renderHashtagBadges();
 
   function bindHashtagListeners(el) {
@@ -1248,14 +804,12 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   bindHashtagListeners(titleInputEl);
   bindHashtagListeners(detailsTextarea);
-  bindHashtagListeners(archiveTextarea);
 
   document.addEventListener('click', (event) => {
     if (!hashtagSuggestions || hashtagSuggestions.classList.contains('d-none')) return;
     if (hashtagSuggestions.contains(event.target)) return;
     if (titleInputEl && titleInputEl === event.target) return;
     if (detailsTextarea && detailsTextarea === event.target) return;
-    if (archiveTextarea && archiveTextarea === event.target) return;
     hideHashtagSuggestions();
   });
 
@@ -1272,14 +826,13 @@ $user_hashtags_json = json_encode($user_hashtags);
   });
 
   const nextTaskId = <?= $next_task_id !== null ? (int)$next_task_id : 'null' ?>;
-  const hasOverdueTasks = <?= count($overdue_ids) > 0 ? 'true' : 'false' ?>;
   const nextButton = document.getElementById('nextTaskBtn');
   const nextMessage = document.getElementById('nextTaskMessage');
   if (nextButton) {
     if (nextTaskId === null) {
       nextButton.disabled = true;
       if (nextMessage) {
-        nextMessage.textContent = hasOverdueTasks ? 'No more overdue tasks to review.' : 'You’re all caught up on overdue tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     }
@@ -1287,7 +840,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       if (nextTaskId !== null) {
         window.location.href = 'task.php?id=' + nextTaskId;
       } else if (nextMessage) {
-        nextMessage.textContent = hasOverdueTasks ? 'No more overdue tasks to review.' : 'You’re all caught up on overdue tasks.';
+        nextMessage.textContent = 'You’re all caught up on overdue tasks.';
         nextMessage.classList.remove('d-none');
       }
     });
@@ -1295,17 +848,15 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   let updateDetails;
   let updateArchiveDetails;
-
-  function readEditorSettings(editorEl) {
-    if (!editorEl) {
-      return { rules: [], dateFormats: [], textExpanders: [], capitalizeSentences: false, textColor: undefined };
-    }
+  const details = document.getElementById('detailsInput');
+  const detailsField = document.getElementById('detailsField');
+  function readEditorOptions(wrapper) {
     let rules = [];
+    const capitalizeSentences = wrapper.dataset.capitalizeSentences === 'true';
     let dateFormats = [];
     let textExpanders = [];
-    const capitalizeSentences = editorEl.dataset.capitalizeSentences === 'true';
     try {
-      rules = JSON.parse(editorEl.dataset.lineRules || '[]');
+      rules = JSON.parse(wrapper.dataset.lineRules || '[]');
       if (!Array.isArray(rules)) {
         rules = [];
       }
@@ -1313,7 +864,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       rules = [];
     }
     try {
-      dateFormats = JSON.parse(editorEl.dataset.dateFormats || '[]');
+      dateFormats = JSON.parse(wrapper.dataset.dateFormats || '[]');
       if (!Array.isArray(dateFormats)) {
         dateFormats = [];
       }
@@ -1321,7 +872,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       dateFormats = [];
     }
     try {
-      textExpanders = JSON.parse(editorEl.dataset.textExpanders || '[]');
+      textExpanders = JSON.parse(wrapper.dataset.textExpanders || '[]');
       if (!Array.isArray(textExpanders)) {
         textExpanders = [];
       }
@@ -1329,73 +880,34 @@ $user_hashtags_json = json_encode($user_hashtags);
       textExpanders = [];
     }
     return {
-      rules,
-      dateFormats,
-      textExpanders,
-      capitalizeSentences,
-      textColor: editorEl.dataset.textColor
+      lineRules: rules,
+      textColor: wrapper.dataset.textColor,
+      capitalizeSentences: capitalizeSentences,
+      dateFormats: dateFormats,
+      textExpanders: textExpanders
     };
   }
 
-  function initEditor(editorEl, fieldEl, setUpdate) {
-    if (!editorEl || !fieldEl || !window.initTaskDetailsEditor) {
-      return;
-    }
-    const settings = readEditorSettings(editorEl);
-    const editor = initTaskDetailsEditor(editorEl, fieldEl, scheduleSave, {
-      lineRules: settings.rules,
-      textColor: settings.textColor,
-      capitalizeSentences: settings.capitalizeSentences,
-      dateFormats: settings.dateFormats,
-      textExpanders: settings.textExpanders
-    });
+  if (details && detailsField && window.initTaskDetailsEditor) {
+    const editor = initTaskDetailsEditor(details, detailsField, scheduleSave, readEditorOptions(details));
     if (editor && typeof editor.updateDetails === 'function') {
       const baseUpdate = editor.updateDetails;
-      setUpdate(function() {
+      updateDetails = function() {
         const val = baseUpdate();
         renderHashtagBadges();
         return val;
-      });
+      };
     }
   }
 
-  const details = document.getElementById('detailsInput');
-  const detailsField = document.getElementById('detailsField');
-  initEditor(details, detailsField, (fn) => { updateDetails = fn; });
-
   const archive = document.getElementById('archiveInput');
-  const archiveField = document.getElementById('descriptionArchiveField');
-  initEditor(archive, archiveField, (fn) => { updateArchiveDetails = fn; });
-
-  // Re-hydrate queued task after editors are initialized to ensure fields are set
-  const payloadToRehydrate = queuedPayload || (isOfflineTask && offlineEntryForTask ? offlineEntryForTask : null);
-  if (payloadToRehydrate && isOfflineTask) {
-    hydrateQueuedTask(payloadToRehydrate);
+  const archiveField = document.getElementById('archiveField');
+  if (archive && archiveField && window.initTaskDetailsEditor) {
+    const archiveEditor = initTaskDetailsEditor(archive, archiveField, scheduleSave, readEditorOptions(archive));
+    if (archiveEditor && typeof archiveEditor.updateDetails === 'function') {
+      updateArchiveDetails = archiveEditor.updateDetails;
+    }
   }
-
-  const tabButtons = Array.from(document.querySelectorAll('.editor-tab-btn'));
-  const tabPanels = Array.from(document.querySelectorAll('.editor-tab-panel'));
-
-  function activateTab(targetId) {
-    tabButtons.forEach((button) => {
-      const isActive = button.dataset.tabTarget === targetId;
-      button.classList.toggle('btn-primary', isActive);
-      button.classList.toggle('btn-outline-secondary', !isActive);
-      button.classList.toggle('active', isActive);
-      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
-    tabPanels.forEach((panel) => {
-      panel.classList.toggle('active', panel.id === targetId);
-    });
-  }
-
-  tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const targetId = button.dataset.tabTarget;
-      if (!targetId) return;
-      activateTab(targetId);
-    });
-  });
 
   const taskReloadKey = 'taskListNeedsReload';
 
@@ -1440,8 +952,7 @@ $user_hashtags_json = json_encode($user_hashtags);
     const starredCheckbox = form.querySelector('input[name="starred"]');
     const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
-    const archiveWrapper = document.getElementById('archiveInput');
-    const archiveField = form.querySelector('input[name="description_archive"]');
+    const archiveField = form.querySelector('input[name="details_archive"]');
 
     recordPendingUpdate({
       description: titleInput ? titleInput.value.trim() : undefined,
@@ -1450,7 +961,7 @@ $user_hashtags_json = json_encode($user_hashtags);
       priority: prioritySelect ? Number(prioritySelect.value) : undefined,
       starred: starredCheckbox ? starredCheckbox.checked : undefined,
       details: detailsField ? detailsField.value : undefined,
-      description_archive: archiveField ? archiveField.value : undefined,
+      details_archive: archiveField ? archiveField.value : undefined,
       hashtags: currentHashtags()
     });
   }
@@ -1465,9 +976,8 @@ $user_hashtags_json = json_encode($user_hashtags);
     const doneCheckbox = form.querySelector('input[name="done"]');
     const prioritySelect = form.querySelector('select[name="priority"]');
     const starredCheckbox = form.querySelector('input[name="starred"]');
-    const detailsWrapper = document.getElementById('detailsInput');
     const detailsField = form.querySelector('input[name="details"]');
-    const archiveField = form.querySelector('input[name="description_archive"]');
+    const archiveField = form.querySelector('input[name="details_archive"]');
     const archiveWrapper = document.getElementById('archiveInput');
 
     if (titleInput && typeof pending.description === 'string') {
@@ -1501,12 +1011,12 @@ $user_hashtags_json = json_encode($user_hashtags);
         }
       }
     }
-    if (archiveField && typeof pending.description_archive === 'string') {
-      archiveField.value = pending.description_archive;
+    if (archiveField && typeof pending.details_archive === 'string') {
+      archiveField.value = pending.details_archive;
       if (archiveWrapper) {
         const archiveTextarea = archiveWrapper.querySelector('textarea');
         if (archiveTextarea) {
-          archiveTextarea.value = pending.description_archive;
+          archiveTextarea.value = pending.details_archive;
         }
         if (typeof updateArchiveDetails === 'function') {
           updateArchiveDetails();
@@ -1524,17 +1034,10 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
   }
 
-  function clearSaveTimer() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  }
-
   function scheduleSave() {
     captureFormState();
     markListReloadNeeded();
-    clearSaveTimer();
+    if (timer) clearTimeout(timer);
     if (hasUnfinishedHashtag()) {
       pendingSaveBlocked = true;
       return;
@@ -1561,45 +1064,6 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   if (deleteLink) {
-    if (isOfflineTask) {
-      deleteLink.classList.remove('disabled', 'text-muted');
-      deleteLink.removeAttribute('aria-disabled');
-      deleteLink.textContent = 'Discard';
-      deleteLink.href = '#';
-
-      deleteLink.addEventListener('click', (event) => {
-        event.preventDefault();
-        discardInProgress = true;
-        clearSaveTimer();
-
-        const discardIds = Array.from(new Set([
-          queuedPayload?.requestId,
-          queuedPayload?.id,
-          currentTaskId,
-        ].filter(Boolean)));
-
-        discardIds.forEach(removeOfflineTask);
-        const pendingUpdates = readPendingUpdates();
-        if (pendingUpdates[currentTaskId]) {
-          delete pendingUpdates[currentTaskId];
-          writePendingUpdates(pendingUpdates);
-        }
-        try { sessionStorage.removeItem('queuedTaskEditPayload'); } catch (err) {}
-
-        if (navigator?.serviceWorker?.controller) {
-          discardIds.forEach(id => {
-            navigator.serviceWorker.controller.postMessage({ type: 'discard-item', id });
-          });
-        }
-        if (window.updateSharedSyncStatus) {
-          window.updateSharedSyncStatus('synced', 'Offline task discarded');
-        }
-        instantNavigateToIndex();
-      });
-
-      return;
-    }
-
     deleteLink.addEventListener('click', function(e){
       e.preventDefault();
       const url = deleteLink.getAttribute('href');
@@ -1634,99 +1098,27 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function sendSave(immediate = false) {
-    if (discardInProgress) return;
     if (updateDetails) updateDetails();
     if (updateArchiveDetails) updateArchiveDetails();
     const data = new FormData(form);
-    const priorityLabels = {0: 'None', 1: 'Low', 2: 'Medium', 3: 'High'};
-    const priorityClasses = {0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger'};
-
-    const withResolvedIdentifiers = (payload = {}) => {
-      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers(payload?.requestId || payload?.id, payload?.localId || payload?.id);
-      return {
-        ...payload,
-        requestId: offlineMatch?.requestId || queuedPayload?.requestId || requestId,
-        localId: payload?.localId || offlineMatch?.localId || localId,
-        id: payload?.id || offlineMatch?.id || localId,
-      };
-    };
-
-    const buildLocalPayload = () => {
-      const { requestId, localId, offlineMatch } = resolveOfflineIdentifiers();
-      const stableRequestId = offlineMatch?.requestId || queuedPayload?.requestId || requestId;
-      const stableLocalId = offlineMatch?.localId || localId;
-      const stableId = offlineMatch?.id || stableLocalId;
-      const titleInput = form.querySelector('input[name="description"]');
-      const dueInput = form.querySelector('input[name="due_date"]');
-      const starredCheckbox = form.querySelector('input[name="starred"]');
-      const detailsField = form.querySelector('input[name="details"]');
-      const archiveField = form.querySelector('input[name="description_archive"]');
-      const prioritySelect = form.querySelector('select[name="priority"]');
-      const dueValue = dueInput ? (dueInput.value || '').slice(0, 10) : '';
-      const dueMeta = formatDue(dueValue);
-
-      const priorityVal = prioritySelect ? Number(prioritySelect.value) : 0;
-      const normalizedPriority = Number.isFinite(priorityVal) ? priorityVal : 0;
-
-      return withStableOfflineIds({
-        status: 'ok',
-        queued: true,
-        offline: true,
-        description: titleInput ? titleInput.value.trim() : '',
-        due_date: dueValue,
-        due_label: dueMeta.label,
-        due_class: dueMeta.className,
-        priority: normalizedPriority,
-        priority_label: priorityLabels[normalizedPriority] || 'None',
-        priority_class: priorityClasses[normalizedPriority] || 'text-secondary',
-        starred: starredCheckbox ? starredCheckbox.checked : false,
-        done: false,
-        hashtags: currentHashtags(),
-        details: detailsField ? detailsField.value : '',
-        description_archive: archiveField ? archiveField.value : '',
-      });
-    };
-
-    const canUseBeacon = immediate && navigator.sendBeacon && !isOfflineTask;
-    const forceLocal = isOfflineTask || !navigator.onLine;
-
-    if (forceLocal) {
-      refreshOfflineCache(buildLocalPayload());
-      if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saved offline');
-      return;
-    }
-
-    if (canUseBeacon) {
+    if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
     } else {
-      const request = fetch(window.location.href, {method: 'POST', body: data}).then(async (resp) => {
-        if (resp) {
+      const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
+        if (resp && resp.ok) {
           try {
-            const isJson = (resp.headers.get('content-type') || '').includes('application/json');
-            if (isJson) {
-              const payload = await resp.clone().json();
-                if (payload && typeof payload === 'object') {
-                  if (Array.isArray(payload.user_hashtags)) {
-                    replaceHashtagAutocomplete(payload.user_hashtags);
-                  } else if (Array.isArray(payload.hashtags)) {
-                    mergeHashtagsIntoAutocomplete(payload.hashtags);
-                  }
-                  if (payload.queued || payload.offline) {
-                    refreshOfflineCache(withStableOfflineIds(payload));
-                  }
-                }
+            resp.clone().json().then((payload) => {
+              if (!payload || typeof payload !== 'object') return;
+              if (Array.isArray(payload.user_hashtags)) {
+                replaceHashtagAutocomplete(payload.user_hashtags);
+              } else if (Array.isArray(payload.hashtags)) {
+                mergeHashtagsIntoAutocomplete(payload.hashtags);
               }
-            } catch (err) {
-            refreshOfflineCache(buildLocalPayload());
-          }
-        } else {
-          refreshOfflineCache(buildLocalPayload());
+            }).catch(() => {});
+          } catch (err) {}
         }
         return resp;
-      }).catch(() => {
-        refreshOfflineCache(buildLocalPayload());
-        return null;
       });
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
@@ -1737,17 +1129,14 @@ $user_hashtags_json = json_encode($user_hashtags);
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
-    window.addEventListener('beforeunload', function(){
-      if (discardInProgress) return;
-      // Flush any pending autosave before navigating away, even if the timer
-      // hasn’t fired yet (common when working offline).
-      if (timer || pendingSaveBlocked) {
-        clearSaveTimer();
-        sendSave(true);
-      }
-    });
+  window.addEventListener('beforeunload', function(){
+    if (timer) {
+      sendSave(true);
+    }
+  });
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
+<script src="sw-register.js"></script>
 </body>
 </html>

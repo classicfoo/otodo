@@ -23,17 +23,6 @@ $capitalize_sentences = isset($_SESSION['capitalize_sentences']) ? (bool)$_SESSI
 $date_formats = $_SESSION['date_formats'] ?? get_default_date_formats();
 $text_expanders = $_SESSION['text_expanders'] ?? [];
 $timezones = DateTimeZone::listIdentifiers();
-$accepts_json = stripos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false
-    || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
-
-function respond_json($payload, $code = 200) {
-    if ($code !== 200) {
-        http_response_code($code);
-    }
-    header('Content-Type: application/json');
-    echo json_encode($payload);
-    exit();
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? $username);
@@ -112,13 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Username already taken';
         }
     }
-
-    if ($accepts_json) {
-        respond_json([
-            'status' => $error ? 'error' : 'ok',
-            'message' => $error ?: $message,
-        ], $error ? 400 : 200);
-    }
 }
 ?>
 <!DOCTYPE html>
@@ -126,10 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/styles/vanilla.css">
-    <script>
-        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
-    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <title>Settings</title>
     <style>
         .navbar-toggler {
@@ -141,39 +120,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <nav class="navbar navbar-light bg-white mb-4">
     <div class="container d-flex justify-content-between align-items-center">
         <a href="index.php" class="navbar-brand">Otodo</a>
-        <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
-            <span class="navbar-toggler-icon"><span></span></span>
+        <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+            <span class="navbar-toggler-icon"></span>
         </button>
     </div>
 </nav>
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
-    <div class="offcanvas-header d-flex align-items-start justify-content-between">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
-        </div>
-        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
-            <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
-            <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
-            <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
-<div id="view-root" data-view-root data-view="settings">
 <div class="container">
     <h5 class="mb-3">Settings</h5>
-    <div id="settingsStatus" aria-live="polite">
     <?php if ($message): ?>
         <div class="alert alert-success"><?=$message?></div>
     <?php endif; ?>
     <?php if ($error): ?>
         <div class="alert alert-danger"><?=$error?></div>
     <?php endif; ?>
-    </div>
     <form method="post" class="mb-3" autocomplete="off">
         <div class="mb-3">
             <label class="form-label" for="username">Username</label>
@@ -248,16 +223,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="index.php" class="btn btn-secondary">Back</a>
     </form>
 </div>
-</div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="offline-cleanup.js"></script>
+<script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
-<script src="sync-queue-ui.js"></script>
-<script src="app-api.js"></script>
-<script src="app-router.js"></script>
-<script src="/assets/vanilla-ui.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
 const input = document.getElementById('location');
 const detectBtn = document.getElementById('detect-tz');
 function setBrowserTz() {
@@ -265,39 +235,9 @@ function setBrowserTz() {
         input.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
     } catch (e) {}
 }
-if (detectBtn) {
-    detectBtn.addEventListener('click', setBrowserTz);
-}
-if (input && !input.value) {
+detectBtn.addEventListener('click', setBrowserTz);
+if (!input.value) {
     setBrowserTz();
-}
-
-const settingsStatus = document.getElementById('settingsStatus');
-const settingsForm = document.querySelector('#view-root form');
-
-function renderSettingsStatus(type, message) {
-    if (!settingsStatus) return;
-    settingsStatus.innerHTML = '';
-    if (!message) return;
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type}`;
-    alert.textContent = message;
-    settingsStatus.appendChild(alert);
-}
-
-if (settingsForm) {
-    settingsForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const formData = new FormData(settingsForm);
-        renderSettingsStatus('secondary', 'Saving settings…');
-        const response = await ApiClient.saveSettings(formData);
-        if (response.ok && response.data && response.data.status === 'ok') {
-            renderSettingsStatus('success', response.data.message || 'Settings saved');
-        } else {
-            const offline = response.offline ? ' You appear to be offline.' : '';
-            renderSettingsStatus('danger', (response.error || 'Could not save settings') + offline);
-        }
-    });
 }
 
 const lineRulesContainer = document.getElementById('lineRulesContainer');

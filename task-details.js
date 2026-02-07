@@ -23,6 +23,38 @@
     return text.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
   }
 
+  function replaceOutsideTags(html, regex, replacer) {
+    return html.split(/(<[^>]+>)/g).map(function(part) {
+      if (part.startsWith('<')) {
+        return part;
+      }
+      return part.replace(regex, replacer);
+    }).join('');
+  }
+
+  function replaceOutsideLinks(html, regex, replacer) {
+    return html.split(/(<a\b[^>]*>.*?<\/a>)/gis).map(function(part) {
+      if (part.toLowerCase().startsWith('<a')) {
+        return part;
+      }
+      return replaceOutsideTags(part, regex, replacer);
+    }).join('');
+  }
+
+  function linkifyUrls(text = '') {
+    const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+    return text.replace(urlPattern, function(match) {
+      const trailingMatch = match.match(/^(.*?)([)\].,!?;:]+)$/);
+      const url = trailingMatch ? trailingMatch[1] : match;
+      const trailing = trailingMatch ? trailingMatch[2] : '';
+      if (!url) {
+        return match;
+      }
+      const href = url.startsWith('http://') || url.startsWith('https://') ? url : 'https://' + url;
+      return '<a class="inline-link" href="' + href + '" target="_blank" rel="noopener noreferrer">' + url + '</a>' + trailing;
+    });
+  }
+
   function buildDateRegexes(dateFormats = []) {
     if (!Array.isArray(dateFormats)) {
       return [];
@@ -94,13 +126,14 @@
 
   function highlightHtml(text = '', dateRegexes = []) {
     const escaped = escapeHtml(text);
-    const withHashtags = escaped.replace(/#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
+    const withLinks = linkifyUrls(escaped);
+    const withHashtags = replaceOutsideLinks(withLinks, /#([\p{L}\p{N}_-]+)(?=$|[^\p{L}\p{N}_-])/gu, '<span class="inline-hashtag">#$1</span>');
     const withDates = Array.isArray(dateRegexes) && dateRegexes.length
       ? dateRegexes.reduce(function(prev, regex) {
           if (!(regex instanceof RegExp)) {
             return prev;
           }
-          return prev.replace(regex, function(match) {
+          return replaceOutsideLinks(prev, regex, function(match) {
             const normalized = capitalizeMonths(match);
             return '<span class="inline-date">' + normalized + '</span>';
           });

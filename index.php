@@ -34,36 +34,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/styles/vanilla.css">
-    <script>
-        window.otodoUserId = <?=isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'null'?>;
-        window.otodoDefaults = {
-            timeZone: <?=json_encode($_SESSION['location'] ?? null)?>,
-            defaultPriority: <?=json_encode((int)($_SESSION['default_priority'] ?? 0))?>,
-        };
-    </script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        a {
-            color: #000;
-            text-decoration: none;
-        }
-        a:hover {
-            color: #000;
-            text-decoration: none;
-        }
         .navbar-toggler {
             border: 1px solid #e9ecef;
-        }
-        .visually-hidden {
-            border: 0;
-            clip: rect(0 0 0 0);
-            height: 1px;
-            margin: -1px;
-            overflow: hidden;
-            padding: 0;
-            position: absolute;
-            width: 1px;
-            white-space: nowrap;
         }
         .task-row {
             display: grid;
@@ -284,32 +258,31 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                 <input type="text" id="task-search-input" class="search-input" placeholder="Search tasks…" aria-label="Search tasks" tabindex="-1" inputmode="search">
                 <button class="search-clear" type="button" id="task-search-clear" aria-label="Clear search">&times;</button>
             </div>
-            <button class="navbar-toggler" type="button" data-offcanvas-target="#menu" aria-controls="menu" aria-expanded="false">
-                <span class="navbar-toggler-icon"><span></span></span>
+            <button class="navbar-toggler" type="button" data-bs-toggle="offcanvas" data-bs-target="#menu" aria-controls="menu">
+                <span class="navbar-toggler-icon"></span>
             </button>
         </div>
     </div>
 </nav>
 
-<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel" aria-hidden="true">
-    <div class="offcanvas-header d-flex align-items-start justify-content-between">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h5 class="offcanvas-title mb-0" id="menuLabel">Menu</h5>
-        </div>
-        <button type="button" class="btn-close" data-offcanvas-close aria-label="Close"></button>
+<div class="offcanvas offcanvas-start" tabindex="-1" id="menu" aria-labelledby="menuLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="menuLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body">
         <p class="mb-4">Hello, <?=htmlspecialchars($_SESSION['username'] ?? '')?></p>
         <div class="list-group">
-            <a href="index.php" class="list-group-item list-group-item-action" data-route>Active Tasks</a>
-            <a href="completed.php" class="list-group-item list-group-item-action" data-route>Completed Tasks</a>
-            <button type="button" class="list-group-item list-group-item-action text-start" id="openHashtagManager">Manage hashtags</button>
-            <a href="settings.php" class="list-group-item list-group-item-action" data-route>Settings</a>
+            <a href="index.php" class="list-group-item list-group-item-action">Active Tasks</a>
+            <a href="completed.php" class="list-group-item list-group-item-action">Completed Tasks</a>
+            <button type="button" class="list-group-item list-group-item-action text-start" data-bs-toggle="modal" data-bs-target="#hashtagManagerModal" id="openHashtagManager">Manage hashtags</button>
+            <a href="settings.php" class="list-group-item list-group-item-action">Settings</a>
             <a href="logout.php" class="list-group-item list-group-item-action">Logout</a>
         </div>
+        <div class="mt-3 small text-muted" id="sync-status" aria-live="polite">All changes saved</div>
     </div>
 </div>
-<div class="modal" id="hashtagManagerModal" tabindex="-1" aria-labelledby="hashtagManagerLabel" aria-hidden="true">
+<div class="modal fade" id="hashtagManagerModal" tabindex="-1" aria-labelledby="hashtagManagerLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -317,7 +290,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
                     <h5 class="modal-title" id="hashtagManagerLabel">Manage hashtags</h5>
                     <p class="mb-0 text-muted small">Curate your tags, keep naming consistent, and tidy up unused ones.</p>
                 </div>
-                <button type="button" class="btn-close" data-close-modal aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="hashtag-manager-hero d-flex flex-column flex-md-row align-items-md-center gap-3 mb-4 p-3 rounded-4">
@@ -345,7 +318,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         </div>
     </div>
 </div>
-<div id="view-root" data-view-root data-view="active">
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
         <div class="input-group">
@@ -417,16 +389,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         <?php endforeach; ?>
     </div>
 </div>
-</div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="offline-cleanup.js"></script>
+<script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
-<script src="sync-queue-ui.js"></script>
-<script src="app-api.js"></script>
-<script src="app-router.js"></script>
-<script src="/assets/vanilla-ui.js"></script>
 <script>
-    window.viewRouter = window.viewRouter || new ViewRouter('#view-root');
     (function() {
         const searchContainer = document.getElementById('task-search');
         const searchToggle = document.getElementById('task-search-toggle');
@@ -533,7 +499,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             }
         });
     })();
-  </script>
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   (function() {
     const modalEl = document.getElementById('hashtagManagerModal');
@@ -543,69 +510,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const inputEl = document.getElementById('newHashtagInput');
     const totalEl = document.getElementById('hashtagTotal');
     const inUseEl = document.getElementById('hashtagInUse');
-    const openTrigger = document.getElementById('openHashtagManager');
     if (!modalEl || !listEl) return;
-
-    const modalController = (() => {
-      const backdrop = document.createElement('div');
-      backdrop.className = 'modal-backdrop';
-      let open = false;
-
-      const close = () => {
-        if (!open) return;
-        open = false;
-        modalEl.classList.remove('show');
-        modalEl.setAttribute('aria-hidden', 'true');
-        if (backdrop.parentElement) backdrop.remove();
-        document.body.classList.remove('no-scroll');
-        modalEl.dispatchEvent(new CustomEvent('otodo.modal.hidden'));
-      };
-
-      const show = () => {
-        if (open) return;
-        open = true;
-        modalEl.classList.add('show');
-        modalEl.setAttribute('aria-hidden', 'false');
-        document.body.appendChild(backdrop);
-        document.body.classList.add('no-scroll');
-        modalEl.focus({ preventScroll: true });
-      };
-
-      backdrop.addEventListener('click', close);
-      modalEl.addEventListener('click', (event) => {
-        if (event.target === modalEl) close();
-      });
-      modalEl.querySelectorAll('[data-close-modal]').forEach(btn => btn.addEventListener('click', close));
-      window.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && open) close();
-      });
-
-      return { show, close, isOpen: () => open };
-    })();
-
-    if (window.viewRouter && window.viewRouter.setSpecialRouteHandler) {
-      window.viewRouter.setSpecialRouteHandler((path) => {
-        if (path.replace(/\/$/, '') === '/hashtags') {
-          modalController.show();
-          return true;
-        }
-        return false;
-      });
-    }
-
-    if (openTrigger) {
-      openTrigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        window.history.pushState({}, '', '/hashtags');
-        modalController.show();
-      });
-    }
-
-    modalEl.addEventListener('otodo.modal.hidden', () => {
-      if (window.location.pathname === '/hashtags') {
-        window.history.back();
-      }
-    });
 
     let hashtags = [];
     let isLoading = false;
@@ -708,11 +613,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
         const sendAction = async (params) => {
           setStatus('Saving changes…', 'secondary');
-          const response = await ApiClient.manageHashtag(params.action, params);
-          if (!response.ok || !response.data || response.data.status !== 'ok') {
-            throw new Error(response.error || 'Unable to save hashtag');
+          const resp = await fetch('manage_hashtags.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+            body: new URLSearchParams(params),
+          });
+          const json = await resp.json().catch(() => null);
+          if (!resp.ok || !json || json.status !== 'ok') {
+            throw new Error(json && json.message ? json.message : 'Unable to save hashtag');
           }
-          hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
+          hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
           renderList();
           setStatus('Saved', 'success');
         };
@@ -769,11 +679,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       isLoading = true;
       setStatus('Loading hashtags…', 'secondary');
       try {
-        const response = await ApiClient.fetchHashtags();
-        if (!response.ok || !response.data || response.data.status !== 'ok') {
-          throw new Error(response.error || 'Unable to load hashtags');
+        const resp = await fetch('manage_hashtags.php', {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
+        const fallback = resp.clone();
+        const json = await resp.json().catch(() => null);
+        if (!resp.ok || !json || json.status !== 'ok') {
+          const text = !json ? await fallback.text().catch(() => '') : '';
+          const detail = (json && json.message) || (text ? text.slice(0, 140) : '');
+          throw new Error(detail || 'Unable to load hashtags');
         }
-        hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
+        hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
         renderList();
         setStatus(hashtags.length ? '' : 'Start by adding your first hashtag.', hashtags.length ? 'muted' : 'info');
       } catch (err) {
@@ -795,11 +713,16 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         inputEl.disabled = true;
         try {
           await (async () => {
-            const response = await ApiClient.manageHashtag('create', { name: value });
-            if (!response.ok || !response.data || response.data.status !== 'ok') {
-              throw new Error(response.error || 'Unable to add hashtag');
+            const resp = await fetch('manage_hashtags.php', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'fetch' },
+              body: new URLSearchParams({ action: 'create', name: value }),
+            });
+            const json = await resp.json().catch(() => null);
+            if (!resp.ok || !json || json.status !== 'ok') {
+              throw new Error(json && json.message ? json.message : 'Unable to add hashtag');
             }
-            hashtags = Array.isArray(response.data.hashtags) ? response.data.hashtags : [];
+            hashtags = Array.isArray(json.hashtags) ? json.hashtags : [];
             renderList();
             setStatus('Added #' + value.replace(/^#+/, '').toLowerCase(), 'success');
             inputEl.value = '';
@@ -915,7 +838,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   }
 
   function sendStarUpdate(entry, options = {}) {
-    const request = ApiClient.toggleStar(entry.id, entry.starred);
+    const data = new FormData();
+    data.append('id', entry.id);
+    data.append('starred', entry.starred);
+
+    const request = fetch('toggle_star.php', {
+      method: 'POST',
+      body: data,
+      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+    });
 
     const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {
       syncing: entry.starred ? 'Starring task…' : 'Unstarring task…',
@@ -923,7 +854,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       error: 'Could not reach server'
     }) : request;
 
-    return tracked.then(resp => resp && resp.ok ? resp.data : Promise.reject())
+    return tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Update failed');
         const btn = findStarButton(entry.id);
@@ -986,174 +917,15 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   flushPendingStars();
   window.addEventListener('online', flushPendingStars);
 
-  if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
-    navigator.serviceWorker.addEventListener('message', event => {
-      const data = event.data || {};
-
-      if (data.type === 'queue-state') {
-        if (!data.draining && (!Array.isArray(data.queue) || !data.queue.length)) {
-          clearOfflineTasksNotInQueue(data.queue || []);
-          if (taskListGroup) restoreOfflineTasks(taskListGroup);
-        }
-        return;
-      }
-
-      if (data.type === 'queue-event' && (data.event === 'sent' || data.event === 'discarded')) {
-        const entry = data.entry || {};
-        const isAddTask = entry.url?.includes('add_task.php');
-        const isOnline = navigator.onLine !== false;
-
-        if (!isAddTask || !isOnline) {
-          return;
-        }
-
-        let taskRowUpdated = false;
-        if (data.event === 'sent' && data.responseData?.id) {
-          taskRowUpdated = applyServerIdForQueuedTask(entry.id, data.responseData);
-        }
-
-        if (entry.id) {
-          removeOfflineTask(entry.id);
-          if (!taskRowUpdated) {
-            const selector = `[data-request-id="${CSS.escape(entry.id)}"]`;
-            const queuedRow = document.querySelector(selector);
-            if (queuedRow) queuedRow.remove();
-          }
-        }
-      }
-    });
-  }
-
-  function buildTaskRowFromPayload(payload) {
-    const requestId = payload.requestId || payload.id || '';
-    const localId = payload.localId || payload.id || '';
-    const item = document.createElement('a');
-    item.className = 'list-group-item list-group-item-action task-row';
-    item.dataset.taskId = payload.queued ? '' : (payload.id || '');
-    item.dataset.requestId = requestId;
-    item.dataset.localId = localId;
-    item.dataset.dueDate = payload.due_date || '';
-    item.dataset.priority = payload.priority ?? '0';
-    item.dataset.hashtags = (payload.hashtags || []).map(tag => '#' + tag).join(' ');
-    item.dataset.queued = payload.queued ? 'true' : 'false';
-
-    item.innerHTML = `<div class="task-main"><div class="task-title"></div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge"></span><span class="small priority-text"></span><button type="button" class="task-star star-toggle" aria-pressed="false"><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
-
-    const title = item.querySelector('.task-title');
-    if (title) title.textContent = payload.description || '';
-    const badge = item.querySelector('.badge');
-    renderDueBadge(badge, payload.due_label, payload.due_class);
-    const priority = item.querySelector('.priority-text');
-    renderPriorityText(priority, payload.priority, payload.priority_label, payload.priority_class);
-    const hashtagContainer = item.querySelector('.task-hashtags');
-    renderHashtagRow(hashtagContainer, payload.hashtags || []);
-
-    const star = item.querySelector('.star-toggle');
-    setStarAppearance(star, payload.starred || 0);
-    if (!payload.queued && payload.id) {
-      star.dataset.id = payload.id;
-      star.disabled = false;
-      bindStarButton(star);
-      item.href = `task.php?id=${encodeURIComponent(payload.id)}`;
-    } else {
-      star.disabled = true;
-      item.setAttribute('aria-disabled', 'true');
-      item.classList.add('opacity-75');
-      item.removeAttribute('href');
-      item.dataset.offlineEditable = 'true';
-    }
-
-    return item;
-  }
-
-  function restoreOfflineTasks(listGroupEl) {
-    const stored = readOfflineTasks();
-    let changed = false;
-    const normalized = stored.map(entry => {
-      if (entry?.queued && looksLikeRequestId(entry.id)) {
-        const newId = entry.localId || nextOfflineTaskId();
-        changed = true;
-        return { ...entry, id: newId, localId: newId };
-      }
-      return entry;
-    });
-
-    if (changed) {
-      persistOfflineTasks(normalized);
-    }
-
-    normalized.forEach(payload => {
-      const requestId = payload?.requestId || payload?.id;
-      if (!requestId) return;
-
-      if (!payload.requestId) {
-        payload.requestId = requestId;
-      }
-
-      // Check multiple identifiers to find existing row
-      const localId = payload.localId || payload.id || '';
-      const taskId = payload.id || '';
-      
-      // Try to find existing row by checking all possible identifier combinations
-      // Check across the entire document, not just listGroupEl, in case rows are elsewhere
-      let existing = null;
-      const allPossibleIds = [requestId, localId, taskId].filter(Boolean);
-      
-      // First try within the list group
-      for (const checkId of allPossibleIds) {
-        if (!checkId) continue;
-        const checkIdStr = String(checkId);
-        existing = listGroupEl.querySelector(
-          `[data-request-id="${CSS.escape(checkIdStr)}"], ` +
-          `[data-local-id="${CSS.escape(checkIdStr)}"], ` +
-          `[data-task-id="${CSS.escape(checkIdStr)}"]`
-        );
-        if (existing) break;
-      }
-      
-      // If not found, try document-wide (in case row is in a different container)
-      if (!existing) {
-        for (const checkId of allPossibleIds) {
-          if (!checkId) continue;
-          const checkIdStr = String(checkId);
-          existing = document.querySelector(
-            `.task-row[data-request-id="${CSS.escape(checkIdStr)}"], ` +
-            `.task-row[data-local-id="${CSS.escape(checkIdStr)}"], ` +
-            `.task-row[data-task-id="${CSS.escape(checkIdStr)}"]`
-          );
-          if (existing) break;
-        }
-      }
-      
-      if (existing) {
-        // Update existing row attributes to ensure consistency with latest payload
-        existing.dataset.requestId = String(requestId);
-        existing.dataset.localId = String(localId);
-        existing.dataset.taskId = String(taskId);
-        // Update the row UI to reflect any changes in the payload
-        updateTaskRowUI(existing, payload);
-        return;
-      }
-      const row = buildTaskRowFromPayload(payload);
-      listGroupEl.prepend(row);
-    });
-  }
-
   function isoDateFromToday(offset) {
-    return toIsoDate(offset);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    now.setDate(now.getDate() + offset);
+    return now.toISOString().slice(0, 10);
   }
 
   function updateTaskRowUI(taskEl, payload) {
     if (!taskEl) return;
-    
-    // Update title if provided
-    if (typeof payload.description === 'string' && payload.description.trim()) {
-      const titleEl = taskEl.querySelector('.task-title');
-      if (titleEl) {
-        titleEl.textContent = payload.description;
-      }
-    }
-    
     if (payload.priority !== undefined && payload.priority !== null) {
       taskEl.dataset.priority = payload.priority;
     }
@@ -1233,234 +1005,32 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     } catch (err) {}
   }
 
-  const userTimeZone = (typeof window !== 'undefined' && window.otodoDefaults?.timeZone) || null;
-  const defaultPrioritySetting = (typeof window !== 'undefined' && window.otodoDefaults?.defaultPriority !== undefined)
-    ? Number(window.otodoDefaults.defaultPriority)
-    : 0;
-
-  function toIsoDate(offsetDays = 0, timeZone = userTimeZone) {
-    const parts = (typeof Intl !== 'undefined' && Intl.DateTimeFormat && timeZone)
-      ? new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-          .formatToParts(new Date())
-          .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {})
-      : null;
-
-    const baseDate = parts?.year
-      ? new Date(`${parts.year}-${parts.month}-${parts.day}T00:00:00`)
-      : new Date();
-
-    baseDate.setHours(0, 0, 0, 0);
-    baseDate.setDate(baseDate.getDate() + offsetDays);
-    return baseDate.toISOString().slice(0, 10);
+  function toIsoDate(offsetDays = 0) {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + offsetDays);
+    return d.toISOString().slice(0, 10);
   }
 
-  function formatDue(dateStr, timeZone = userTimeZone) {
+  function formatDue(dateStr) {
     if (!dateStr) return { label: '', className: '' };
-    const today = toIsoDate(0, timeZone);
-    const tomorrow = toIsoDate(1, timeZone);
-
-    if (dateStr === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
-    if (dateStr === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
-    if (dateStr < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
-    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
+    const today = toIsoDate(0);
+    const tomorrow = toIsoDate(1);
+    try {
+      const dt = new Date(`${dateStr}T00:00:00`);
+      const iso = dt.toISOString().slice(0, 10);
+      if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+      if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+      if (dt < new Date(today)) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+      return { label: 'Later', className: 'bg-primary-subtle text-primary' };
+    } catch (err) {
+      return { label: '', className: '' };
+    }
   }
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
   const priorityClasses = { 0: 'text-secondary', 1: 'text-success', 2: 'text-warning', 3: 'text-danger' };
   const priorityLabelsShort = { 0: 'Non', 1: 'Low', 2: 'Med', 3: 'Hig' };
-
-  const OFFLINE_TASKS_KEY = 'offlineQueuedTasks';
-  const OFFLINE_ID_COUNTER_KEY = 'offlineQueuedTaskCounter';
-
-  function looksLikeRequestId(value) {
-    return typeof value === 'string' && value.length > 16 && value.includes('-');
-  }
-
-  function clearOfflineTasksNotInQueue(queueEntries = []) {
-    if (navigator.onLine === false) {
-      return;
-    }
-    const allowedRequestIds = new Set((queueEntries || []).map(entry => entry?.id).filter(Boolean));
-    const existing = readOfflineTasks();
-    const removedIds = [];
-    const filtered = existing.filter(item => {
-      const keep = allowedRequestIds.has(item.requestId);
-      if (!keep && item?.requestId) removedIds.push(item.requestId);
-      return keep;
-    });
-
-    if (filtered.length !== existing.length) {
-      persistOfflineTasks(filtered);
-      removedIds.forEach(requestId => {
-        const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
-        const queuedRow = document.querySelector(selector);
-        if (queuedRow) queuedRow.remove();
-      });
-    }
-
-    return filtered;
-  }
-
-  function nextOfflineTaskId() {
-    try {
-      const current = Number(localStorage.getItem(OFFLINE_ID_COUNTER_KEY) || '0');
-      const next = Number.isFinite(current) ? current + 1 : 1;
-      localStorage.setItem(OFFLINE_ID_COUNTER_KEY, String(next));
-      return `queued-${next}`;
-    } catch (err) {
-      return `queued-${Date.now()}`;
-    }
-  }
-
-  function readOfflineTasks() {
-    try {
-      const stored = JSON.parse(localStorage.getItem(OFFLINE_TASKS_KEY) || '[]');
-      return Array.isArray(stored) ? stored : [];
-    } catch (err) {
-      console.warn('Could not read offline tasks', err);
-      return [];
-    }
-  }
-
-  function persistOfflineTasks(tasks = []) {
-    try {
-      localStorage.setItem(OFFLINE_TASKS_KEY, JSON.stringify(tasks));
-    } catch (err) {
-      console.warn('Could not persist offline tasks', err);
-    }
-  }
-
-  function saveOfflineTask(payload) {
-    if (!payload?.requestId) return;
-    const existing = readOfflineTasks();
-    const filtered = existing.filter(item => item.requestId !== payload.requestId);
-    filtered.unshift(payload);
-    persistOfflineTasks(filtered);
-    window.dispatchEvent(new CustomEvent('offline-task-queued', { detail: payload }));
-  }
-
-  function updateOfflineTask(requestId, updates = {}) {
-    if (!requestId) return null;
-    const existing = readOfflineTasks();
-    let updatedEntry = null;
-    const next = existing.map(item => {
-      if (item.requestId !== requestId) return item;
-      updatedEntry = { ...item, ...updates, requestId: item.requestId };
-      return updatedEntry;
-    });
-    if (updatedEntry) {
-      persistOfflineTasks(next);
-      return updatedEntry;
-    }
-    return null;
-  }
-
-  function removeOfflineTask(requestId) {
-    if (!requestId) return;
-    const existing = readOfflineTasks();
-    const filtered = existing.filter(item => item.requestId !== requestId);
-    if (filtered.length !== existing.length) {
-      persistOfflineTasks(filtered);
-    }
-    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
-  }
-
-  function applyServerIdForQueuedTask(requestId, serverPayload = {}) {
-    if (!requestId || !serverPayload || !serverPayload.id) return false;
-
-    removeOfflineTask(requestId);
-
-    const selector = `[data-request-id="${CSS.escape(requestId)}"]`;
-    const taskEl = document.querySelector(selector);
-    if (!taskEl) return false;
-
-    const normalizedPayload = {
-      ...serverPayload,
-      queued: false,
-      requestId,
-      id: serverPayload.id,
-      localId: serverPayload.id,
-    };
-
-    taskEl.dataset.requestId = '';
-    taskEl.dataset.taskId = String(serverPayload.id);
-    taskEl.dataset.localId = String(serverPayload.id);
-    taskEl.dataset.queued = 'false';
-    taskEl.classList.remove('opacity-75');
-    taskEl.removeAttribute('aria-disabled');
-    taskEl.href = `task.php?id=${encodeURIComponent(serverPayload.id)}`;
-
-    updateTaskRowUI(taskEl, normalizedPayload);
-
-    const star = taskEl.querySelector('.star-toggle');
-    if (star) {
-      star.dataset.id = String(serverPayload.id);
-      star.disabled = false;
-      bindStarButton(star);
-    }
-    window.dispatchEvent(new CustomEvent('offline-task-removed', { detail: { requestId } }));
-    return true;
-  }
-
-  function buildQueuedMetaUpdate(taskEl, action, value, extras = {}) {
-    const currentPriority = Number(taskEl?.dataset.priority || 0);
-    let priority = currentPriority;
-    let dueDate = (taskEl?.dataset.dueDate || '').slice(0, 10);
-
-    if (action === 'priority') {
-      priority = Number(value || 0);
-    } else if (action === 'due') {
-      if (value === 'today') {
-        dueDate = isoDateFromToday(0);
-      } else if (value === 'tomorrow') {
-        dueDate = isoDateFromToday(1);
-      } else if (value === 'next-week') {
-        dueDate = isoDateFromToday(7);
-      } else if (value === 'clear') {
-        dueDate = '';
-      }
-    }
-
-    const dueMeta = formatDue(dueDate);
-
-    return {
-      status: 'ok',
-      queued: true,
-      requestId: extras.requestId || taskEl?.dataset?.requestId || undefined,
-      due_date: dueDate,
-      due_label: dueMeta.label,
-      due_class: dueMeta.className,
-      priority,
-      priority_label: priorityLabels[priority] ?? priorityLabels[0],
-      priority_class: priorityClasses[priority] ?? priorityClasses[0],
-    };
-  }
-
-  function buildQueuedTaskPayload(description, data = {}) {
-    const todayIso = toIsoDate(0);
-    const dueMeta = formatDue(todayIso);
-    const priority = defaultPrioritySetting;
-    const requestId = data.requestId || data.id || `queued-${Date.now()}`;
-    const queuedId = data.localId || data.offlineId || data.tempId || (looksLikeRequestId(data.id) ? nextOfflineTaskId() : (data.id || nextOfflineTaskId()));
-
-    return {
-      status: 'ok',
-      id: queuedId,
-      description,
-      due_date: todayIso,
-      due_label: data.due_label || dueMeta.label,
-      due_class: data.due_class || dueMeta.className,
-      priority,
-      priority_label: data.priority_label || priorityLabels[priority],
-      priority_class: data.priority_class || priorityClasses[priority],
-      starred: data.starred ?? 0,
-      hashtags: data.hashtags || [],
-      queued: true,
-      requestId,
-      localId: queuedId,
-      timestamp: Date.now(),
-    };
-  }
 
   function renderDueBadge(badge, label, className = '') {
     if (!badge) return;
@@ -1513,9 +1083,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       }
       if (titleEl && typeof update.done === 'boolean') {
         titleEl.classList.toggle('text-decoration-line-through', update.done);
-      }
-      if (typeof update.requestId === 'string') {
-        row.dataset.requestId = update.requestId;
       }
       if (typeof update.priority === 'number') {
         row.dataset.priority = String(update.priority);
@@ -1620,62 +1187,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   let contextTask = null;
 
-  function findQueuedTaskPayload(requestId) {
-    if (!requestId) return null;
-    const cached = readOfflineTasks();
-    const requestIdStr = String(requestId);
-    // Search by requestId, id, or localId
-    return cached.find(item => 
-      String(item.requestId || '') === requestIdStr ||
-      String(item.id || '') === requestIdStr ||
-      String(item.localId || '') === requestIdStr
-    ) || null;
-  }
-
-  function openTaskEditorFromPayload(payload) {
-    if (!payload) return;
-    try {
-      sessionStorage.setItem('queuedTaskEditPayload', JSON.stringify(payload));
-    } catch (err) {}
-
-    const targetId = payload.id || payload.requestId || '';
-    const targetUrl = `task.php?id=${encodeURIComponent(targetId)}`;
-    const shouldBypassSpa = !payload || payload.queued || payload.offline || !navigator.onLine;
-    if (!shouldBypassSpa && window.viewRouter && typeof window.viewRouter.navigate === 'function') {
-      window.viewRouter.navigate(targetUrl, true);
-      return;
-    }
-
-    window.location.href = targetUrl;
-  }
-
-  document.addEventListener('click', function(e){
-    const taskEl = e.target.closest('.task-row');
-    if (!taskEl) return;
-    const taskId = taskEl.dataset.taskId;
-    const requestId = taskEl.dataset.requestId;
-    const localId = taskEl.dataset.localId;
-    if (requestId.startsWith('queued-')) {
-      const payload = findQueuedTaskPayload(requestId) || {
-      requestId,
-      id: localId || requestId,
-      description: taskEl.querySelector('.task-title')?.textContent?.trim() || '',
-      due_label: taskEl.querySelector('.due-date-badge')?.textContent?.trim() || '',
-      priority: Number(taskEl.dataset.priority || 0),
-      hashtags: (taskEl.dataset.hashtags || '')
-        .split(' ')
-        .map(tag => tag.replace(/^#+/, ''))
-        .filter(Boolean),
-      queued: true,
-    };
-
-    openTaskEditorFromPayload(payload);
-    }
-    else {
-      e.preventDefault();
-    }    
-  });
-
   function setActiveOption(group, value) {
     contextMenu.querySelectorAll(`.context-group[data-group="${group}"] button`).forEach(btn => {
       btn.classList.toggle('active', btn.dataset.value === value);
@@ -1740,49 +1251,33 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
       const taskEl = contextTask;
       const taskId = taskEl.dataset.taskId;
-      const requestId = taskEl.dataset.requestId;
       hideContextMenu();
 
-      if (!taskId && !requestId) {
+      if (!taskId) {
         return;
       }
+      const data = new FormData();
+      data.append('id', taskId);
+      if (btn.dataset.action === 'priority') {
+        data.append('priority', btn.dataset.value);
+      } else if (btn.dataset.action === 'due') {
+        data.append('due_shortcut', btn.dataset.value);
+      }
+
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Updating task…');
 
-      if (!taskId && requestId) {
-        const queuedUpdate = buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value, { requestId });
-        updateTaskRowUI(taskEl, queuedUpdate);
-        updateOfflineTask(requestId, queuedUpdate);
-        if (window.updateSyncStatus) window.updateSyncStatus('synced');
-        return;
-      }
-
-      const request = ApiClient.updateTaskMeta(taskId, {
-        priority: btn.dataset.action === 'priority' ? btn.dataset.value : undefined,
-        due_shortcut: btn.dataset.action === 'due' ? btn.dataset.value : undefined,
+      const request = fetch('update_task_meta.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
       });
 
       const tracked = window.trackBackgroundSync ? window.trackBackgroundSync(request, {syncing: 'Updating task…'}) : request;
 
-      tracked.then(resp => {
-        if (!resp || !resp.ok) return Promise.reject();
-        if (resp.queued) {
-          return buildQueuedMetaUpdate(taskEl, btn.dataset.action, btn.dataset.value, { requestId: resp.data?.requestId });
-        }
-        return resp.data;
-      }).then(json => {
+      tracked.then(resp => resp && resp.ok ? resp.json() : Promise.reject())
+        .then(json => {
           if (!json || json.status !== 'ok') throw new Error('Update failed');
           updateTaskRowUI(taskEl, json);
-          taskEl.dataset.requestId = json.requestId || taskEl.dataset.requestId || '';
-          recordPendingUpdate({
-            id: taskId,
-            requestId: json.requestId,
-            due_date: json.due_date,
-            priority: json.priority,
-            due_label: json.due_label,
-            due_class: json.due_class,
-            priority_label: json.priority_label,
-            priority_class: json.priority_class,
-          });
           if (window.updateSyncStatus) window.updateSyncStatus('synced');
         })
         .catch(() => {
@@ -1814,45 +1309,9 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
 
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
-  let taskListGroup = listGroup;
   const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
   let isFallbackSubmit = false;
   if (form && listGroup) {
-    const restoreTasks = () => restoreOfflineTasks(taskListGroup || listGroup);
-
-    if (navigator.onLine && navigator.serviceWorker?.controller) {
-      const awaitQueueState = new Promise(resolve => {
-        let finished = false;
-        const handler = (event) => {
-          const payload = event.data || {};
-          if (payload.type === 'queue-state') {
-            finished = true;
-            navigator.serviceWorker.removeEventListener('message', handler);
-            if (!Array.isArray(payload.queue) || !payload.queue.length) {
-              clearOfflineTasksNotInQueue(payload.queue || []);
-            }
-            resolve(payload.queue || []);
-          }
-        };
-
-        navigator.serviceWorker.addEventListener('message', handler);
-
-        try {
-          navigator.serviceWorker.controller.postMessage({ type: 'get-queue' });
-        } catch (err) {}
-
-        setTimeout(() => {
-          if (!finished) {
-            navigator.serviceWorker.removeEventListener('message', handler);
-            resolve(null);
-          }
-        }, 1500);
-      });
-
-      awaitQueueState.then(() => restoreTasks());
-    } else {
-      restoreTasks();
-    }
     form.addEventListener('submit', function(e){
       if (isFallbackSubmit) return;
       e.preventDefault();
@@ -1873,7 +1332,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       }
 
       data.set('description', description);
-      const request = ApiClient.createTask(description);
+      const request = fetch('add_task.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      });
 
       if (window.trackBackgroundSync) {
         window.trackBackgroundSync(request, {
@@ -1883,27 +1346,10 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         });
       }
 
-      request.then(resp => {
-        if (resp?.queued) {
-          return buildQueuedTaskPayload(description, resp.data || {});
-        }
-        if (resp?.ok) {
-          return resp.data;
-        }
-        if (resp?.offline) {
-          return buildQueuedTaskPayload(description, resp.data || {});
-        }
-        return Promise.reject(resp);
-      })
+      request.then(resp => resp.ok ? resp.json() : Promise.reject())
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Save failed');
-
-        tempItem.href = (!json.queued && json.id) ? `task.php?id=${encodeURIComponent(json.id)}` : '#';
-    tempItem.dataset.requestId = json.requestId || json.id || '';
-        if (json.queued) {
-          tempItem.setAttribute('aria-disabled', 'true');
-          saveOfflineTask(json);
-        }
+        tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
           const title = tempItem.querySelector('.task-main');
           if (title) title.textContent = json.description;
@@ -1920,32 +1366,21 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         renderHashtagRow(hashtagContainer, json.hashtags || []);
         const star = tempItem.querySelector('.star-toggle');
         if (star) {
+          star.dataset.id = json.id;
+          star.disabled = false;
           setStarAppearance(star, json.starred || 0);
-          if (!json.queued && json.id) {
-            star.dataset.id = json.id;
-            star.disabled = false;
-            bindStarButton(star);
-          } else {
-            star.disabled = true;
-          }
+          bindStarButton(star);
         }
-        tempItem.dataset.taskId = json.queued ? '' : (json.id || '');
+        tempItem.dataset.taskId = json.id;
         tempItem.dataset.dueDate = json.due_date || '';
         tempItem.dataset.priority = json.priority ?? '0';
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
-        const payload = buildQueuedTaskPayload(description, {});
-        saveOfflineTask(payload);
-        const row = buildTaskRowFromPayload(payload);
-        listGroup.replaceChild(tempItem, row);
-
-        if (navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'queue-task-add',
-            payload: { description: description }
-          });
-        }
+        tempItem.remove();
+        if (descriptionInput) descriptionInput.value = description;
+        isFallbackSubmit = true;
+        form.submit();
       })
       .finally(() => {
         if (!isFallbackSubmit) {
