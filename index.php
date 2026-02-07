@@ -765,6 +765,8 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
   })();
 </script>
 <script>
+  const optimisticDefaultPriority = <?= (int)($_SESSION['default_priority'] ?? 0) ?>;
+  const optimisticTodayIso = '<?= htmlspecialchars($todayFmt, ENT_QUOTES) ?>';
   const pendingStarKey = 'pendingStarToggles';
   const starOverrideKey = 'starStateOverrides';
   function loadPendingStars() {
@@ -1414,6 +1416,9 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
       tempItem.dataset.hashtags = '';
       tempItem.dataset.starred = '0';
+      tempItem.dataset.taskId = String(Date.now());
+      tempItem.dataset.dueDate = optimisticTodayIso;
+      tempItem.dataset.priority = String(optimisticDefaultPriority);
       tempItem.innerHTML = `<div class="task-main"><div class="task-title">${description}</div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
       reorderTaskRows();
@@ -1442,8 +1447,8 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-          const title = tempItem.querySelector('.task-main');
-          if (title) title.textContent = json.description;
+        const title = tempItem.querySelector('.task-title');
+        if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           renderDueBadge(badge, json.due_label, json.due_class);
