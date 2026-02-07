@@ -404,6 +404,7 @@
 
     function hideLinkActions() {
       activeLinkHref = '';
+      openLinkBtn.dataset.href = '';
       linkActions.classList.add('d-none');
     }
 
@@ -413,6 +414,7 @@
         return;
       }
       activeLinkHref = href;
+      openLinkBtn.dataset.href = href;
       const maxLeft = Math.max(8, window.innerWidth - 220);
       const maxTop = Math.max(8, window.innerHeight - 96);
       const left = Math.min(Math.max(8, clientX + 8), maxLeft);
@@ -531,10 +533,7 @@
       updateExpanderSuggestions();
       hideLinkActions();
     });
-    textarea.addEventListener('blur', function() {
-      hideExpanderSuggestions();
-      hideLinkActions();
-    });
+    textarea.addEventListener('blur', hideExpanderSuggestions);
 
     textarea.addEventListener('click', function(event) {
       updateExpanderSuggestions();
@@ -694,8 +693,9 @@
     });
 
     openLinkBtn.addEventListener('click', function() {
-      if (!activeLinkHref) return;
-      const opened = window.open(activeLinkHref, '_blank', 'noopener,noreferrer');
+      const href = openLinkBtn.dataset.href || activeLinkHref;
+      if (!href) return;
+      const opened = window.open(href, '_blank', 'noopener,noreferrer');
       if (opened && typeof opened.focus === 'function') {
         opened.focus();
       }
