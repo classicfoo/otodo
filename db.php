@@ -4,12 +4,20 @@ session_start();
 function get_db() {
     static $db = null;
     if ($db === null) {
-        $databaseFile = __DIR__ . '/.database.sqlite';
+        $dataDir = __DIR__ . '/data';
+        $databaseFile = $dataDir . '/.database.sqlite';
         $legacyDatabaseFile = __DIR__ . '/database.sqlite';
         $previousHiddenFile = __DIR__ . '/.database.sql';
+        $previousHiddenSqliteFile = __DIR__ . '/.database.sqlite';
+
+        if (!is_dir($dataDir)) {
+            mkdir($dataDir, 0775, true);
+        }
 
         if (!file_exists($databaseFile)) {
-            if (file_exists($previousHiddenFile)) {
+            if (file_exists($previousHiddenSqliteFile)) {
+                rename($previousHiddenSqliteFile, $databaseFile);
+            } elseif (file_exists($previousHiddenFile)) {
                 rename($previousHiddenFile, $databaseFile);
             } elseif (file_exists($legacyDatabaseFile)) {
                 rename($legacyDatabaseFile, $databaseFile);
@@ -40,7 +48,7 @@ function get_db() {
             description TEXT NOT NULL,
             due_date TEXT,
             details TEXT,
-            details_archive TEXT,
+            description_archive TEXT,
             priority INTEGER NOT NULL DEFAULT 2,
             starred INTEGER NOT NULL DEFAULT 0,
             done INTEGER NOT NULL DEFAULT 0,
@@ -71,8 +79,8 @@ function get_db() {
         if (!in_array('details', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN details TEXT');
         }
-        if (!in_array('details_archive', $columns, true)) {
-            $db->exec('ALTER TABLE tasks ADD COLUMN details_archive TEXT');
+        if (!in_array('description_archive', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN description_archive TEXT');
         }
         if (!in_array('priority', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 2');
