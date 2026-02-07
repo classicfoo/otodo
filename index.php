@@ -19,6 +19,48 @@ $tomorrow = (clone $today)->modify('+1 day');
 $todayFmt = $today->format('Y-m-d');
 $tomorrowFmt = $tomorrow->format('Y-m-d');
 
+function normalize_due_date_string($rawDue, DateTimeZone $tzObj): string {
+    if (!is_string($rawDue)) {
+        return '';
+    }
+    $rawDue = trim($rawDue);
+    if ($rawDue === '') {
+        return '';
+    }
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $rawDue, $parts)) {
+        $year = (int)$parts[1];
+        $month = (int)$parts[2];
+        $day = (int)$parts[3];
+        if (!checkdate($month, $day, $year)) {
+            return '';
+        }
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+    try {
+        $dueDate = new DateTime($rawDue, $tzObj);
+        return $dueDate->format('Y-m-d');
+    } catch (Exception $e) {
+        return '';
+    }
+}
+
+function due_bucket_from_raw($rawDue, string $todayFmt, string $tomorrowFmt, DateTimeZone $tzObj): int {
+    $due = normalize_due_date_string((string)$rawDue, $tzObj);
+    if ($due === '') {
+        return 0;
+    }
+    if ($due < $todayFmt) {
+        return 1;
+    }
+    if ($due === $todayFmt) {
+        return 2;
+    }
+    if ($due === $tomorrowFmt) {
+        return 3;
+    }
+    return 4;
+}
+
 $stmt = $db->prepare("
     SELECT id, description, due_date, details, done, priority, starred
     FROM tasks
@@ -42,6 +84,27 @@ $stmt->execute([
     ':tomorrow' => $tomorrowFmt,
 ]);
 $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+usort($tasks, function(array $a, array $b) use ($todayFmt, $tomorrowFmt, $tzObj): int {
+    $aBucket = due_bucket_from_raw($a['due_date'] ?? '', $todayFmt, $tomorrowFmt, $tzObj);
+    $bBucket = due_bucket_from_raw($b['due_date'] ?? '', $todayFmt, $tomorrowFmt, $tzObj);
+    if ($aBucket !== $bBucket) {
+        return $aBucket <=> $bBucket;
+    }
+
+    $aPriority = (int)($a['priority'] ?? 0);
+    $bPriority = (int)($b['priority'] ?? 0);
+    if ($aPriority !== $bPriority) {
+        return $bPriority <=> $aPriority;
+    }
+
+    $aStarred = (int)($a['starred'] ?? 0);
+    $bStarred = (int)($b['starred'] ?? 0);
+    if ($aStarred !== $bStarred) {
+        return $bStarred <=> $aStarred;
+    }
+
+    return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0);
+});
 $priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
 $priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
 $priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
@@ -349,32 +412,22 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
             <?php
                 $p = (int)($task['priority'] ?? 0);
                 if ($p < 0 || $p > 3) { $p = 0; }
-                $rawDue = $task['due_date'] ?? '';
-                $due = $rawDue;
-                $dueClass = 'bg-secondary-subtle text-secondary';
-                if ($due !== '') {
-                    try {
-                        $dueDate = new DateTime($due, $tzObj);
-                        if ($dueDate < $today) {
-                            $due = 'Overdue';
-                            $dueClass = 'bg-danger-subtle text-danger';
-                        } else {
-                            $dueFmt = $dueDate->format('Y-m-d');
-                            if ($dueFmt === $todayFmt) {
-                                $due = 'Today';
-                                $dueClass = 'bg-success-subtle text-success';
-                            } elseif ($dueFmt === $tomorrowFmt) {
-                                $due = 'Tomorrow';
-                                $dueClass = 'bg-primary-subtle text-primary';
-                            } else {
-                                $due = 'Later';
-                                $dueClass = 'bg-primary-subtle text-primary';
-
-                            }
-                        }
-                    } catch (Exception $e) {
-                        // leave $due unchanged if parsing fails
-                    }
+                $rawDue = normalize_due_date_string((string)($task['due_date'] ?? ''), $tzObj);
+                $dueBucket = due_bucket_from_raw($rawDue, $todayFmt, $tomorrowFmt, $tzObj);
+                $due = '';
+                $dueClass = '';
+                if ($dueBucket === 1) {
+                    $due = 'Overdue';
+                    $dueClass = 'bg-danger-subtle text-danger';
+                } elseif ($dueBucket === 2) {
+                    $due = 'Today';
+                    $dueClass = 'bg-success-subtle text-success';
+                } elseif ($dueBucket === 3) {
+                    $due = 'Tomorrow';
+                    $dueClass = 'bg-primary-subtle text-primary';
+                } elseif ($dueBucket === 4) {
+                    $due = 'Later';
+                    $dueClass = 'bg-primary-subtle text-primary';
                 }
             ?>
             <?php $hashtags = $task_hashtags[$task['id']] ?? []; $hashtag_text = implode(' ', array_map(function($tag){ return '#'.$tag; }, $hashtags)); ?>
@@ -840,8 +893,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
   }
 
   function rowSortValueDate(row) {
-    const raw = (row.dataset.dueDate || '').slice(0, 10);
-    return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+    return normalizeDueIso(row.dataset.dueDate || '');
   }
 
   function dueStatusBucket(row) {
@@ -1006,7 +1058,10 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     now.setDate(now.getDate() + offset);
-    return now.toISOString().slice(0, 10);
+    const year = String(now.getFullYear()).padStart(4, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   function updateTaskRowUI(taskEl, payload) {
@@ -1098,23 +1153,35 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().slice(0, 10);
+    const year = String(d.getFullYear()).padStart(4, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function normalizeDueIso(rawDate) {
+    const raw = String(rawDate || '').trim();
+    if (!raw) return null;
+    const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    const dt = new Date(year, month - 1, day);
+    if (dt.getFullYear() !== year || dt.getMonth() !== (month - 1) || dt.getDate() !== day) return null;
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
   function formatDue(dateStr) {
-    if (!dateStr) return { label: '', className: '' };
+    const iso = normalizeDueIso(dateStr);
+    if (!iso) return { label: '', className: '' };
     const today = toIsoDate(0);
     const tomorrow = toIsoDate(1);
-    try {
-      const dt = new Date(`${dateStr}T00:00:00`);
-      const iso = dt.toISOString().slice(0, 10);
-      if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
-      if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
-      if (dt < new Date(today)) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
-      return { label: 'Later', className: 'bg-primary-subtle text-primary' };
-    } catch (err) {
-      return { label: '', className: '' };
-    }
+    if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+    if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+    if (iso < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
   }
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
@@ -1288,7 +1355,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
     const priorityVal = taskEl.dataset.priority || '0';
     setActiveOption('priority', priorityVal);
 
-    const dueDate = (taskEl.dataset.dueDate || '').slice(0, 10);
+    const dueDate = normalizeDueIso(taskEl.dataset.dueDate || '') || '';
     let dueChoice = '';
     if (!dueDate) {
       dueChoice = 'clear';
