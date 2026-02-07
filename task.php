@@ -278,7 +278,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             overflow-wrap: break-word;
             overflow: hidden;
             padding: 0.75rem;
-            z-index: 0;
+            z-index: 2;
         }
         .prism-editor__preview code {
             display: block;
@@ -339,6 +339,8 @@ $user_hashtags_json = json_encode($user_hashtags);
             text-decoration: underline;
             text-decoration-thickness: 1px;
             text-underline-offset: 2px;
+            pointer-events: auto;
+            cursor: pointer;
         }
         .expander-suggestions {
             position: absolute;
