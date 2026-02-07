@@ -360,7 +360,7 @@ $user_hashtags_json = json_encode($user_hashtags);
             background-color: #e7f1ff;
         }
     </style>
-    <title>Task Details</title>
+    <title>Otodo - Task Details</title>
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-light bg-white mb-4">
