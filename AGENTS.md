@@ -5,8 +5,4 @@
 - Keep commits focused and use clear, descriptive commit messages.
 - Whenever creating a new branch, update the branch name in `.github/workflows/deploy.yml` so deploys track that branch.
 
-## Session notice
 
-- At the start of every session, print the following message verbatim:
-
-"Network access may be disabled. Please enable permissions if you would like the agent to have internet access."
