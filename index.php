@@ -8,16 +8,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $db = get_db();
-$stmt = $db->prepare('SELECT id, description, due_date, details, done, priority, starred FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
-
-$stmt->execute([':uid' => $_SESSION['user_id']]);
-$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
-$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
-$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
-$priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
-$task_ids = array_column($tasks, 'id');
-$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
-
 $tz = $_SESSION['location'] ?? 'UTC';
 try {
     $tzObj = new DateTimeZone($tz);
@@ -28,6 +18,98 @@ $today = new DateTime('today', $tzObj);
 $tomorrow = (clone $today)->modify('+1 day');
 $todayFmt = $today->format('Y-m-d');
 $tomorrowFmt = $tomorrow->format('Y-m-d');
+
+function normalize_due_date_string($rawDue, DateTimeZone $tzObj): string {
+    if (!is_string($rawDue)) {
+        return '';
+    }
+    $rawDue = trim($rawDue);
+    if ($rawDue === '') {
+        return '';
+    }
+    if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $rawDue, $parts)) {
+        $year = (int)$parts[1];
+        $month = (int)$parts[2];
+        $day = (int)$parts[3];
+        if (!checkdate($month, $day, $year)) {
+            return '';
+        }
+        return sprintf('%04d-%02d-%02d', $year, $month, $day);
+    }
+    try {
+        $dueDate = new DateTime($rawDue, $tzObj);
+        return $dueDate->format('Y-m-d');
+    } catch (Exception $e) {
+        return '';
+    }
+}
+
+function due_bucket_from_raw($rawDue, string $todayFmt, string $tomorrowFmt, DateTimeZone $tzObj): int {
+    $due = normalize_due_date_string((string)$rawDue, $tzObj);
+    if ($due === '') {
+        return 0;
+    }
+    if ($due < $todayFmt) {
+        return 1;
+    }
+    if ($due === $todayFmt) {
+        return 2;
+    }
+    if ($due === $tomorrowFmt) {
+        return 3;
+    }
+    return 4;
+}
+
+$stmt = $db->prepare("
+    SELECT id, description, due_date, details, done, priority, starred
+    FROM tasks
+    WHERE user_id = :uid AND done = 0
+    ORDER BY
+        CASE
+            WHEN due_date IS NULL OR due_date = '' THEN 0
+            WHEN due_date < :today THEN 1
+            WHEN due_date = :today THEN 2
+            WHEN due_date = :tomorrow THEN 3
+            ELSE 4
+        END,
+        priority DESC,
+        starred DESC,
+        id DESC
+");
+
+$stmt->execute([
+    ':uid' => $_SESSION['user_id'],
+    ':today' => $todayFmt,
+    ':tomorrow' => $tomorrowFmt,
+]);
+$tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+usort($tasks, function(array $a, array $b) use ($todayFmt, $tomorrowFmt, $tzObj): int {
+    $aBucket = due_bucket_from_raw($a['due_date'] ?? '', $todayFmt, $tomorrowFmt, $tzObj);
+    $bBucket = due_bucket_from_raw($b['due_date'] ?? '', $todayFmt, $tomorrowFmt, $tzObj);
+    if ($aBucket !== $bBucket) {
+        return $aBucket <=> $bBucket;
+    }
+
+    $aPriority = (int)($a['priority'] ?? 0);
+    $bPriority = (int)($b['priority'] ?? 0);
+    if ($aPriority !== $bPriority) {
+        return $bPriority <=> $aPriority;
+    }
+
+    $aStarred = (int)($a['starred'] ?? 0);
+    $bStarred = (int)($b['starred'] ?? 0);
+    if ($aStarred !== $bStarred) {
+        return $bStarred <=> $aStarred;
+    }
+
+    return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0);
+});
+$priority_labels = [0 => 'None', 1 => 'Low', 2 => 'Medium', 3 => 'High'];
+$priority_labels_short = [0 => 'Non', 1 => 'Low', 2 => 'Med', 3 => 'Hig'];
+$priority_classes = [0 => 'text-secondary', 1 => 'text-success', 2 => 'text-warning', 3 => 'text-danger'];
+$task_ids = array_column($tasks, 'id');
+$task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_ids);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -330,36 +412,26 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
             <?php
                 $p = (int)($task['priority'] ?? 0);
                 if ($p < 0 || $p > 3) { $p = 0; }
-                $rawDue = $task['due_date'] ?? '';
-                $due = $rawDue;
-                $dueClass = 'bg-secondary-subtle text-secondary';
-                if ($due !== '') {
-                    try {
-                        $dueDate = new DateTime($due, $tzObj);
-                        if ($dueDate < $today) {
-                            $due = 'Overdue';
-                            $dueClass = 'bg-danger-subtle text-danger';
-                        } else {
-                            $dueFmt = $dueDate->format('Y-m-d');
-                            if ($dueFmt === $todayFmt) {
-                                $due = 'Today';
-                                $dueClass = 'bg-success-subtle text-success';
-                            } elseif ($dueFmt === $tomorrowFmt) {
-                                $due = 'Tomorrow';
-                                $dueClass = 'bg-primary-subtle text-primary';
-                            } else {
-                                $due = 'Later';
-                                $dueClass = 'bg-primary-subtle text-primary';
-
-                            }
-                        }
-                    } catch (Exception $e) {
-                        // leave $due unchanged if parsing fails
-                    }
+                $rawDue = normalize_due_date_string((string)($task['due_date'] ?? ''), $tzObj);
+                $dueBucket = due_bucket_from_raw($rawDue, $todayFmt, $tomorrowFmt, $tzObj);
+                $due = '';
+                $dueClass = '';
+                if ($dueBucket === 1) {
+                    $due = 'Overdue';
+                    $dueClass = 'bg-danger-subtle text-danger';
+                } elseif ($dueBucket === 2) {
+                    $due = 'Today';
+                    $dueClass = 'bg-success-subtle text-success';
+                } elseif ($dueBucket === 3) {
+                    $due = 'Tomorrow';
+                    $dueClass = 'bg-primary-subtle text-primary';
+                } elseif ($dueBucket === 4) {
+                    $due = 'Later';
+                    $dueClass = 'bg-primary-subtle text-primary';
                 }
             ?>
             <?php $hashtags = $task_hashtags[$task['id']] ?? []; $hashtag_text = implode(' ', array_map(function($tag){ return '#'.$tag; }, $hashtags)); ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-starred="<?=!empty($task['starred']) ? '1' : '0'?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
                 <div class="task-main">
                     <div class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                     <div class="task-hashtags">
@@ -390,7 +462,6 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     </div>
 </div>
 <script src="prevent-save-shortcut.js"></script>
-<script src="sw-register.js"></script>
 <script src="sync-status.js"></script>
 <script>
     (function() {
@@ -747,6 +818,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
   })();
 </script>
 <script>
+  const optimisticDefaultPriority = <?= (int)($_SESSION['default_priority'] ?? 0) ?>;
+  const optimisticTodayIso = '<?= htmlspecialchars($todayFmt, ENT_QUOTES) ?>';
   const pendingStarKey = 'pendingStarToggles';
   const starOverrideKey = 'starStateOverrides';
   function loadPendingStars() {
@@ -819,6 +892,53 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     if (sr) sr.textContent = starred ? 'Starred' : 'Not starred';
   }
 
+  function rowSortValueDate(row) {
+    return normalizeDueIso(row.dataset.dueDate || '');
+  }
+
+  function dueStatusBucket(row) {
+    const due = rowSortValueDate(row);
+    if (!due) return 0;
+    const today = toIsoDate(0);
+    const tomorrow = toIsoDate(1);
+    if (due < today) return 1;
+    if (due === today) return 2;
+    if (due === tomorrow) return 3;
+    return 4;
+  }
+
+  function rowSortValueInt(row, key) {
+    const value = Number(row.dataset[key] || 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function compareTaskRows(a, b) {
+    const aBucket = dueStatusBucket(a);
+    const bBucket = dueStatusBucket(b);
+    if (aBucket !== bBucket) return aBucket - bBucket;
+
+    const aPriority = rowSortValueInt(a, 'priority');
+    const bPriority = rowSortValueInt(b, 'priority');
+    if (aPriority !== bPriority) return bPriority - aPriority;
+
+    const aStarred = rowSortValueInt(a, 'starred');
+    const bStarred = rowSortValueInt(b, 'starred');
+    if (aStarred !== bStarred) return bStarred - aStarred;
+
+    const aId = rowSortValueInt(a, 'taskId');
+    const bId = rowSortValueInt(b, 'taskId');
+    return bId - aId;
+  }
+
+  function reorderTaskRows() {
+    const list = document.querySelector('.container .list-group');
+    if (!list) return;
+    const rows = Array.from(list.querySelectorAll('.task-row'));
+    if (!rows.length) return;
+    rows.sort(compareTaskRows);
+    rows.forEach(row => list.appendChild(row));
+  }
+
   function enqueuePendingStar(id, starred) {
     const entry = { id: Number(id), starred: starred ? 1 : 0, at: Date.now() };
     pendingStarQueue = pendingStarQueue.filter(item => !(String(item.id) === String(id) && item.starred === entry.starred));
@@ -858,7 +978,14 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       .then(json => {
         if (!json || json.status !== 'ok') throw new Error('Update failed');
         const btn = findStarButton(entry.id);
-        if (btn) setStarAppearance(btn, json.starred);
+        if (btn) {
+          setStarAppearance(btn, json.starred);
+          const row = btn.closest('.task-row');
+          if (row) {
+            row.dataset.starred = json.starred ? '1' : '0';
+            reorderTaskRows();
+          }
+        }
         recordStarOverride(entry.id, json.starred);
         clearMatchingOverride(entry.id, json.starred);
         clearPendingUpTo(entry);
@@ -879,6 +1006,11 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const next = this.getAttribute('aria-pressed') === 'true' ? 0 : 1;
 
       setStarAppearance(this, next);
+      const row = this.closest('.task-row');
+      if (row) {
+        row.dataset.starred = next ? '1' : '0';
+        reorderTaskRows();
+      }
       const queued = enqueuePendingStar(id, next);
 
       sendStarUpdate(queued).catch(() => {});
@@ -893,8 +1025,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (pending && override) return pending.at >= override.at ? pending : override;
         return pending || override || null;
       })();
-      if (chosen) setStarAppearance(btn, chosen.starred);
+      if (chosen) {
+        setStarAppearance(btn, chosen.starred);
+        const row = btn.closest('.task-row');
+        if (row) row.dataset.starred = chosen.starred ? '1' : '0';
+      }
     });
+    reorderTaskRows();
   }
 
   function flushPendingStars() {
@@ -921,13 +1058,19 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     now.setDate(now.getDate() + offset);
-    return now.toISOString().slice(0, 10);
+    const year = String(now.getFullYear()).padStart(4, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   function updateTaskRowUI(taskEl, payload) {
     if (!taskEl) return;
     if (payload.priority !== undefined && payload.priority !== null) {
       taskEl.dataset.priority = payload.priority;
+    }
+    if (payload.starred !== undefined && payload.starred !== null) {
+      taskEl.dataset.starred = payload.starred ? '1' : '0';
     }
     if (payload.due_date !== undefined && payload.due_date !== null) {
       taskEl.dataset.dueDate = payload.due_date;
@@ -950,6 +1093,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         : Number(taskEl.dataset.priority || 0);
       renderPriorityText(priorityEl, priorityVal, payload.priority_label, payload.priority_class);
     }
+    reorderTaskRows();
   }
 
   const deletedTaskKey = 'deletedTaskIds';
@@ -1009,23 +1153,35 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + offsetDays);
-    return d.toISOString().slice(0, 10);
+    const year = String(d.getFullYear()).padStart(4, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function normalizeDueIso(rawDate) {
+    const raw = String(rawDate || '').trim();
+    if (!raw) return null;
+    const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+    const dt = new Date(year, month - 1, day);
+    if (dt.getFullYear() !== year || dt.getMonth() !== (month - 1) || dt.getDate() !== day) return null;
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
 
   function formatDue(dateStr) {
-    if (!dateStr) return { label: '', className: '' };
+    const iso = normalizeDueIso(dateStr);
+    if (!iso) return { label: '', className: '' };
     const today = toIsoDate(0);
     const tomorrow = toIsoDate(1);
-    try {
-      const dt = new Date(`${dateStr}T00:00:00`);
-      const iso = dt.toISOString().slice(0, 10);
-      if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
-      if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
-      if (dt < new Date(today)) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
-      return { label: 'Later', className: 'bg-primary-subtle text-primary' };
-    } catch (err) {
-      return { label: '', className: '' };
-    }
+    if (iso === today) return { label: 'Today', className: 'bg-success-subtle text-success' };
+    if (iso === tomorrow) return { label: 'Tomorrow', className: 'bg-primary-subtle text-primary' };
+    if (iso < today) return { label: 'Overdue', className: 'bg-danger-subtle text-danger' };
+    return { label: 'Later', className: 'bg-primary-subtle text-primary' };
   }
 
   const priorityLabels = { 0: 'None', 1: 'Low', 2: 'Medium', 3: 'High' };
@@ -1092,6 +1248,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         }
       }
       if (typeof update.starred === 'boolean') {
+        row.dataset.starred = update.starred ? '1' : '0';
         const starBtn = row.querySelector('.task-star');
         if (starBtn) {
           starBtn.classList.toggle('starred', update.starred);
@@ -1121,6 +1278,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     });
 
     if (changed) {
+      reorderTaskRows();
       writePendingUpdates(remaining);
       if (window.applyTaskSearchFilter) {
         const currentQuery = window.getTaskSearchValue ? window.getTaskSearchValue() : '';
@@ -1197,7 +1355,7 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
     const priorityVal = taskEl.dataset.priority || '0';
     setActiveOption('priority', priorityVal);
 
-    const dueDate = (taskEl.dataset.dueDate || '').slice(0, 10);
+    const dueDate = normalizeDueIso(taskEl.dataset.dueDate || '') || '';
     let dueChoice = '';
     if (!dueDate) {
       dueChoice = 'clear';
@@ -1324,8 +1482,13 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
       const tempItem = document.createElement('a');
       tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
       tempItem.dataset.hashtags = '';
+      tempItem.dataset.starred = '0';
+      tempItem.dataset.taskId = String(Date.now());
+      tempItem.dataset.dueDate = optimisticTodayIso;
+      tempItem.dataset.priority = String(optimisticDefaultPriority);
       tempItem.innerHTML = `<div class="task-main"><div class="task-title">${description}</div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
       listGroup.prepend(tempItem);
+      reorderTaskRows();
 
       if (window.applyTaskSearchFilter) {
         window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
@@ -1351,8 +1514,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         if (!json || json.status !== 'ok') throw new Error('Save failed');
         tempItem.href = `task.php?id=${json.id}`;
         tempItem.classList.remove('opacity-75');
-          const title = tempItem.querySelector('.task-main');
-          if (title) title.textContent = json.description;
+        const title = tempItem.querySelector('.task-title');
+        if (title) title.textContent = json.description;
         const badge = tempItem.querySelector('.badge');
         if (badge) {
           renderDueBadge(badge, json.due_label, json.due_class);
@@ -1374,6 +1537,8 @@ $tomorrowFmt = $tomorrow->format('Y-m-d');
         tempItem.dataset.taskId = json.id;
         tempItem.dataset.dueDate = json.due_date || '';
         tempItem.dataset.priority = json.priority ?? '0';
+        tempItem.dataset.starred = json.starred ? '1' : '0';
+        reorderTaskRows();
         if (window.updateSyncStatus) window.updateSyncStatus('synced');
       })
       .catch(() => {
