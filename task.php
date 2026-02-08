@@ -32,8 +32,30 @@ try {
     $tzObj = new DateTimeZone('UTC');
 }
 $today = new DateTime('today', $tzObj);
-$overdue_stmt = $db->prepare('SELECT id, due_date, priority FROM tasks WHERE user_id = :uid AND done = 0 ORDER BY due_date IS NULL, due_date, priority DESC, id DESC');
-$overdue_stmt->execute([':uid' => $_SESSION['user_id']]);
+$tomorrow = (clone $today)->modify('+1 day');
+$todayFmt = $today->format('Y-m-d');
+$tomorrowFmt = $tomorrow->format('Y-m-d');
+$overdue_stmt = $db->prepare("
+    SELECT id, due_date, priority
+    FROM tasks
+    WHERE user_id = :uid AND done = 0
+    ORDER BY
+        CASE
+            WHEN due_date IS NULL OR due_date = '' THEN 0
+            WHEN due_date < :today THEN 1
+            WHEN due_date = :today THEN 2
+            WHEN due_date = :tomorrow THEN 3
+            ELSE 4
+        END,
+        priority DESC,
+        starred DESC,
+        id DESC
+");
+$overdue_stmt->execute([
+    ':uid' => $_SESSION['user_id'],
+    ':today' => $todayFmt,
+    ':tomorrow' => $tomorrowFmt,
+]);
 $overdue_rows = $overdue_stmt->fetchAll(PDO::FETCH_ASSOC);
 $overdue_ids = [];
 foreach ($overdue_rows as $row) {
@@ -1163,6 +1185,5 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
 </script>
-<script src="sw-register.js"></script>
 </body>
 </html>
