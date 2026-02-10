@@ -552,6 +552,8 @@ $user_hashtags_json = json_encode($user_hashtags);
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
+  let saveInFlight = false;
+  let needsAnotherSave = false;
 
   const hashtagBadges = document.getElementById('hashtagBadges');
   const hashtagSuggestions = document.getElementById('hashtagSuggestions');
@@ -992,6 +994,14 @@ $user_hashtags_json = json_encode($user_hashtags);
     writePendingUpdates(updates);
   }
 
+  function clearPendingUpdateForCurrentTask() {
+    if (!currentTaskId) return;
+    const updates = readPendingUpdates();
+    if (!updates[currentTaskId]) return;
+    delete updates[currentTaskId];
+    writePendingUpdates(updates);
+  }
+
   function captureFormState() {
     const titleInput = form.querySelector('input[name="description"]');
     const dueInput = form.querySelector('input[name="due_date"]');
@@ -1091,7 +1101,10 @@ $user_hashtags_json = json_encode($user_hashtags);
       return;
     }
     pendingSaveBlocked = false;
-    timer = setTimeout(sendSave, 500);
+    timer = setTimeout(function() {
+      timer = null;
+      sendSave();
+    }, 500);
   }
 
   applyPendingUpdatesToForm();
@@ -1104,9 +1117,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   if (backLink) {
     backLink.addEventListener('click', function(e){
       e.preventDefault();
-      if (timer) {
-        sendSave(true);
-      }
+      sendSave(true);
       instantNavigateToIndex();
     });
   }
@@ -1152,25 +1163,38 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
-    } else {
-      const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
-        if (resp && resp.ok) {
-          try {
-            resp.clone().json().then((payload) => {
-              if (!payload || typeof payload !== 'object') return;
-              if (Array.isArray(payload.user_hashtags)) {
-                replaceHashtagAutocomplete(payload.user_hashtags);
-              } else if (Array.isArray(payload.hashtags)) {
-                mergeHashtagsIntoAutocomplete(payload.hashtags);
-              }
-            }).catch(() => {});
-          } catch (err) {}
-        }
-        return resp;
-      });
-      if (window.trackBackgroundSync) {
-        window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
+      return;
+    }
+    if (saveInFlight) {
+      needsAnotherSave = true;
+      return;
+    }
+
+    saveInFlight = true;
+    const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
+      if (resp && resp.ok) {
+        clearPendingUpdateForCurrentTask();
+        try {
+          resp.clone().json().then((payload) => {
+            if (!payload || typeof payload !== 'object') return;
+            if (Array.isArray(payload.user_hashtags)) {
+              replaceHashtagAutocomplete(payload.user_hashtags);
+            } else if (Array.isArray(payload.hashtags)) {
+              mergeHashtagsIntoAutocomplete(payload.hashtags);
+            }
+          }).catch(() => {});
+        } catch (err) {}
       }
+      return resp;
+    }).finally(() => {
+      saveInFlight = false;
+      if (needsAnotherSave && navigator.onLine) {
+        needsAnotherSave = false;
+        sendSave();
+      }
+    });
+    if (window.trackBackgroundSync) {
+      window.trackBackgroundSync(request, {syncing: 'Saving changes…'});
     }
   }
 
@@ -1178,9 +1202,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
   window.addEventListener('beforeunload', function(){
-    if (timer) {
-      sendSave(true);
-    }
+    sendSave(true);
   });
   if (window.updateSyncStatus) window.updateSyncStatus('synced');
 })();
