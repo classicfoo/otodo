@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $db = get_db();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$stmt = $db->prepare('SELECT id, description, due_date, details, details_archive, done, priority, starred FROM tasks WHERE id = :id AND user_id = :uid');
+$stmt = $db->prepare('SELECT id, description, due_date, details, details_archive, done, priority, starred, last_save_seq FROM tasks WHERE id = :id AND user_id = :uid');
 $stmt->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
 $task = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$task) {
@@ -95,26 +95,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $done = isset($_POST['done']) ? 1 : 0;
     $starred = isset($_POST['starred']) ? 1 : 0;
-    $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, details_archive = :details_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
-    $stmt->execute([
-        ':description' => $description,
-        ':due_date' => $due_date !== '' ? $due_date : null,
-        ':details' => $details !== '' ? $details : null,
-        ':details_archive' => $details_archive !== '' ? $details_archive : null,
-        ':priority' => $priority,
-        ':done' => $done,
-        ':starred' => $starred,
-        ':id' => $id,
-        ':uid' => $_SESSION['user_id'],
-    ]);
-    $hashtags = collect_hashtags_from_texts($description, $details);
-    sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
+    $save_seq = isset($_POST['save_seq']) ? (int)$_POST['save_seq'] : null;
+    if ($save_seq !== null && $save_seq < 0) {
+        $save_seq = 0;
+    }
+
+    $applied = false;
+    if ($save_seq !== null) {
+        $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, details_archive = :details_archive, priority = :priority, done = :done, starred = :starred, last_save_seq = :save_seq WHERE id = :id AND user_id = :uid AND :save_seq >= last_save_seq');
+        $stmt->execute([
+            ':description' => $description,
+            ':due_date' => $due_date !== '' ? $due_date : null,
+            ':details' => $details !== '' ? $details : null,
+            ':details_archive' => $details_archive !== '' ? $details_archive : null,
+            ':priority' => $priority,
+            ':done' => $done,
+            ':starred' => $starred,
+            ':save_seq' => $save_seq,
+            ':id' => $id,
+            ':uid' => $_SESSION['user_id'],
+        ]);
+        $applied = $stmt->rowCount() > 0;
+    } else {
+        $stmt = $db->prepare('UPDATE tasks SET description = :description, due_date = :due_date, details = :details, details_archive = :details_archive, priority = :priority, done = :done, starred = :starred WHERE id = :id AND user_id = :uid');
+        $stmt->execute([
+            ':description' => $description,
+            ':due_date' => $due_date !== '' ? $due_date : null,
+            ':details' => $details !== '' ? $details : null,
+            ':details_archive' => $details_archive !== '' ? $details_archive : null,
+            ':priority' => $priority,
+            ':done' => $done,
+            ':starred' => $starred,
+            ':id' => $id,
+            ':uid' => $_SESSION['user_id'],
+        ]);
+        $applied = true;
+    }
+
+    $hashtags = [];
+    if ($applied) {
+        $hashtags = collect_hashtags_from_texts($description, $details);
+        sync_task_hashtags($db, $id, (int)$_SESSION['user_id'], $hashtags);
+    }
+
+    $fresh = $db->prepare('SELECT description, due_date, details, details_archive, priority, done, starred, last_save_seq FROM tasks WHERE id = :id AND user_id = :uid');
+    $fresh->execute([':id' => $id, ':uid' => $_SESSION['user_id']]);
+    $current_task = $fresh->fetch(PDO::FETCH_ASSOC);
+
     header('Content-Type: application/json');
     $user_hashtags = get_user_hashtags($db, (int)$_SESSION['user_id']);
     echo json_encode([
-        'status' => 'ok',
+        'status' => $applied ? 'ok' : 'stale',
         'hashtags' => $hashtags,
         'user_hashtags' => $user_hashtags,
+        'description' => $current_task['description'] ?? '',
+        'due_date' => $current_task['due_date'] ?? '',
+        'details' => $current_task['details'] ?? '',
+        'details_archive' => $current_task['details_archive'] ?? '',
+        'priority' => isset($current_task['priority']) ? (int)$current_task['priority'] : 0,
+        'done' => !empty($current_task['done']),
+        'starred' => !empty($current_task['starred']),
+        'last_save_seq' => isset($current_task['last_save_seq']) ? (int)$current_task['last_save_seq'] : 0,
     ]);
     exit();
 }
@@ -548,12 +589,14 @@ $user_hashtags_json = json_encode($user_hashtags);
   const backLink = document.getElementById('backToList');
   const deleteLink = document.getElementById('taskDeleteLink');
   const currentTaskId = <?=$task['id']?>;
+  const serverLastSaveSeq = <?=isset($task['last_save_seq']) ? (int)$task['last_save_seq'] : 0?>;
 
   const form = document.querySelector('form');
   if (!form) return;
   let timer;
   let saveInFlight = false;
   let needsAnotherSave = false;
+  let latestCapturedSaveSeq = serverLastSaveSeq;
 
   const hashtagBadges = document.getElementById('hashtagBadges');
   const hashtagSuggestions = document.getElementById('hashtagSuggestions');
@@ -986,6 +1029,36 @@ $user_hashtags_json = json_encode($user_hashtags);
     } catch (err) {}
   }
 
+  const saveSeqKey = currentTaskId ? `taskSaveSeq:${currentTaskId}` : null;
+
+  function readLocalSaveSeq() {
+    if (!saveSeqKey) return 0;
+    try {
+      const raw = sessionStorage.getItem(saveSeqKey);
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 0) return 0;
+      return Math.floor(parsed);
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  function writeLocalSaveSeq(seq) {
+    if (!saveSeqKey) return;
+    try {
+      sessionStorage.setItem(saveSeqKey, String(seq));
+    } catch (err) {}
+  }
+
+  function bumpLocalSaveSeq() {
+    latestCapturedSaveSeq = Math.max(latestCapturedSaveSeq, readLocalSaveSeq(), serverLastSaveSeq) + 1;
+    writeLocalSaveSeq(latestCapturedSaveSeq);
+    return latestCapturedSaveSeq;
+  }
+
+  latestCapturedSaveSeq = Math.max(latestCapturedSaveSeq, readLocalSaveSeq(), serverLastSaveSeq);
+  writeLocalSaveSeq(latestCapturedSaveSeq);
+
   function recordPendingUpdate(partial) {
     if (!currentTaskId) return;
     const updates = readPendingUpdates();
@@ -1009,6 +1082,7 @@ $user_hashtags_json = json_encode($user_hashtags);
   }
 
   function captureFormState() {
+    const nextSaveSeq = bumpLocalSaveSeq();
     const titleInput = form.querySelector('input[name="description"]');
     const dueInput = form.querySelector('input[name="due_date"]');
     const doneCheckbox = form.querySelector('input[name="done"]');
@@ -1026,7 +1100,8 @@ $user_hashtags_json = json_encode($user_hashtags);
       starred: starredCheckbox ? starredCheckbox.checked : undefined,
       details: detailsField ? detailsField.value : undefined,
       details_archive: archiveField ? archiveField.value : undefined,
-      hashtags: currentHashtags()
+      hashtags: currentHashtags(),
+      save_seq: nextSaveSeq
     });
   }
 
@@ -1034,6 +1109,11 @@ $user_hashtags_json = json_encode($user_hashtags);
     const updates = readPendingUpdates();
     const pending = updates[currentTaskId];
     if (!pending) return;
+    const pendingSaveSeq = Number(pending.save_seq ?? 0);
+    if (Number.isFinite(pendingSaveSeq) && pendingSaveSeq <= serverLastSaveSeq) {
+      clearPendingUpdateForCurrentTask();
+      return;
+    }
 
     const titleInput = form.querySelector('input[name="description"]');
     const dueInput = form.querySelector('input[name="due_date"]');
@@ -1166,6 +1246,8 @@ $user_hashtags_json = json_encode($user_hashtags);
     if (updateDetails) updateDetails();
     if (updateArchiveDetails) updateArchiveDetails();
     const data = new FormData(form);
+    const sentSaveSeq = latestCapturedSaveSeq;
+    data.set('save_seq', String(sentSaveSeq));
     if (immediate && navigator.sendBeacon) {
       navigator.sendBeacon(window.location.href, data);
       if (window.updateSyncStatus) window.updateSyncStatus('syncing', 'Saving changes…');
@@ -1177,19 +1259,28 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
 
     saveInFlight = true;
-    const request = fetch(window.location.href, {method: 'POST', body: data}).then((resp) => {
+    const request = fetch(window.location.href, {method: 'POST', body: data}).then(async (resp) => {
+      let payload = null;
+      try {
+        payload = await resp.clone().json();
+      } catch (err) {}
+
       if (resp && resp.ok) {
-        clearPendingUpdateForCurrentTask();
-        try {
-          resp.clone().json().then((payload) => {
-            if (!payload || typeof payload !== 'object') return;
-            if (Array.isArray(payload.user_hashtags)) {
-              replaceHashtagAutocomplete(payload.user_hashtags);
-            } else if (Array.isArray(payload.hashtags)) {
-              mergeHashtagsIntoAutocomplete(payload.hashtags);
-            }
-          }).catch(() => {});
-        } catch (err) {}
+        const status = payload && typeof payload.status === 'string' ? payload.status : 'ok';
+        if ((status === 'ok' || status === 'stale') && sentSaveSeq >= latestCapturedSaveSeq) {
+          clearPendingUpdateForCurrentTask();
+        }
+        if (payload && typeof payload.last_save_seq === 'number') {
+          latestCapturedSaveSeq = Math.max(latestCapturedSaveSeq, payload.last_save_seq);
+          writeLocalSaveSeq(latestCapturedSaveSeq);
+        }
+        if (status === 'ok') {
+          if (Array.isArray(payload.user_hashtags)) {
+            replaceHashtagAutocomplete(payload.user_hashtags);
+          } else if (Array.isArray(payload.hashtags)) {
+            mergeHashtagsIntoAutocomplete(payload.hashtags);
+          }
+        }
       }
       return resp;
     }).finally(() => {

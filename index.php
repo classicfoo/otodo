@@ -62,7 +62,7 @@ function due_bucket_from_raw($rawDue, string $todayFmt, string $tomorrowFmt, Dat
 }
 
 $stmt = $db->prepare("
-    SELECT id, description, due_date, details, done, priority, starred
+    SELECT id, description, due_date, details, done, priority, starred, last_save_seq
     FROM tasks
     WHERE user_id = :uid AND done = 0
     ORDER BY
@@ -431,7 +431,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
                 }
             ?>
             <?php $hashtags = $task_hashtags[$task['id']] ?? []; $hashtag_text = implode(' ', array_map(function($tag){ return '#'.$tag; }, $hashtags)); ?>
-            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-starred="<?=!empty($task['starred']) ? '1' : '0'?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
+            <a href="task.php?id=<?=$task['id']?>" class="list-group-item list-group-item-action task-row" data-task-id="<?=$task['id']?>" data-due-date="<?=htmlspecialchars($rawDue ?? '')?>" data-priority="<?=$p?>" data-starred="<?=!empty($task['starred']) ? '1' : '0'?>" data-save-seq="<?=isset($task['last_save_seq']) ? (int)$task['last_save_seq'] : 0?>" data-hashtags="<?=htmlspecialchars($hashtag_text)?>">
                 <div class="task-main">
                     <div class="task-title <?php if ($task['done']) echo 'text-decoration-line-through'; ?>">&ZeroWidthSpace;<?=htmlspecialchars(ucwords(strtolower($task['description'] ?? '')))?></div>
                     <div class="task-hashtags">
@@ -1233,6 +1233,16 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
       if (!taskId) return;
       const row = document.querySelector(`.task-row[data-task-id="${taskId}"]`);
       if (!row) return;
+      const rowSaveSeq = Number(row.dataset.saveSeq || 0);
+      const updateSaveSeq = Number(update.save_seq || 0);
+      if (!Number.isFinite(updateSaveSeq) || updateSaveSeq <= 0) {
+        delete remaining[taskId];
+        return;
+      }
+      if (Number.isFinite(updateSaveSeq) && updateSaveSeq > 0 && updateSaveSeq <= rowSaveSeq) {
+        delete remaining[taskId];
+        return;
+      }
       const titleEl = row.querySelector('.task-title');
       if (titleEl && typeof update.description === 'string') {
         titleEl.textContent = update.description || '\u200B';
@@ -1272,6 +1282,9 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
         row.dataset.hashtags = update.hashtags.map(tag => '#' + tag).join(' ');
         const tags = row.querySelector('.task-hashtags');
         renderHashtagRow(tags, update.hashtags);
+      }
+      if (Number.isFinite(updateSaveSeq) && updateSaveSeq > 0) {
+        row.dataset.saveSeq = String(updateSaveSeq);
       }
       delete remaining[taskId];
       changed = true;

@@ -51,6 +51,7 @@ function get_db() {
             description_archive TEXT,
             priority INTEGER NOT NULL DEFAULT 2,
             starred INTEGER NOT NULL DEFAULT 0,
+            last_save_seq INTEGER NOT NULL DEFAULT 0,
             done INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(user_id) REFERENCES users(id)
         )");
@@ -87,6 +88,9 @@ function get_db() {
         }
         if (!in_array('starred', $columns, true)) {
             $db->exec('ALTER TABLE tasks ADD COLUMN starred INTEGER NOT NULL DEFAULT 0');
+        }
+        if (!in_array('last_save_seq', $columns, true)) {
+            $db->exec('ALTER TABLE tasks ADD COLUMN last_save_seq INTEGER NOT NULL DEFAULT 0');
         }
 
         // Ensure user columns exist for older databases
