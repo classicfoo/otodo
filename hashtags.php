@@ -7,7 +7,10 @@ function normalize_hashtag($tag) {
     if ($normalized === '') {
         return '';
     }
-    return mb_strtolower($normalized, 'UTF-8');
+    if (function_exists('mb_strtolower')) {
+        return mb_strtolower($normalized, 'UTF-8');
+    }
+    return strtolower($normalized);
 }
 
 function extract_hashtags_from_text($text) {
@@ -178,4 +181,3 @@ function sync_task_hashtags(PDO $db, $taskId, $userId, array $hashtags) {
         throw $e;
     }
 }
-
