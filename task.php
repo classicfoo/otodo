@@ -1002,6 +1002,12 @@ $user_hashtags_json = json_encode($user_hashtags);
     writePendingUpdates(updates);
   }
 
+  function hasPendingUpdateForCurrentTask() {
+    if (!currentTaskId) return false;
+    const updates = readPendingUpdates();
+    return !!updates[currentTaskId];
+  }
+
   function captureFormState() {
     const titleInput = form.querySelector('input[name="description"]');
     const dueInput = form.querySelector('input[name="due_date"]');
@@ -1201,6 +1207,11 @@ $user_hashtags_json = json_encode($user_hashtags);
   form.addEventListener('input', scheduleSave);
   form.addEventListener('change', scheduleSave);
   form.addEventListener('submit', function(e){ e.preventDefault(); });
+  window.addEventListener('online', function() {
+    if (hasPendingUpdateForCurrentTask()) {
+      sendSave();
+    }
+  });
   window.addEventListener('beforeunload', function(){
     sendSave(true);
   });
