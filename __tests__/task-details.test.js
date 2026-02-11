@@ -326,6 +326,21 @@ describe('task details editor behaviors', () => {
     expect(preview.innerHTML).not.toContain('inline-hashtag">#section</span>');
   });
 
+  test('malformed scheme links are normalized instead of double-prefixed', () => {
+    const details = document.getElementById('detailsInput');
+    const textarea = details.querySelector('textarea');
+    const hidden = document.getElementById('detailsField');
+
+    const editor = initTaskDetailsEditor(details, hidden, jest.fn());
+
+    textarea.value = 'Open https//otodo.42web.io/task.php?id=185 now.';
+    editor.updateDetails();
+
+    const preview = details.querySelector('code');
+    expect(preview.innerHTML).toContain('<a class="inline-link" href="https://otodo.42web.io/task.php?id=185" target="_blank" rel="noopener noreferrer">https//otodo.42web.io/task.php?id=185</a>');
+    expect(preview.innerHTML).not.toContain('href="https://https//otodo.42web.io/task.php?id=185"');
+  });
+
   test('capitalization toggle uppercases lines that match a rule while leaving others untouched', () => {
     const details = document.getElementById('detailsInput');
     const textarea = details.querySelector('textarea');

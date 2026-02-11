@@ -42,7 +42,7 @@
   }
 
   function linkifyUrls(text = '') {
-    const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+    const urlPattern = /(?:https?:\/\/|https?\/\/|www\.)[^\s<]+/gi;
     return text.replace(urlPattern, function(match) {
       const trailingMatch = match.match(/^(.*?)([)\].,!?;:]+)$/);
       const url = trailingMatch ? trailingMatch[1] : match;
@@ -50,9 +50,26 @@
       if (!url) {
         return match;
       }
-      const href = url.startsWith('http://') || url.startsWith('https://') ? url : 'https://' + url;
+      const href = normalizeUrlHref(url);
       return '<a class="inline-link" href="' + href + '" target="_blank" rel="noopener noreferrer">' + url + '</a>' + trailing;
     });
+  }
+
+  function normalizeUrlHref(url = '') {
+    if (!url) {
+      return '';
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+      return url;
+    }
+
+    const missingColon = url.match(/^([a-z][a-z0-9+.-]*)\/\/(.*)$/i);
+    if (missingColon) {
+      return missingColon[1] + '://' + missingColon[2];
+    }
+
+    return 'https://' + url;
   }
 
   function buildDateRegexes(dateFormats = []) {
@@ -305,7 +322,7 @@
       if (typeof value !== 'string' || typeof position !== 'number') {
         return null;
       }
-      const urlPattern = /(?:https?:\/\/|www\.)[^\s<]+/gi;
+      const urlPattern = /(?:https?:\/\/|https?\/\/|www\.)[^\s<]+/gi;
       let match;
       while ((match = urlPattern.exec(value))) {
         const raw = match[0];
@@ -314,9 +331,7 @@
         const start = match.index;
         const end = start + clean.length;
         if (clean && position >= start && position < end) {
-          const href = clean.startsWith('http://') || clean.startsWith('https://')
-            ? clean
-            : ('https://' + clean);
+          const href = normalizeUrlHref(clean);
           return { href: href, text: clean };
         }
       }
