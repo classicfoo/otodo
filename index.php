@@ -403,7 +403,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
 <div class="container">
     <form action="add_task.php" method="post" class="mb-3">
         <div class="input-group">
-            <input type="text" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
+            <input type="text" id="new-task-input" name="description" class="form-control" placeholder="New task" required autocapitalize="none">
             <button class="btn btn-primary" type="submit">Add</button>
         </div>
     </form>
@@ -469,6 +469,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
         const searchToggle = document.getElementById('task-search-toggle');
         const searchInput = document.getElementById('task-search-input');
         const clearButton = document.getElementById('task-search-clear');
+        const newTaskInput = document.getElementById('new-task-input');
 
         if (!searchContainer || !searchToggle || !searchInput || !clearButton) {
             return;
@@ -542,6 +543,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
         document.addEventListener('keydown', (event) => {
             const activeEl = document.activeElement;
             const typing = isTypingField(activeEl);
+            const newTaskFocused = !!newTaskInput && activeEl === newTaskInput;
             if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) {
                 if (!typing) {
                     event.preventDefault();
@@ -550,7 +552,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
                 return;
             }
             if ((event.key === 'f' || event.key === 'F') && (event.ctrlKey || event.metaKey) && !event.shiftKey) {
-                if (!typing) {
+                if (!typing || newTaskFocused) {
                     event.preventDefault();
                     expandSearch();
                 }
