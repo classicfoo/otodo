@@ -1481,243 +1481,92 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
   const form = document.querySelector('form[action="add_task.php"]');
   const listGroup = document.querySelector('.container .list-group');
   const descriptionInput = form ? form.querySelector('input[name="description"]') : null;
-
-  const pendingCreateKey = 'pendingTaskCreates';
-  let pendingCreateQueue = loadPendingCreates();
-  let processingPendingCreates = false;
-
-  function loadPendingCreates() {
-    try {
-      const raw = localStorage.getItem(pendingCreateKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .filter(function(entry) {
-          return entry && typeof entry.description === 'string' && entry.description.trim() !== '' && typeof entry.clientId === 'string' && entry.clientId !== '';
-        })
-        .map(function(entry) {
-          return {
-            clientId: entry.clientId,
-            description: entry.description.trim(),
-            createdAt: Number(entry.createdAt || Date.now())
-          };
-        });
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function persistPendingCreates() {
-    try {
-      localStorage.setItem(pendingCreateKey, JSON.stringify(pendingCreateQueue));
-    } catch (e) {}
-  }
-
-  function createPendingEntry(description) {
-    const entry = {
-      clientId: 'create-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-      description: description.trim(),
-      createdAt: Date.now()
-    };
-    pendingCreateQueue.push(entry);
-    persistPendingCreates();
-    return entry;
-  }
-
-  function removePendingEntry(clientId) {
-    pendingCreateQueue = pendingCreateQueue.filter(function(entry) { return entry.clientId !== clientId; });
-    persistPendingCreates();
-  }
-
-  function findRowByClientId(clientId) {
-    return Array.from(listGroup.querySelectorAll('.task-row')).find(function(row) {
-      return row.dataset.clientId === clientId;
-    }) || null;
-  }
-
-  function applyPendingRowState(row, state) {
-    const priority = row.querySelector('.priority-text');
-    if (!priority) return;
-
-    priority.classList.remove('text-secondary', 'text-warning', 'text-danger');
-    row.classList.remove('opacity-75');
-    row.dataset.createState = state;
-
-    if (state === 'saving') {
-      priority.textContent = 'Saving...';
-      priority.classList.add('text-secondary');
-      row.classList.add('opacity-75');
-    } else if (state === 'queued') {
-      priority.textContent = 'Queued';
-      priority.classList.add('text-warning');
-      row.classList.add('opacity-75');
-    } else if (state === 'failed') {
-      priority.textContent = 'Not saved';
-      priority.classList.add('text-danger');
-    }
-  }
-
-  function createTempTaskRow(description, clientId) {
-    const tempItem = document.createElement('a');
-    tempItem.className = 'list-group-item list-group-item-action task-row';
-    tempItem.dataset.hashtags = '';
-    tempItem.dataset.starred = '0';
-    tempItem.dataset.taskId = clientId;
-    tempItem.dataset.clientId = clientId;
-    tempItem.dataset.dueDate = optimisticTodayIso;
-    tempItem.dataset.priority = String(optimisticDefaultPriority);
-    tempItem.innerHTML = '<div class="task-main"><div class="task-title"></div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving...</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">&#9734;</span><span class="visually-hidden">Not starred</span></button></div>';
-    const title = tempItem.querySelector('.task-title');
-    if (title) title.textContent = description;
-    listGroup.prepend(tempItem);
-    reorderTaskRows();
-    if (window.applyTaskSearchFilter) {
-      window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
-    }
-    return tempItem;
-  }
-
-  function ensurePendingRow(entry) {
-    const existing = findRowByClientId(entry.clientId);
-    if (existing) return existing;
-    return createTempTaskRow(entry.description, entry.clientId);
-  }
-
-  async function createTaskOnServer(description) {
-    const data = new FormData();
-    data.set('description', description);
-    const resp = await fetch('add_task.php', {
-      method: 'POST',
-      body: data,
-      headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
-    });
-
-    if (!resp.ok) {
-      throw new Error('Could not save task');
-    }
-
-    const contentType = (resp.headers.get('content-type') || '').toLowerCase();
-    if (!contentType.includes('application/json')) {
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    const json = await resp.json();
-    if (!json || json.status !== 'ok') {
-      throw new Error('Could not save task');
-    }
-    return json;
-  }
-
-  function finalizeCreatedTaskRow(row, json) {
-    row.href = 'task.php?id=' + json.id;
-    row.classList.remove('opacity-75');
-    delete row.dataset.clientId;
-    delete row.dataset.createState;
-
-    const title = row.querySelector('.task-title');
-    if (title) title.textContent = json.description;
-    const badge = row.querySelector('.badge');
-    if (badge) {
-      renderDueBadge(badge, json.due_label, json.due_class);
-    }
-    const priority = row.querySelector('.priority-text');
-    if (priority) {
-      renderPriorityText(priority, json.priority, json.priority_label, json.priority_class);
-    }
-    const hashtagContainer = row.querySelector('.task-hashtags');
-    row.dataset.hashtags = (json.hashtags || []).map(function(tag) { return '#' + tag; }).join(' ');
-    renderHashtagRow(hashtagContainer, json.hashtags || []);
-    const star = row.querySelector('.star-toggle');
-    if (star) {
-      star.dataset.id = json.id;
-      star.disabled = false;
-      setStarAppearance(star, json.starred || 0);
-      bindStarButton(star);
-    }
-    row.dataset.taskId = json.id;
-    row.dataset.dueDate = json.due_date || '';
-    row.dataset.priority = json.priority ?? '0';
-    row.dataset.starred = json.starred ? '1' : '0';
-    reorderTaskRows();
-    if (window.applyTaskSearchFilter) {
-      window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
-    }
-  }
-
-  async function syncPendingEntry(entry, options = {}) {
-    const row = ensurePendingRow(entry);
-    applyPendingRowState(row, 'saving');
-    if (!options.silent && window.updateSyncStatus) {
-      window.updateSyncStatus('syncing', 'Saving task...');
-    }
-    try {
-      const json = await createTaskOnServer(entry.description);
-      finalizeCreatedTaskRow(row, json);
-      removePendingEntry(entry.clientId);
-      if (!options.silent && window.updateSyncStatus) {
-        window.updateSyncStatus('synced', 'Task saved');
-      }
-      return true;
-    } catch (e) {
-      applyPendingRowState(row, navigator.onLine ? 'failed' : 'queued');
-      if (window.updateSyncStatus) {
-        const message = navigator.onLine ? (e.message || 'Task not saved. Will retry.') : 'Offline. Task queued for retry.';
-        window.updateSyncStatus('error', message);
-      }
-      return false;
-    }
-  }
-
-  async function processPendingCreates(options = {}) {
-    if (processingPendingCreates) return;
-    if (!pendingCreateQueue.length) return;
-    processingPendingCreates = true;
-    try {
-      const snapshot = pendingCreateQueue.slice();
-      for (const entry of snapshot) {
-        if (!pendingCreateQueue.some(function(item) { return item.clientId === entry.clientId; })) {
-          continue;
-        }
-        await syncPendingEntry(entry, options);
-      }
-    } finally {
-      processingPendingCreates = false;
-    }
-  }
-
+  let isFallbackSubmit = false;
   if (form && listGroup) {
     form.addEventListener('submit', function(e){
+      if (isFallbackSubmit) return;
       e.preventDefault();
       const data = new FormData(form);
       const description = (data.get('description') || '').toString().trim();
       if (!description) return;
 
       if (descriptionInput) descriptionInput.value = '';
-      const entry = createPendingEntry(description);
-      ensurePendingRow(entry);
-      syncPendingEntry(entry);
-      form.reset();
-    });
 
-    pendingCreateQueue.forEach(function(entry) {
-      const row = ensurePendingRow(entry);
-      applyPendingRowState(row, navigator.onLine ? 'failed' : 'queued');
-    });
+      const tempItem = document.createElement('a');
+      tempItem.className = 'list-group-item list-group-item-action task-row opacity-75';
+      tempItem.dataset.hashtags = '';
+      tempItem.dataset.starred = '0';
+      tempItem.dataset.taskId = String(Date.now());
+      tempItem.dataset.dueDate = optimisticTodayIso;
+      tempItem.dataset.priority = String(optimisticDefaultPriority);
+      tempItem.innerHTML = `<div class="task-main"><div class="task-title">${description}</div><div class="task-hashtags"></div></div><div class="task-meta"><span class="badge due-date-badge bg-primary-subtle text-primary">Today</span><span class="small priority-text text-secondary">Saving…</span><button type="button" class="task-star star-toggle" aria-pressed="false" disabled><span class="star-icon" aria-hidden="true">☆</span><span class="visually-hidden">Not starred</span></button></div>`;
+      listGroup.prepend(tempItem);
+      reorderTaskRows();
 
-    processPendingCreates({ silent: true });
-    window.addEventListener('online', function() {
-      processPendingCreates({ silent: true });
-    });
-    window.addEventListener('focus', function() {
-      processPendingCreates({ silent: true });
-    });
-    document.addEventListener('visibilitychange', function() {
-      if (!document.hidden) {
-        processPendingCreates({ silent: true });
+      if (window.applyTaskSearchFilter) {
+        window.applyTaskSearchFilter(window.getTaskSearchValue ? window.getTaskSearchValue() : '');
       }
+
+      data.set('description', description);
+      const request = fetch('add_task.php', {
+        method: 'POST',
+        body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'fetch'}
+      });
+
+      if (window.trackBackgroundSync) {
+        window.trackBackgroundSync(request, {
+          syncing: 'Saving task…',
+          synced: 'Task saved',
+          error: 'Could not reach server'
+        });
+      }
+
+      request.then(resp => resp.ok ? resp.json() : Promise.reject())
+      .then(json => {
+        if (!json || json.status !== 'ok') throw new Error('Save failed');
+        tempItem.href = `task.php?id=${json.id}`;
+        tempItem.classList.remove('opacity-75');
+        const title = tempItem.querySelector('.task-title');
+        if (title) title.textContent = json.description;
+        const badge = tempItem.querySelector('.badge');
+        if (badge) {
+          renderDueBadge(badge, json.due_label, json.due_class);
+        }
+        const priority = tempItem.querySelector('.priority-text');
+        if (priority) {
+          renderPriorityText(priority, json.priority, json.priority_label, json.priority_class);
+        }
+        const hashtagContainer = tempItem.querySelector('.task-hashtags');
+        tempItem.dataset.hashtags = (json.hashtags || []).map(tag => '#' + tag).join(' ');
+        renderHashtagRow(hashtagContainer, json.hashtags || []);
+        const star = tempItem.querySelector('.star-toggle');
+        if (star) {
+          star.dataset.id = json.id;
+          star.disabled = false;
+          setStarAppearance(star, json.starred || 0);
+          bindStarButton(star);
+        }
+        tempItem.dataset.taskId = json.id;
+        tempItem.dataset.dueDate = json.due_date || '';
+        tempItem.dataset.priority = json.priority ?? '0';
+        tempItem.dataset.starred = json.starred ? '1' : '0';
+        reorderTaskRows();
+        if (window.updateSyncStatus) window.updateSyncStatus('synced');
+      })
+      .catch(() => {
+        tempItem.remove();
+        if (descriptionInput) descriptionInput.value = description;
+        isFallbackSubmit = true;
+        form.submit();
+      })
+      .finally(() => {
+        if (!isFallbackSubmit) {
+          form.reset();
+        }
+      });
     });
   }
 </script>
 </body>
 </html>
-
