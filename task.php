@@ -6,7 +6,24 @@ require_once 'date_formats.php';
 require_once 'text_expanders.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+    $xRequestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    $isAsyncRequest = $_SERVER['REQUEST_METHOD'] === 'POST'
+        || stripos($accept, 'application/json') !== false
+        || strcasecmp($xRequestedWith, 'fetch') === 0
+        || strcasecmp($xRequestedWith, 'xmlhttprequest') === 0;
+    if ($isAsyncRequest) {
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'status' => 'auth_expired',
+            'message' => 'Session expired',
+            'login_url' => 'login.php?redirect=' . rawurlencode($_SERVER['REQUEST_URI'] ?? 'index.php'),
+        ]);
+        exit();
+    }
+    $redirect = rawurlencode($_SERVER['REQUEST_URI'] ?? 'index.php');
+    header('Location: login.php?redirect=' . $redirect);
     exit();
 }
 
@@ -561,6 +578,7 @@ $user_hashtags_json = json_encode($user_hashtags);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
+  const currentUserId = <?= json_encode((string)($_SESSION['user_id'] ?? '')) ?>;
   const select = document.querySelector('select[name="priority"]');
   const badge = document.getElementById('priorityBadge');
   if (select) {
@@ -1010,34 +1028,61 @@ $user_hashtags_json = json_encode($user_hashtags);
     } catch (err) {}
   }
 
-  const updateKey = 'pendingTaskUpdates';
+  function scopedKey(base) {
+    return currentUserId ? `${base}:u${currentUserId}` : base;
+  }
+
+  const updateKey = scopedKey('pendingTaskUpdates');
+  const legacyUpdateKey = 'pendingTaskUpdates';
 
   function readPendingUpdates() {
     try {
-      const raw = sessionStorage.getItem(updateKey);
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === 'object' ? parsed : {};
+      const sources = [
+        sessionStorage.getItem(updateKey),
+        localStorage.getItem(updateKey),
+        sessionStorage.getItem(legacyUpdateKey),
+        localStorage.getItem(legacyUpdateKey)
+      ];
+      for (const raw of sources) {
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          return parsed;
+        }
+      }
+      return {};
     } catch (err) {
       return {};
     }
   }
 
   function writePendingUpdates(updates) {
-    try {
-      sessionStorage.setItem(updateKey, JSON.stringify(updates));
-    } catch (err) {}
+    const serialized = JSON.stringify(updates);
+    try { sessionStorage.setItem(updateKey, serialized); } catch (err) {}
+    try { localStorage.setItem(updateKey, serialized); } catch (err) {}
+    try { sessionStorage.removeItem(legacyUpdateKey); } catch (err) {}
+    try { localStorage.removeItem(legacyUpdateKey); } catch (err) {}
   }
 
-  const saveSeqKey = currentTaskId ? `taskSaveSeq:${currentTaskId}` : null;
+  const saveSeqKey = currentTaskId ? scopedKey(`taskSaveSeq:${currentTaskId}`) : null;
+  const legacySaveSeqKey = currentTaskId ? `taskSaveSeq:${currentTaskId}` : null;
 
   function readLocalSaveSeq() {
     if (!saveSeqKey) return 0;
     try {
-      const raw = sessionStorage.getItem(saveSeqKey);
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed < 0) return 0;
-      return Math.floor(parsed);
+      const values = [
+        sessionStorage.getItem(saveSeqKey),
+        localStorage.getItem(saveSeqKey),
+        legacySaveSeqKey ? sessionStorage.getItem(legacySaveSeqKey) : null,
+        legacySaveSeqKey ? localStorage.getItem(legacySaveSeqKey) : null
+      ];
+      for (const raw of values) {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed) && parsed >= 0) {
+          return Math.floor(parsed);
+        }
+      }
+      return 0;
     } catch (err) {
       return 0;
     }
@@ -1045,9 +1090,13 @@ $user_hashtags_json = json_encode($user_hashtags);
 
   function writeLocalSaveSeq(seq) {
     if (!saveSeqKey) return;
-    try {
-      sessionStorage.setItem(saveSeqKey, String(seq));
-    } catch (err) {}
+    const value = String(seq);
+    try { sessionStorage.setItem(saveSeqKey, value); } catch (err) {}
+    try { localStorage.setItem(saveSeqKey, value); } catch (err) {}
+    if (legacySaveSeqKey) {
+      try { sessionStorage.removeItem(legacySaveSeqKey); } catch (err) {}
+      try { localStorage.removeItem(legacySaveSeqKey); } catch (err) {}
+    }
   }
 
   function bumpLocalSaveSeq() {
@@ -1259,27 +1308,59 @@ $user_hashtags_json = json_encode($user_hashtags);
     }
 
     saveInFlight = true;
-    const request = fetch(window.location.href, {method: 'POST', body: data}).then(async (resp) => {
+    const request = fetch(window.location.href, {
+      method: 'POST',
+      body: data,
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'fetch'
+      },
+      credentials: 'same-origin'
+    }).then(async (resp) => {
       let payload = null;
+      const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
       try {
-        payload = await resp.clone().json();
+        if (isJson) {
+          payload = await resp.clone().json();
+        }
       } catch (err) {}
 
-      if (resp && resp.ok) {
-        const status = payload && typeof payload.status === 'string' ? payload.status : 'ok';
-        if ((status === 'ok' || status === 'stale') && sentSaveSeq >= latestCapturedSaveSeq) {
-          clearPendingUpdateForCurrentTask();
-        }
-        if (payload && typeof payload.last_save_seq === 'number') {
-          latestCapturedSaveSeq = Math.max(latestCapturedSaveSeq, payload.last_save_seq);
-          writeLocalSaveSeq(latestCapturedSaveSeq);
-        }
-        if (status === 'ok') {
-          if (Array.isArray(payload.user_hashtags)) {
-            replaceHashtagAutocomplete(payload.user_hashtags);
-          } else if (Array.isArray(payload.hashtags)) {
-            mergeHashtagsIntoAutocomplete(payload.hashtags);
-          }
+      const redirectedToLogin = !!(resp && resp.redirected && resp.url && resp.url.indexOf('login.php') !== -1);
+      const authExpired = !!(
+        (resp && resp.status === 401) ||
+        redirectedToLogin ||
+        (payload && payload.status === 'auth_expired')
+      );
+
+      if (authExpired) {
+        if (window.updateSyncStatus) window.updateSyncStatus('error', 'Session expired. Redirecting to login...');
+        const loginUrl = (payload && typeof payload.login_url === 'string' && payload.login_url)
+          ? payload.login_url
+          : ('login.php?redirect=' + encodeURIComponent(window.location.href));
+        setTimeout(() => {
+          window.location.href = loginUrl;
+        }, 50);
+        throw new Error('auth_expired');
+      }
+
+      if (!resp || !resp.ok || !isJson || !payload || typeof payload.status !== 'string') {
+        throw new Error('invalid_save_response');
+      }
+
+      const status = payload.status;
+      if ((status === 'ok' || status === 'stale') && sentSaveSeq >= latestCapturedSaveSeq) {
+        clearPendingUpdateForCurrentTask();
+      }
+      if (typeof payload.last_save_seq === 'number') {
+        latestCapturedSaveSeq = Math.max(latestCapturedSaveSeq, payload.last_save_seq);
+        writeLocalSaveSeq(latestCapturedSaveSeq);
+      }
+      if (status === 'ok') {
+        if (Array.isArray(payload.user_hashtags)) {
+          replaceHashtagAutocomplete(payload.user_hashtags);
+        } else if (Array.isArray(payload.hashtags)) {
+          mergeHashtagsIntoAutocomplete(payload.hashtags);
         }
       }
       return resp;

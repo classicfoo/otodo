@@ -4,8 +4,27 @@ require_once 'line_rules.php';
 require_once 'date_formats.php';
 require_once 'text_expanders.php';
 
+function sanitize_redirect_target($candidate) {
+    if (!is_string($candidate)) {
+        return 'index.php';
+    }
+    $candidate = trim($candidate);
+    if ($candidate === '') {
+        return 'index.php';
+    }
+    if (preg_match('/^[a-z][a-z0-9+\-.]*:/i', $candidate) || strpos($candidate, '//') === 0) {
+        return 'index.php';
+    }
+    if ($candidate[0] === '/') {
+        return 'index.php';
+    }
+    return $candidate;
+}
+
+$redirect_target = sanitize_redirect_target($_GET['redirect'] ?? $_POST['redirect'] ?? 'index.php');
+
 if (isset($_SESSION['user_id'])) {
-    header('Location: index.php');
+    header('Location: ' . $redirect_target);
     exit();
 }
 
@@ -31,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['capitalize_sentences'] = isset($user['capitalize_sentences']) ? (int)$user['capitalize_sentences'] === 1 : true;
             $_SESSION['date_formats'] = decode_date_formats_from_storage($user['date_formats'] ?? '');
             $_SESSION['text_expanders'] = decode_text_expanders_from_storage($user['text_expanders'] ?? '');
-            header('Location: index.php');
+            header('Location: ' . $redirect_target);
             exit();
         } else {
             $error = 'Invalid credentials';
@@ -54,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="alert alert-danger"><?=$error?></div>
     <?php endif; ?>
     <form method="post" class="mb-3">
+        <input type="hidden" name="redirect" value="<?=htmlspecialchars($redirect_target, ENT_QUOTES)?>">
         <div class="mb-3">
             <label class="form-label">Username</label>
             <input type="text" name="username" class="form-control" required>
