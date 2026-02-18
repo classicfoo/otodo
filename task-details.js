@@ -518,7 +518,7 @@
       }
       const token = findCurrentToken();
       const tokenText = token.text || '';
-      if (!tokenText) {
+      if (!tokenText || tokenText.length < 2) {
         hideExpanderSuggestions();
         return;
       }
