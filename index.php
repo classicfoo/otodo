@@ -177,8 +177,7 @@ $task_hashtags = get_hashtags_for_tasks($db, (int)$_SESSION['user_id'], $task_id
             border-radius: 0.5rem;
             box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
             z-index: 1080;
-            width: max-content;
-            min-width: 220px;
+            width: 220px;
             max-width: calc(100vw - 16px);
             overflow: hidden;
         }
